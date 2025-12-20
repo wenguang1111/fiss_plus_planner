@@ -1,0 +1,55 @@
+[project]
+name = "fiss_plus_planner"
+version = "0.1.0"
+description = "Planning project that wraps fiss, reactive planner, and CVAE planning"
+authors = [
+    {name = "Kareem Mohamed",email = "kareemmagdy420@gmail.com"}
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+
+ipywidgets = "*"
+matplotlib = ">=2.2.2,<3.8"
+networkx = ">=2.2"
+numpy = ">=1.22"
+methodtools = "^0.4.5"
+omegaconf = ">=2.1.1"
+scipy = ">=1.5.2"
+imageio = ">=2.13.5"
+triangle = ">=20230923"
+
+commonroad-route-planner = "=2024.1.1"
+commonroad-io = "=2024.1"
+commonroad-drivability-checker = "=2024.1"
+commonroad_vehicle_models = "=3.0.2"
+commonroad-reactive-planner = "=2024.1"
+
+torch = "^2.8.0"
+torchvision = "^0.23.0"
+pandas = "^2.3.1"
+scikit-learn = ">=1.4.2"
+pyarrow = ">=15.0.0"
+fastparquet = ">=2024.2.0"
+torchinfo = "^1.8.0"
+torchviz = "^0.0.3"
+tensorboard = "^2.20.0"
+tensorboardx = "^2.6.4"
+opencv-python = "4.6.0.66"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=2.2.1"
+
+[tool.poetry.group.tests]
+optional = true
+
+[tool.poetry.group.tests.dependencies]
+pytest = ">=6.2.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
