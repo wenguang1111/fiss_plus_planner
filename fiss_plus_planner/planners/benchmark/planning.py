@@ -85,20 +85,20 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     if method == 'FOP':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
-        planner = FrenetOptimalPlanner(planner_settings, vehicle, scenario)
+        planner = FrenetOptimalPlanner(planner_settings, vehicle)
     elif method == 'FOP+':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
-        planner = FopPlusPlanner(planner_settings, vehicle, scenario)
+        planner = FopPlusPlanner(planner_settings, vehicle)
     elif method == 'FISS':
         planner_settings = FissPlannerSettings(num_width, num_speed, num_t)
-        planner = FissPlanner(planner_settings, vehicle, scenario)
+        planner = FissPlanner(planner_settings, vehicle)
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
-        planner = FissPlusPlanner(planner_settings, vehicle, scenario)
+        planner = FissPlusPlanner(planner_settings, vehicle)
     elif method == 'SPARSE':
         planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
-        planner = SparsePlanner(planner_settings, vehicle, scenario)
+        planner = SparsePlanner(planner_settings, vehicle)
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
