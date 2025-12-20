@@ -2,6 +2,7 @@ from queue import PriorityQueue
 
 from commonroad.scenario.obstacle import Obstacle
 from commonroad.scenario.scenario import Scenario
+from commonroad.scenario.state import InitialState
 
 from planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from planners.common.vehicle.vehicle import Vehicle
@@ -9,11 +10,11 @@ from planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalP
 
 
 class FopPlusPlanner(FrenetOptimalPlanner):
-    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, scenario: Scenario=None):
-        super().__init__(planner_settings, ego_vehicle, scenario)
+    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle):
+        super().__init__(planner_settings, ego_vehicle)
         self.candidate_trajs = PriorityQueue()
 
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list[Obstacle], time_step_now: int = 0) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list[Obstacle], time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         # reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed

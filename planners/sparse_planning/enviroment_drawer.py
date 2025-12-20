@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 from typing import Iterable, List
+from PIL import Image
+import io
 
 import matplotlib.pyplot as plt
 from commonroad.common.file_reader import CommonRoadFileReader
@@ -14,9 +16,9 @@ from commonroad.prediction.prediction import TrajectoryPrediction
 class EnviromentDrawer:
     """Render CommonRoad scenarios to image files."""
 
-    def __init__(self, scenario_dir: str | Path, save_dir: str | Path, scenario_name: str,):
+    def __init__(self, scenario_name: str, scenario_dir: str | Path, save_dir: str | Path = None):
+        self.save_dir = Path(save_dir) if save_dir is not None else None
         self.scenario_dir = Path(scenario_dir)
-        self.save_dir = Path(save_dir)
         self.scenario_name = scenario_name
         self.ego_params = DynamicObstacleParams()
         self.ego_params.vehicle_shape.occupancy.shape.facecolor = "#ff0000"
@@ -28,9 +30,7 @@ class EnviromentDrawer:
         self.shape = Rectangle(width=1.8, length=4.3)
         self.scenario, _ = CommonRoadFileReader(os.path.join(self.scenario_dir, self.scenario_name) + ".xml").open()
 
-    def save_single_time_step(self, ego_state: State, ego_trajectory: TrajectoryPrediction, time_step: int) -> Path:
-        """Render one time step and save as PNG."""
-        # genearate only figure around ego vehicle
+    def generate_image_at_time_step(self, time_step: int, ego_state: State, ego_trajectory: TrajectoryPrediction = None) -> bytes:
         if self.ego_id == None:
             self.ego_id = self.scenario.generate_object_id()
 
@@ -59,11 +59,25 @@ class EnviromentDrawer:
 
         plt.gca().set_aspect("equal")
         renderer.render()
+        buf = io.BytesIO()
+        fig = plt.gcf()
+        fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0, dpi=300)
+        plt.close(fig)
+        return buf.getvalue()
 
-        output_dir = self.save_dir / self.scenario_name
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"time_step_{time_step}.png"
-        plt.savefig(output_path, bbox_inches="tight", pad_inches=0, dpi=300)
+    def save_single_time_step(self, time_step: int, ego_state: State, ego_trajectory: TrajectoryPrediction = None) -> Path:
+        """Render one time step and save as PNG."""
+        # genearate only figure around ego vehicle
+        png_bytes = self.generate_image_at_time_step(time_step, ego_state, ego_trajectory)
+
+        if  self.save_dir is None:
+            raise ValueError("save_dir is None, cannot save PNG to disk. Check the EnviromentDrawer initialization.")
+        else:
+            output_dir = self.save_dir / self.scenario_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"time_step_{time_step}.png"
+            output_path.write_bytes(png_bytes)
+            return output_path
 
 #----------------------------- Example Usage -----------------------#
 from commonroad.scenario.state import InitialState
@@ -74,7 +88,7 @@ def main():
     scenario_dir = "/home/wenguang/workplace/test/wenguang/fiss_plus_planner/data/demo"
     save_dir = "/home/wenguang/workplace/test/wenguang/fiss_plus_planner/data/output/"
     scenario_name = "ARG_Carcarana-1_2_T-1"
-    drawer = EnviromentDrawer(scenario_dir, save_dir, scenario_name)
+    drawer = EnviromentDrawer(scenario_name, scenario_dir, save_dir)
     scenario, planning_problem_set = CommonRoadFileReader(os.path.join(scenario_dir, scenario_name) + ".xml").open()
 
     planning_problem = next(iter(planning_problem_set.planning_problem_dict.values()))
@@ -89,7 +103,8 @@ def main():
         )
         traj = Trajectory(initial_time_step=time_step, state_list=[new_state])
         trajectory_prediction = TrajectoryPrediction(trajectory=traj, shape=Rectangle(length=1.0, width=1.0))
-        drawer.save_single_time_step(new_state, trajectory_prediction, time_step)
+        # drawer.save_single_time_step(new_state, trajectory_prediction, time_step)
+        drawer.save_single_time_step(time_step, new_state, trajectory_prediction)
 
 
 if __name__ == "__main__":

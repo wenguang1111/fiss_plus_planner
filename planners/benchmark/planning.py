@@ -15,6 +15,7 @@ from commonroad.scenario.scenario import Scenario
 from commonroad.scenario.state import CustomState
 from commonroad.scenario.trajectory import Trajectory
 from commonroad.visualization.mp_renderer import MPRenderer
+from commonroad.scenario.state import InitialState
 from commonroad_dc.feasibility.vehicle_dynamics import VehicleParameterMapping
 from matplotlib.collections import LineCollection
 from omegaconf import DictConfig
@@ -27,12 +28,13 @@ from planners.fiss_planner import FissPlanner, FissPlannerSettings
 from planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from planners.fop_plus_planner import FopPlusPlanner
 from planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
+from planners.sparse_planner import SparsePlanner, SparsePlannerSettings
 from SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from SMP.motion_planner.utility import create_trajectory_from_list_states
 
 
-def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple):
+def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str):
     # Plan a global route
     global_planner = GlobalPlanner()
     global_plan = global_planner.plan_global_route(scenario, planning_problem)
@@ -94,6 +96,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusPlanner(planner_settings, vehicle, scenario)
+    elif method == 'SPARSE':
+        planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlanner(planner_settings, vehicle, scenario)
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
@@ -123,7 +128,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         # Plan!
         start_time = time.time()
         best_traj_ego = planner.plan(
-            current_frenet_state, max_speed, obstacles_all, i)
+            current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
         processing_time += (end_time - start_time)
         stats += planner.stats
@@ -136,6 +141,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         current_state = best_traj_ego.state_at_time_step(next_step_idx)
         current_frenet_state = best_traj_ego.frenet_state_at_time_step(
             next_step_idx)
+        #TODO: Adapated code from sparse planner to get cartesian vehicle state for sampling 
+        initial_state = CustomState(position = np.array([best_traj_ego.x[next_step_idx], best_traj_ego.y[next_step_idx]]),
+                                             velocity = best_traj_ego.ds[next_step_idx],
+                                             orientation = best_traj_ego.yaw[next_step_idx],
+                                             time_step = i).convert_state_to_state(InitialState())
+        
         state = CustomState(**{'time_step': i,
                                'position': np.array([current_state.x, current_state.y]),
                                'orientation': current_state.yaw,
@@ -312,7 +323,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
                 scenario, planning_problem, vehicle_params)
         else:
             _, ego_vehicle_trajectory, _, time_list, _, fplist = frenet_optimal_planning(
-                scenario, planning_problem, vehicle_params, method, num_samples)
+                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file)
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

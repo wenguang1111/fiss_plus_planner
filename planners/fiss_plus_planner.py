@@ -4,6 +4,7 @@ from queue import PriorityQueue
 
 import numpy as np
 from commonroad.scenario.scenario import Scenario
+from commonroad.scenario.state import InitialState
 
 from planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from planners.common.scenario.frenet import FrenetState, FrenetTrajectory
@@ -22,8 +23,8 @@ class FissPlusPlannerSettings(FissPlannerSettings):
         self.decaying_factor = 0.5
 
 class FissPlusPlanner(FissPlanner):
-    def __init__(self, planner_settings: FissPlusPlannerSettings, ego_vehicle: Vehicle, scenario: Scenario=None):
-        super().__init__(planner_settings, ego_vehicle, scenario)
+    def __init__(self, planner_settings: FissPlusPlannerSettings, ego_vehicle: Vehicle):
+        super().__init__(planner_settings, ego_vehicle)
         self.frontier_idxs = PriorityQueue()
         self.refined_trajs = PriorityQueue()
         
@@ -58,7 +59,7 @@ class FissPlusPlanner(FissPlanner):
         
         return is_local_minimum, best_idx
     
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         t_start = time.time()
         
         # Reset values for each planning cycle

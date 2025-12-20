@@ -3,6 +3,7 @@ from queue import PriorityQueue
 
 import numpy as np
 from commonroad.scenario.scenario import Scenario
+from commonroad.scenario.state import InitialState
 
 from planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from planners.common.scenario.frenet import FrenetState, FrenetTrajectory
@@ -18,8 +19,8 @@ class FissPlannerSettings(FrenetOptimalPlannerSettings):
         self.vis_all_candidates = False
         
 class FissPlanner(FrenetOptimalPlanner):
-    def __init__(self, planner_settings: FissPlannerSettings, ego_vehicle: Vehicle, scenario: Scenario=None):
-        super().__init__(planner_settings, ego_vehicle, scenario)
+    def __init__(self, planner_settings: FissPlannerSettings, ego_vehicle: Vehicle):
+        super().__init__(planner_settings, ego_vehicle)
         self.sampling_res = np.empty(3)
         self.sampling_min = np.empty(3)
         self.sampling_max = np.empty(3)
@@ -187,7 +188,7 @@ class FissPlanner(FrenetOptimalPlanner):
 
             return False, next_idx
     
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         # Reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed

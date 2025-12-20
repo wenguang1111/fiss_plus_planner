@@ -3,6 +3,7 @@ import math
 
 import numpy as np
 from commonroad.scenario.scenario import Scenario
+from commonroad.scenario.state import InitialState
 from shapely import Polygon, affinity
 
 from planners.common.cost.cost_function import CostFunction
@@ -56,13 +57,14 @@ class FrenetOptimalPlannerSettings(object):
         self.check_boundary = True          # True if check collison with road boundaries
 
 class FrenetOptimalPlanner(object):
-    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, scenario: Scenario=None):
+    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle):
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
         self.cubic_spline = None
         self.best_traj = None
         self.all_trajs = []
+        
         # Statistics
         self.stats = Stats()
 
@@ -244,7 +246,7 @@ class FrenetOptimalPlanner(object):
 
     #     return passed
     
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         # reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed
