@@ -54,22 +54,15 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         print(
             f"    Scenario has no speed interval, using {min_speed}, {max_speed} m/s")
 
-    goal_lanelet_idx = goal_region.lanelets_of_goal_position[0][0]
-    goal_lanelet = scenario.lanelet_network.find_lanelet_by_id(
-        goal_lanelet_idx)
-    center_vertices = goal_lanelet.center_vertices
-    mid_idx = int((center_vertices.shape[0] - 1)/2)
-    goal_center = center_vertices[mid_idx]
-    # goal_polygon = goal_lanelet.polygon().shapely_object
-    # print("goal_center", goal_center)
-
     # Obstacle lists
     obstacles_static = scenario.static_obstacles
     obstacles_dynamic = scenario.dynamic_obstacles
     obstacles_all = obstacles_static + obstacles_dynamic
 
     obstacle_positions = []
-    final_time_step = scenario.dynamic_obstacles[0].prediction.final_time_step
+    obstacles_final_time_step = [obs.prediction.final_time_step for obs in scenario.dynamic_obstacles]
+    final_time_step = max(obstacles_final_time_step)
+
     for t_step in range(final_time_step):
         frame_positions = []
         # frame_obstacles = []
@@ -142,10 +135,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         current_frenet_state = best_traj_ego.frenet_state_at_time_step(
             next_step_idx)
         #TODO: Adapated code from sparse planner to get cartesian vehicle state for sampling 
-        initial_state = CustomState(position = np.array([best_traj_ego.x[next_step_idx], best_traj_ego.y[next_step_idx]]),
-                                             velocity = best_traj_ego.ds[next_step_idx],
-                                             orientation = best_traj_ego.yaw[next_step_idx],
-                                             time_step = i).convert_state_to_state(InitialState())
+        # initial_state = CustomState(position = np.array([best_traj_ego.x[next_step_idx], best_traj_ego.y[next_step_idx]]),
+        #                                      velocity = best_traj_ego.ds[next_step_idx],
+        #                                      orientation = best_traj_ego.yaw[next_step_idx],
+        #                                      time_step = i).convert_state_to_state(InitialState())
         
         state = CustomState(**{'time_step': i,
                                'position': np.array([current_state.x, current_state.y]),
@@ -156,21 +149,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                                })
         state_list.append(state)
         time_list.append(end_time - start_time)
-
-        # Verify if the goal has been reached
-        if goal_region.is_reached(state):
-            print("Goal Reached")
-            goal_reached = True
-            break
-        # if goal_polygon.contains_properly()
-        elif np.hypot(state.position[0] - goal_center[0], state.position[1] - goal_center[1]) <= vehicle.l/2:
-            print("    Goal Reached")
-            goal_reached = True
-            break
-        elif np.hypot(state.position[0] - ref_ego_lane_pts[-1, 0], state.position[1] - ref_ego_lane_pts[-1, 1]) <= 3.0:
-            print("    Reaching End of the Map, Stopping, Goal Not Reached")
-            goal_reached = True
-            break
 
         if show_animation:  # pragma: no cover
             plt.cla()
