@@ -141,7 +141,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         current_state = best_traj_ego.state_at_time_step(next_step_idx)
         current_frenet_state = best_traj_ego.frenet_state_at_time_step(
             next_step_idx)
-        #TODO: Adapated code from sparse planner to get cartesian vehicle state for sampling 
+        #TODO: update initial_state for low speed scenarios
         dt = planner.settings.tick_t
         yaw = best_traj_ego.yaw
         buf_yaw_rate = np.diff(yaw, prepend=yaw[0]) / dt 
