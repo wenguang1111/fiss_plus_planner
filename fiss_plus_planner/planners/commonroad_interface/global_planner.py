@@ -3,8 +3,6 @@ import numpy as np
 from commonroad_route_planner.route_planner import RoutePlanner
 from commonroad_route_planner.utility.visualization import visualize_route
 from commonroad.scenario.scenario import Scenario
-# from commonroad.scenario.traffic_sign import SupportedTrafficSignCountry
-# from commonroad.scenario.traffic_sign_interpreter import TrafficSigInterpreter
 
 class GlobalPlan(object):
     def __init__(self):
@@ -19,7 +17,7 @@ class GlobalPlanner(object):
     
     #  NETWORKX: uses built-in functions from the networkx package, tends to change lane earlier
     #  PRIORITY_QUEUE: uses A-star search to find routes, lane change maneuver depends on the heuristic cost
-    def plan_global_route(self, scenario: Scenario, planning_problem, method: str = 'NETWORKX_REVERSED', plan_all_routes: bool = False, view_route: bool = False):
+    def plan_global_route(self, scenario: Scenario, planning_problem, view_route: bool = False):
         ''' Plan the global route for a given scenario and problem
         
         Parameters
@@ -27,43 +25,24 @@ class GlobalPlanner(object):
         
         `scenerio` (`commonroad.scenario.Scenerio`): the CommonRoad scenerio
         `planning_problem` (`commonroad.planning_problem.PlanningProblemSet`): the CommonRoad planning problem
-        `method` (`string`): the method used by the planner. Options: `'NETWORKX_REVERSED'`, `'NETWORKX'`, `'PRIORITY_QUEUE'`
-        `plan_all_routes` (`bool`): if all alternative routes are returned as well, default: `False`
 
         Returns
         -------
         (`commonroad_interface.global_planner.GlobalPlan`): planned global route information
         '''
-        if method == 'NETWORKX_REVERSED':
-            route_planner = RoutePlanner(scenario, planning_problem, backend=RoutePlanner.Backend.NETWORKX_REVERSED)
-        if method == 'NETWORKX':
-            route_planner = RoutePlanner(scenario, planning_problem, backend=RoutePlanner.Backend.NETWORKX)
-        if method == 'PRIORITY_QUEUE':
-            route_planner = RoutePlanner(scenario, planning_problem, backend=RoutePlanner.Backend.PRIORITY_QUEUE)
-
-        # plan routes, and save the routes in a route candidate holder
-        candidate_holder = route_planner.plan_routes()
         
-        # option 1: retrieve all routes
-        if plan_all_routes:
-            list_routes, num_route_candidates = candidate_holder.retrieve_all_routes()
-            # print(f"Number of route candidates: {num_route_candidates}")
-            # here we retrieve the first route in the list, this is equivalent to: route = list_routes[0]
-            route = candidate_holder.retrieve_first_route()
-        # option 2: retrieve the best route by orientation metric
-        else:
-            route = candidate_holder.retrieve_best_route_by_orientation()
+        # initialize the route planner
+        route_planner = RoutePlanner(scenario, planning_problem)
+
+        # plan routes, retrieve the first route
+        route = route_planner.plan_routes().retrieve_first_route()
         
         # Assemble the GlobalPlan
         global_plan = GlobalPlan()
         
         # generate the lanelet network
         llnet = scenario.lanelet_network
-        laneletlist = route.list_ids_lanelets
-        
-        # traffic_sign_interpreter = TrafficSigInterpreter(SupportedTrafficSignCountry.GERMANY, scenario.lanelet_network)
-        # self.speed_limits = traffic_sign_interpreter.speed_limit(route.list_ids_lanelets)
-        # self.required_speeds = traffic_sign_interpreter.required_speed(route.list_ids_lanelets)
+        laneletlist = route.lanelet_ids
         
         if len(llnet.find_lanelet_by_id(laneletlist[len(laneletlist)-1]).successor) != 0:
             lastlanelet = llnet.find_lanelet_by_id(laneletlist[len(laneletlist)-1]).successor[0]
