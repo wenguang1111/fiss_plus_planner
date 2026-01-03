@@ -1,5 +1,6 @@
 import copy
 import math
+import time
 
 from itertools import product
 import numpy as np
@@ -20,14 +21,16 @@ class Stats(object):
         self.num_trajs_generated = 0
         self.num_trajs_validated = 0
         self.num_collison_checks = 0
-        # self.best_traj_costs = [] # float("inf")
+        self.runtime_plan = 0.0
+        self.step_number = 0
+        self.best_traj_costs = [] # float("inf")
+        self.average_cost = 0.0
         
     def __add__(self, other):
         self.num_iter += other.num_iter
         self.num_trajs_generated += other.num_trajs_generated
         self.num_trajs_validated += other.num_trajs_validated
         self.num_collison_checks += other.num_collison_checks
-        # self.best_traj_costs.extend(other.best_traj_costs)
         return self
     
     def average(self, value: int):
@@ -35,6 +38,9 @@ class Stats(object):
         self.num_trajs_generated /= value
         self.num_trajs_validated /= value
         self.num_collison_checks /= value
+        self.runtime_plan /= value
+        if len(self.best_traj_costs) > 0:
+            self.average_cost = np.mean(self.best_traj_costs)
         return self
     
 class FrenetOptimalPlannerSettings(object):
@@ -119,7 +125,7 @@ class FrenetOptimalPlanner(object):
             
         self.all_trajs.append(traj_per_timestep)
         
-        print(f"Generated {len(frenet_paths)} frenet paths.")
+        # print(f"Generated {len(frenet_paths)} frenet paths.")
 
         return frenet_paths
 
@@ -214,17 +220,20 @@ class FrenetOptimalPlanner(object):
 
         return False, num_polys
     
+
     def check_collisions(self, trajs: list, obstacles: list, time_step_now: int = 0) -> list:
         passed = []
-
+        #TODO: print the runtime with number of total trajectories
+        # time_s = time.time()
         for i, traj in enumerate(trajs):
             # Collision check
-            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
+            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 1)
             if collision:
                 continue
 
             passed.append(i)
-
+        # time_s = time.time() - time_s
+        # print(f"Collision checking time for {len(trajs)} trajectories: {time_s:.4f}s, avg {time_s/len(trajs):.6f}s per trajectory, total polygons checked: {num_polys}")
         return [trajs[i] for i in passed]
     
     # def check_collisions(self, trajs: list[FrenetTrajectory], time_step_now: int = 0) -> list[FrenetTrajectory]:
@@ -275,10 +284,10 @@ class FrenetOptimalPlanner(object):
         self.stats.num_trajs_validated = len(fplist)
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
-        print(len(fplist), "trajectories passed constraint check")
+        # print(len(fplist), "trajectories passed constraint check")
         fplist = self.check_collisions(fplist, obstacles, time_step_now)
         # fplist = self.check_collisions(fplist, time_step_now)
-        print(len(fplist), "trajectories passed collision check")
+        # print(len(fplist), "trajectories passed collision check")
 
         # find minimum cost path
         min_cost = float("inf")
@@ -286,7 +295,7 @@ class FrenetOptimalPlanner(object):
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final
                 self.best_traj = fp
-
+                        
         return self.best_traj
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):

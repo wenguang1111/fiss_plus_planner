@@ -118,7 +118,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     for i in range(final_time_step):
         num_cycles += 1
         
-        print(f"Time step {i}:")
+        # print(f"Time step {i}:")
 
         # Plan!
         start_time = time.time()
@@ -126,6 +126,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
         processing_time += (end_time - start_time)
+        stats.runtime_plan = processing_time
+        stats.best_traj_costs.append(best_traj_ego.cost_final)
         stats += planner.stats
 
         if best_traj_ego is None:
@@ -186,6 +188,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
     # print("Success!")
     avg_processing_time = processing_time / num_cycles
+    stats.step_number = num_cycles
     stats.average(num_cycles)
 
     if show_animation and best_traj_ego is not None:  # pragma: no cover
@@ -306,9 +309,12 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
             _, ego_vehicle_trajectory, _, time_list = informed_planning(
                 scenario, planning_problem, vehicle_params)
         else:
-            _, ego_vehicle_trajectory, _, time_list, _, fplist = frenet_optimal_planning(
+            _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file)
 
+        print("average runtime for ", measurment.step_number,"steps is ", measurment.runtime_plan, "s and have ", 
+              measurment.num_trajs_generated, "trajectories generated and", measurment.num_trajs_validated, "trajectories validated and",
+              measurment.num_collison_checks, "collision checks. Average cost is ", measurment.average_cost, " and max cost is ", max(measurment.best_traj_costs))  
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
             raise RuntimeError
