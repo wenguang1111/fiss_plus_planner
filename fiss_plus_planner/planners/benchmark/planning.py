@@ -28,7 +28,7 @@ from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSett
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
-from fiss_plus_planner.planners.cvae_planner import CVAEPlanner, CVAEPlannerSettings
+from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
@@ -89,9 +89,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusPlanner(planner_settings, vehicle)
-    elif method == 'CVAE':
-        planner_settings = CVAEPlannerSettings(num_width, num_speed, num_t, input_dir, file)
-        planner = CVAEPlanner(planner_settings, vehicle)
+    elif method == 'Sparse':
+        planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlanner(planner_settings, vehicle)
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
@@ -100,6 +100,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
     # Initial state
     initial_state = planning_problem.initial_state
+    print(initial_state)
     start_state = State(t=0.0, x=initial_state.position[0], y=initial_state.position[1],
                         yaw=initial_state.orientation, v=initial_state.velocity, a=initial_state.acceleration)
     current_frenet_state = FrenetState()
@@ -141,12 +142,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         #TODO: update initial_state for low speed scenarios
         dt = planner.settings.tick_t
         yaw = best_traj_ego.yaw
-        buf_yaw_rate = np.diff(yaw, prepend=yaw[0]) / dt 
-        initial_state = CustomState(position = np.array([best_traj_ego.x[next_step_idx], best_traj_ego.y[next_step_idx]]),
-                                             velocity = best_traj_ego.ds[next_step_idx],
-                                             orientation = best_traj_ego.yaw[next_step_idx],
-                                             yaw_rate = buf_yaw_rate[next_step_idx],
-                                             time_step = i).convert_state_to_state(InitialState())
+        buf_yaw_rate = np.diff(yaw, prepend=yaw[0]) / dt
+
+        initial_state = InitialState(
+            time_step=i,
+            position=np.array([current_state.x, current_state.y]),
+            orientation=current_state.yaw,
+            velocity=current_state.v,
+            acceleration=current_state.a,
+            yaw_rate=buf_yaw_rate[next_step_idx]
+        )
         
         state = CustomState(**{'time_step': i,
                                'position': np.array([current_state.x, current_state.y]),
