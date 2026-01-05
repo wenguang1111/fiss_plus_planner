@@ -14,15 +14,17 @@ if __name__ == '__main__':
     with open(args.cfg_file, 'r') as file:
         cfg = yaml.safe_load(file)
         file.close()
+
+    save_measurments = cfg['SAVE_MEASUREMENTS']
         
     output_dir = os.path.join(os.getcwd(), cfg['OUTPUT_DIR'])
     input_dir = os.path.join(os.getcwd(), cfg['INPUT_DIR'])
-    
+    measurements = []
     if cfg['FILES']:
         # Only run the specified scenario files under the input directory
         for i, file in enumerate(cfg['FILES']):
-            planning(cfg, output_dir, input_dir, file)
+            measurement = planning(cfg, output_dir, input_dir, file)
     else:
         # Read all scenario files under the input directory
         for i, file in enumerate(os.listdir(input_dir)):
-            planning(cfg, output_dir, input_dir, file)
+            measurement = planning(cfg, output_dir, input_dir, file)

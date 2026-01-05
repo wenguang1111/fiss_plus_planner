@@ -227,7 +227,7 @@ class FrenetOptimalPlanner(object):
         # time_s = time.time()
         for i, traj in enumerate(trajs):
             # Collision check
-            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 1)
+            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
             if collision:
                 continue
 

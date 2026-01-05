@@ -448,4 +448,4 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
                        append_images=images[1:], optimize=True, duration=100, loop=0)
         print("Gif saved to:", gif_filepath)
 
-    return
+    return measurment
