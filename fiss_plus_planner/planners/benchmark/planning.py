@@ -126,14 +126,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         best_traj_ego = planner.plan(
             current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
-        processing_time += (end_time - start_time)
-        stats.runtime_plan = processing_time
+        if best_traj_ego is None:
+            stats.time_step_have_to_break = i
+            break
+
+        processing_time = (end_time - start_time)
+        stats.runtime_history.append(processing_time)
+        stats.average_runtime += processing_time
         stats.best_traj_costs.append(best_traj_ego.cost_final)
         stats += planner.stats
 
-        if best_traj_ego is None:
-            # print("No solution available for problem:", file)
-            break
         # Update and record the vehicle's trajectory
         next_step_idx = 1
         current_state = best_traj_ego.state_at_time_step(next_step_idx)
@@ -317,9 +319,6 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file)
 
-        print("average runtime for ", measurment.step_number,"steps is ", measurment.runtime_plan, "s and have ", 
-              measurment.num_trajs_generated, "trajectories generated and", measurment.num_trajs_validated, "trajectories validated and",
-              measurment.num_collison_checks, "collision checks. Average cost is ", measurment.average_cost, " and max cost is ", max(measurment.best_traj_costs))  
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
             raise RuntimeError

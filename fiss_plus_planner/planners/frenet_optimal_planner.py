@@ -21,10 +21,12 @@ class Stats(object):
         self.num_trajs_generated = 0
         self.num_trajs_validated = 0
         self.num_collison_checks = 0
-        self.runtime_plan = 0.0
+        self.average_runtime = 0.0
         self.step_number = 0
         self.best_traj_costs = [] # float("inf")
         self.average_cost = 0.0
+        self.runtime_history = []
+        self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
         
     def __add__(self, other):
         self.num_iter += other.num_iter
@@ -38,7 +40,7 @@ class Stats(object):
         self.num_trajs_generated /= value
         self.num_trajs_validated /= value
         self.num_collison_checks /= value
-        self.runtime_plan /= value
+        self.average_runtime /= value
         if len(self.best_traj_costs) > 0:
             self.average_cost = np.mean(self.best_traj_costs)
         return self
