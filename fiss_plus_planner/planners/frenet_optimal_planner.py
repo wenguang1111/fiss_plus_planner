@@ -99,7 +99,8 @@ class FrenetOptimalPlanner(object):
             
             di, tv, Ti = s
             
-            Ti = max(Ti, self.settings.tick_t)  # ensure Ti is at least tick_t (temporary, these are not cvae dataset scenarios)
+            # FIXME: ensure Ti is at least tick_t (temporary, these are not cvae dataset scenarios)
+            Ti = max(Ti, self.settings.tick_t)
             
             fp = FrenetTrajectory()
             

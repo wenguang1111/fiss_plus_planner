@@ -28,7 +28,7 @@ from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSett
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
-from fiss_plus_planner.planners.cvae_planner import CVAEPlanner, CVAEPlannerSettings
+from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
@@ -89,9 +89,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusPlanner(planner_settings, vehicle)
-    elif method == 'CVAE':
-        planner_settings = CVAEPlannerSettings(num_width, num_speed, num_t, input_dir, file)
-        planner = CVAEPlanner(planner_settings, vehicle)
+    elif method == 'Sparse':
+        planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlanner(planner_settings, vehicle)
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError

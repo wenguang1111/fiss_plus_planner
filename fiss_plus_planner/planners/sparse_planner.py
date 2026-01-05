@@ -16,8 +16,8 @@ from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynom
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
-from fiss_plus_planner.planners.cvae_planning.scenario_drawer import ScenarioDrawer
-from fiss_plus_planner.planners.cvae_planning.model import CVAE
+from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
+from fiss_plus_planner.planners.sparse_planning.model import CVAE
 
 # @dataclass
 # class ParameterSample:
@@ -27,7 +27,7 @@ from fiss_plus_planner.planners.cvae_planning.model import CVAE
 #     t: float       # time horizon
 
 
-class CVAEPlannerSettings(FrenetOptimalPlannerSettings):
+class SparsePlannerSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
         print(scenario_file, scenario_dir)
@@ -41,11 +41,11 @@ class CVAEPlannerSettings(FrenetOptimalPlannerSettings):
         self.device = "cpu"
         self.c_dim: int = 6 + 64
         current_dir = Path(__file__).parent
-        self.cvae_model_path = current_dir / Path("cvae_planning/cvae_weights/cvae_model_lr_0.0001_batch_1024_epochs_10_zdim_32_cos_0.05_stall_end.pth")
+        self.cvae_model_path = current_dir / Path("sparse_planning/cvae_weights/cvae_model_lr_0.0001_batch_1024_epochs_10_zdim_32_cos_0.05_stall_end.pth")
         
-class CVAEPlanner(FrenetOptimalPlanner):
+class SparsePlanner(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
-    def __init__(self, planner_settings: CVAEPlannerSettings, ego_vehicle: Vehicle):
+    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle):
         super().__init__(planner_settings, ego_vehicle)
         self.cvae_model = CVAE(X_dim=3, 
                                    c_dim=planner_settings.c_dim, 
@@ -99,9 +99,9 @@ class CVAEPlanner(FrenetOptimalPlanner):
         self.stats.num_trajs_validated = len(fplist)
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
-        print(len(fplist), "trajectories passed constraint check")
+        # print(len(fplist), "trajectories passed constraint check")
         fplist = self.check_collisions(fplist, obstacles, time_step_now)
-        print(len(fplist), "trajectories passed collision check")
+        # print(len(fplist), "trajectories passed collision check")
 
         # find minimum cost path
         min_cost = float("inf")
