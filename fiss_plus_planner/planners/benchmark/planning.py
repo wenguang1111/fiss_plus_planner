@@ -28,7 +28,7 @@ from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSett
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
-from fiss_plus_planner.planners.sparse_planner import SparsePlanner, SparsePlannerSettings
+from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
@@ -54,22 +54,15 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         print(
             f"    Scenario has no speed interval, using {min_speed}, {max_speed} m/s")
 
-    goal_lanelet_idx = goal_region.lanelets_of_goal_position[0][0]
-    goal_lanelet = scenario.lanelet_network.find_lanelet_by_id(
-        goal_lanelet_idx)
-    center_vertices = goal_lanelet.center_vertices
-    mid_idx = int((center_vertices.shape[0] - 1)/2)
-    goal_center = center_vertices[mid_idx]
-    # goal_polygon = goal_lanelet.polygon().shapely_object
-    # print("goal_center", goal_center)
-
     # Obstacle lists
     obstacles_static = scenario.static_obstacles
     obstacles_dynamic = scenario.dynamic_obstacles
     obstacles_all = obstacles_static + obstacles_dynamic
 
     obstacle_positions = []
-    final_time_step = scenario.dynamic_obstacles[0].prediction.final_time_step
+    obstacles_final_time_step = [obs.prediction.final_time_step for obs in scenario.dynamic_obstacles]
+    final_time_step = max(obstacles_final_time_step)
+
     for t_step in range(final_time_step):
         frame_positions = []
         # frame_obstacles = []
@@ -96,7 +89,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusPlanner(planner_settings, vehicle)
-    elif method == 'SPARSE':
+    elif method == 'Sparse':
         planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
         planner = SparsePlanner(planner_settings, vehicle)
     else:
@@ -107,6 +100,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
     # Initial state
     initial_state = planning_problem.initial_state
+    print(initial_state)
     start_state = State(t=0.0, x=initial_state.position[0], y=initial_state.position[1],
                         yaw=initial_state.orientation, v=initial_state.velocity, a=initial_state.acceleration)
     current_frenet_state = FrenetState()
@@ -124,6 +118,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     goal_reached = False
     for i in range(final_time_step):
         num_cycles += 1
+        
+        # print(f"Time step {i}:")
 
         # Plan!
         start_time = time.time()
@@ -131,6 +127,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
         processing_time += (end_time - start_time)
+        stats.runtime_plan = processing_time
+        stats.best_traj_costs.append(best_traj_ego.cost_final)
         stats += planner.stats
 
         if best_traj_ego is None:
@@ -144,12 +142,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         #TODO: update initial_state for low speed scenarios
         dt = planner.settings.tick_t
         yaw = best_traj_ego.yaw
-        buf_yaw_rate = np.diff(yaw, prepend=yaw[0]) / dt 
-        initial_state = CustomState(position = np.array([best_traj_ego.x[next_step_idx], best_traj_ego.y[next_step_idx]]),
-                                             velocity = best_traj_ego.ds[next_step_idx],
-                                             orientation = best_traj_ego.yaw[next_step_idx],
-                                             yaw_rate = buf_yaw_rate[next_step_idx],
-                                             time_step = i).convert_state_to_state(InitialState())
+        buf_yaw_rate = np.diff(yaw, prepend=yaw[0]) / dt
+
+        initial_state = InitialState(
+            time_step=i,
+            position=np.array([current_state.x, current_state.y]),
+            orientation=current_state.yaw,
+            velocity=current_state.v,
+            acceleration=current_state.a,
+            yaw_rate=buf_yaw_rate[next_step_idx]
+        )
         
         state = CustomState(**{'time_step': i,
                                'position': np.array([current_state.x, current_state.y]),
@@ -160,21 +162,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                                })
         state_list.append(state)
         time_list.append(end_time - start_time)
-
-        # Verify if the goal has been reached
-        if goal_region.is_reached(state):
-            print("Goal Reached")
-            goal_reached = True
-            break
-        # if goal_polygon.contains_properly()
-        elif np.hypot(state.position[0] - goal_center[0], state.position[1] - goal_center[1]) <= vehicle.l/2:
-            print("    Goal Reached")
-            goal_reached = True
-            break
-        elif np.hypot(state.position[0] - ref_ego_lane_pts[-1, 0], state.position[1] - ref_ego_lane_pts[-1, 1]) <= 3.0:
-            print("    Reaching End of the Map, Stopping, Goal Not Reached")
-            goal_reached = True
-            break
 
         if show_animation:  # pragma: no cover
             plt.cla()
@@ -206,6 +193,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
     # print("Success!")
     avg_processing_time = processing_time / num_cycles
+    stats.step_number = num_cycles
     stats.average(num_cycles)
 
     if show_animation and best_traj_ego is not None:  # pragma: no cover
@@ -326,9 +314,12 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
             _, ego_vehicle_trajectory, _, time_list = informed_planning(
                 scenario, planning_problem, vehicle_params)
         else:
-            _, ego_vehicle_trajectory, _, time_list, _, fplist = frenet_optimal_planning(
+            _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file)
 
+        print("average runtime for ", measurment.step_number,"steps is ", measurment.runtime_plan, "s and have ", 
+              measurment.num_trajs_generated, "trajectories generated and", measurment.num_trajs_validated, "trajectories validated and",
+              measurment.num_collison_checks, "collision checks. Average cost is ", measurment.average_cost, " and max cost is ", max(measurment.best_traj_costs))  
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
             raise RuntimeError

@@ -1,6 +1,8 @@
 import copy
 import math
+import time
 
+from itertools import product
 import numpy as np
 from commonroad.scenario.scenario import Scenario
 from commonroad.scenario.state import InitialState
@@ -19,14 +21,16 @@ class Stats(object):
         self.num_trajs_generated = 0
         self.num_trajs_validated = 0
         self.num_collison_checks = 0
-        # self.best_traj_costs = [] # float("inf")
+        self.runtime_plan = 0.0
+        self.step_number = 0
+        self.best_traj_costs = [] # float("inf")
+        self.average_cost = 0.0
         
     def __add__(self, other):
         self.num_iter += other.num_iter
         self.num_trajs_generated += other.num_trajs_generated
         self.num_trajs_validated += other.num_trajs_validated
         self.num_collison_checks += other.num_collison_checks
-        # self.best_traj_costs.extend(other.best_traj_costs)
         return self
     
     def average(self, value: int):
@@ -34,6 +38,9 @@ class Stats(object):
         self.num_trajs_generated /= value
         self.num_trajs_validated /= value
         self.num_collison_checks /= value
+        self.runtime_plan /= value
+        if len(self.best_traj_costs) > 0:
+            self.average_cost = np.mean(self.best_traj_costs)
         return self
     
 class FrenetOptimalPlannerSettings(object):
@@ -67,41 +74,61 @@ class FrenetOptimalPlanner(object):
         
         # Statistics
         self.stats = Stats()
+        
+    def get_samples(self):
+        """ Get sampling parameters d, s_d, t """
+        
+        sampling_width = self.settings.max_road_width - self.vehicle.w
+        
+        d_samples = np.linspace(-sampling_width/2, sampling_width/2, self.settings.num_width)
+        s__samples = np.linspace(self.settings.lowest_speed, self.settings.highest_speed, self.settings.num_speed)
+        t_samples = np.linspace(self.settings.min_t, self.settings.max_t, self.settings.num_t)
+        
+        samples = list(product(d_samples, s__samples, t_samples))
+        
+        return samples
 
-    def calc_frenet_paths(self, frenet_state: FrenetState) -> list:
+    def calc_frenet_paths(self, frenet_state: FrenetState, samples = None) -> list:
         frenet_paths = []
 
-        sampling_width = self.settings.max_road_width - self.vehicle.w
-        # lateral sampling
+        if samples is None:
+            samples = self.get_samples()
+        
         traj_per_timestep = []
-        for di in np.linspace(-sampling_width/2, sampling_width/2, self.settings.num_width):
+        for s in samples:
+            
+            di, tv, Ti = s
+            
+            # FIXME: ensure Ti is at least tick_t (temporary, these are not cvae dataset scenarios)
+            Ti = max(Ti, self.settings.tick_t)
+            
+            fp = FrenetTrajectory()
+            
+            # lateral trajectory
+            lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
+            fp.t = [t for t in np.arange(0.0, Ti, self.settings.tick_t)]
+            fp.d = [lat_qp.calc_point(t) for t in fp.t]
+            fp.d_d = [lat_qp.calc_first_derivative(t) for t in fp.t]
+            fp.d_dd = [lat_qp.calc_second_derivative(t) for t in fp.t]
+            fp.d_ddd = [lat_qp.calc_third_derivative(t) for t in fp.t]
 
-            # time sampling
-            for Ti in np.linspace(self.settings.min_t, self.settings.max_t, self.settings.num_t):
-                fp = FrenetTrajectory()
-                
-                lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
-                fp.t = [t for t in np.arange(0.0, Ti, self.settings.tick_t)]
-                fp.d = [lat_qp.calc_point(t) for t in fp.t]
-                fp.d_d = [lat_qp.calc_first_derivative(t) for t in fp.t]
-                fp.d_dd = [lat_qp.calc_second_derivative(t) for t in fp.t]
-                fp.d_ddd = [lat_qp.calc_third_derivative(t) for t in fp.t]
-
-                # longitudinal sampling
-                for tv in np.linspace(self.settings.lowest_speed, self.settings.highest_speed, self.settings.num_speed):
-                    tfp = copy.deepcopy(fp)
-                    
-                    lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, frenet_state.s_dd, tv, 0.0, Ti)
-                    tfp.s = [lon_qp.calc_point(t) for t in fp.t]
-                    tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
-                    tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
-                    tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
-                    
-                    # Compute the final cost
-                    tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
-                    frenet_paths.append(tfp)
-                    traj_per_timestep.append(tfp)
+            tfp = copy.deepcopy(fp)
+            
+            # longitudinal trajectory
+            lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, frenet_state.s_dd, tv, 0.0, Ti)
+            tfp.s = [lon_qp.calc_point(t) for t in fp.t]
+            tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
+            tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
+            tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
+            
+            # Compute the final cost
+            tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
+            frenet_paths.append(tfp)
+            traj_per_timestep.append(tfp)
+            
         self.all_trajs.append(traj_per_timestep)
+        
+        # print(f"Generated {len(frenet_paths)} frenet paths.")
 
         return frenet_paths
 
@@ -196,17 +223,20 @@ class FrenetOptimalPlanner(object):
 
         return False, num_polys
     
+
     def check_collisions(self, trajs: list, obstacles: list, time_step_now: int = 0) -> list:
         passed = []
-
+        #TODO: print the runtime with number of total trajectories
+        # time_s = time.time()
         for i, traj in enumerate(trajs):
             # Collision check
-            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
+            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 1)
             if collision:
                 continue
 
             passed.append(i)
-
+        # time_s = time.time() - time_s
+        # print(f"Collision checking time for {len(trajs)} trajectories: {time_s:.4f}s, avg {time_s/len(trajs):.6f}s per trajectory, total polygons checked: {num_polys}")
         return [trajs[i] for i in passed]
     
     # def check_collisions(self, trajs: list[FrenetTrajectory], time_step_now: int = 0) -> list[FrenetTrajectory]:
@@ -268,7 +298,7 @@ class FrenetOptimalPlanner(object):
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final
                 self.best_traj = fp
-
+                        
         return self.best_traj
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
