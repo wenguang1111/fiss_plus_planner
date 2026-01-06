@@ -25,10 +25,12 @@ if __name__ == '__main__':
         # Only run the specified scenario files under the input directory
         for i, file in enumerate(cfg['FILES']):
             measurement = planning(cfg, output_dir, input_dir, file)
+            measurements.append((file, measurement))
     else:
         # Read all scenario files under the input directory
         for i, file in enumerate(os.listdir(input_dir)):
             measurement = planning(cfg, output_dir, input_dir, file)
+            measurements.append((file, measurement))
     
     if save_measurments:
         os.makedirs(measurement_dir, exist_ok=True)
@@ -36,7 +38,7 @@ if __name__ == '__main__':
         with open(csv_path, 'w', newline='') as csv_file:
             csv_file.write(
                 'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                'num_collision_checks,average_cost,max_cost, step_number_for_break\n'
+                'num_collision_checks,average_cost,max_cost, step_number_for_break, success\n'
             )
             for file, measurement in measurements:
                 if measurement is None:
@@ -46,5 +48,5 @@ if __name__ == '__main__':
                 csv_file.write(
                     f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
                     f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-                    f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break}\n'
+                    f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success}\n'
                 )

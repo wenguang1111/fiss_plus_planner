@@ -1,7 +1,7 @@
 OUTPUT_DIR: "data/output/"
 MEASUREMENTS_DIR: "data/measurements/"
 INPUT_DIR: "data/demo/"
-FILES: ["DEU_Lohmar-15_1_T-1_tranformed.xml"] # empty by default if you want to run all the scenario files under the input directory
+FILES: [] # empty by default if you want to run all the scenario files under the input directory
 
 PLANNER: "FISS+" # the name of the planner to be used, can be: FOP, FOP+, FISS, FISS+, Sparse
 N_W_SAMPLE: 5 # number of lateral offset samples

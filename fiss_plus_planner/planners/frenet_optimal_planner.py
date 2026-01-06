@@ -27,6 +27,7 @@ class Stats(object):
         self.average_cost = 0.0
         self.runtime_history = []
         self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
+        self.success = False
         
     def __add__(self, other):
         self.num_iter += other.num_iter

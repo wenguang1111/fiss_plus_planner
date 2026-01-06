@@ -194,6 +194,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             #     raise BaseException
 
     # print("Success!")
+    stats.success = True
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)
