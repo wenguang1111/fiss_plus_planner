@@ -21,6 +21,7 @@ if __name__ == '__main__':
     input_dir = os.path.join(os.getcwd(), cfg['INPUT_DIR'])
     measurement_dir = os.path.join(os.getcwd(), cfg['MEASUREMENTS_DIR'])
     measurements = []
+    name_planner = cfg['PLANNER']
     if cfg['FILES']:
         # Only run the specified scenario files under the input directory
         for i, file in enumerate(cfg['FILES']):
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     
     if save_measurments:
         os.makedirs(measurement_dir, exist_ok=True)
-        csv_path = os.path.join(measurement_dir, 'measurements.csv')
+        csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + '.csv')
         with open(csv_path, 'w', newline='') as csv_file:
             csv_file.write(
                 'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
