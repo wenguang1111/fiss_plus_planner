@@ -32,6 +32,8 @@ from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, Spa
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
+from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
+
 
 
 def frenet_optimal_planning(scenario: Scenario, 
@@ -125,7 +127,7 @@ def frenet_optimal_planning(scenario: Scenario,
     for i in range(final_time_step):
         num_cycles += 1
         
-        # print(f"Time step {i}:")
+        print(f"Time step {i}:")
 
         # Plan!
         start_time = time.time()
@@ -169,14 +171,7 @@ def frenet_optimal_planning(scenario: Scenario,
             yaw_rate=buf_yaw_rate[next_step_idx]
         )
         
-        state = CustomState(**{'time_step': i,
-                               'position': np.array([current_state.x, current_state.y]),
-                               'orientation': current_state.yaw,
-                               'velocity': current_frenet_state.s_d,
-                               'velocity_y': current_frenet_state.d_d,
-                               # 'steering_angle': None
-                               })
-        state_list.append(state)
+        state_list.append(initial_state)
         time_list.append(end_time - start_time)
 
         if show_animation:  # pragma: no cover
@@ -208,7 +203,13 @@ def frenet_optimal_planning(scenario: Scenario,
             #     raise BaseException
 
     # save data for the planned scenario
-    planner.save_data(output_dir=os.path.join("data", "fop_data"))
+    scenario_drawer = ScenarioDrawer(
+        scenario_name=scenario.scenario_id.__str__(),
+        scenario_dir=input_dir,
+        save_dir=planner.settings.data_save_dir
+    )
+    scenario_drawer.save_scenario_imgs(state_list)
+    planner.save_data()
     
     # print("Success!")
     stats.success = True
