@@ -34,7 +34,13 @@ from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, M
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
 
 
-def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str):
+def frenet_optimal_planning(scenario: Scenario, 
+                            planning_problem: PlanningProblem, 
+                            vehicle_params: DictConfig, 
+                            method: str, 
+                            num_samples: tuple, 
+                            input_dir: str, 
+                            file: str):
     # Plan a global route
     global_planner = GlobalPlanner()
     global_plan = global_planner.plan_global_route(scenario, planning_problem)
@@ -124,7 +130,15 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         # Plan!
         start_time = time.time()
         best_traj_ego = planner.plan(
-            current_frenet_state, max_speed, obstacles_all, i, initial_state)
+            scenario_id=scenario.scenario_id.__str__(),
+            frenet_state=current_frenet_state, 
+            max_target_speed=max_speed, 
+            obstacles=obstacles_all, 
+            time_step_now=i,
+            current_state=initial_state,
+            collect_data=True
+        )
+            # current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
         if best_traj_ego is None:
             stats.time_step_have_to_break = i
@@ -193,6 +207,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             #     print("Error!")
             #     raise BaseException
 
+    # save data for the planned scenario
+    planner.save_data(output_dir=os.path.join("data", "fop_data"))
+    
     # print("Success!")
     stats.success = True
     avg_processing_time = processing_time / num_cycles

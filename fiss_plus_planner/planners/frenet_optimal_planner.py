@@ -1,9 +1,11 @@
 import copy
 import math
 import time
+import os
 
 from itertools import product
 import numpy as np
+import pandas as pd
 from commonroad.scenario.scenario import Scenario
 from commonroad.scenario.state import InitialState
 from shapely import Polygon, affinity
@@ -78,6 +80,28 @@ class FrenetOptimalPlanner(object):
         # Statistics
         self.stats = Stats()
         
+        # data collection
+        self.collect_data = False
+        self.samples = None
+        self.sampled_vars = {
+            "scenario": [],
+            "time_step": [],
+            "t": [],
+            "d": [],
+            "v": []
+        }
+        self.conditions = {
+            "scenario": [],
+            "time_step": [],
+            "x": [],
+            "y": [],
+            "theta": [],
+            "velocity": [],
+            "acceleration": [],
+            "yaw_rate": []
+        }
+            
+        
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
         
@@ -88,11 +112,13 @@ class FrenetOptimalPlanner(object):
         t_samples = np.linspace(self.settings.min_t, self.settings.max_t, self.settings.num_t)
         
         samples = list(product(d_samples, s__samples, t_samples))
+        self.samples = samples
         
         return samples
 
     def calc_frenet_paths(self, frenet_state: FrenetState, samples = None) -> list:
-        frenet_paths = []
+        # frenet_paths = []
+        frenet_paths = [[] for _ in range(2)] # the first list is for fp, second for the samples
 
         if samples is None:
             samples = self.get_samples()
@@ -126,7 +152,8 @@ class FrenetOptimalPlanner(object):
             
             # Compute the final cost
             tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
-            frenet_paths.append(tfp)
+            frenet_paths[0].append(tfp) # append the trajectory to the first list
+            frenet_paths[1].append([Ti, di, tv])    # append the samples to the second list
             traj_per_timestep.append(tfp)
             
         self.all_trajs.append(traj_per_timestep)
@@ -137,7 +164,7 @@ class FrenetOptimalPlanner(object):
 
     def calc_global_paths(self, fplist: list) -> list:
         passed_fplist = []
-        for fp in fplist:
+        for fp in fplist[0]:
             # calc global positions
             for i in range(len(fp.s)):
                 ix, iy = self.cubic_spline.calc_position(fp.s[i])
@@ -172,7 +199,7 @@ class FrenetOptimalPlanner(object):
     def check_constraints(self, trajs: list) -> list:
         passed = []
 
-        for i, traj in enumerate(trajs):
+        for i, traj in enumerate(trajs[0]):
             # Max curvature check
             # if any([abs(c) > self.vehicle.max_curvature for c in traj.c]):
             #     continue
@@ -189,7 +216,7 @@ class FrenetOptimalPlanner(object):
 
             passed.append(i)
             
-        return [trajs[i] for i in passed]
+        return [[trajs[0][i] for i in passed], [trajs[1][i] for i in passed]]
     
     def construct_polygon(self, polygon: Polygon, x: float, y: float, yaw: float) -> Polygon:
         polygon_translated = affinity.translate(polygon, xoff=x, yoff=y)
@@ -231,7 +258,7 @@ class FrenetOptimalPlanner(object):
         passed = []
         #TODO: print the runtime with number of total trajectories
         # time_s = time.time()
-        for i, traj in enumerate(trajs):
+        for i, traj in enumerate(trajs[0]):
             # Collision check
             collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
             if collision:
@@ -240,7 +267,7 @@ class FrenetOptimalPlanner(object):
             passed.append(i)
         # time_s = time.time() - time_s
         # print(f"Collision checking time for {len(trajs)} trajectories: {time_s:.4f}s, avg {time_s/len(trajs):.6f}s per trajectory, total polygons checked: {num_polys}")
-        return [trajs[i] for i in passed]
+        return [[trajs[0][i] for i in passed], [trajs[1][i] for i in passed]]
     
     # def check_collisions(self, trajs: list[FrenetTrajectory], time_step_now: int = 0) -> list[FrenetTrajectory]:
     #     passed = []
@@ -279,7 +306,18 @@ class FrenetOptimalPlanner(object):
 
     #     return passed
     
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+    def plan(
+        self, 
+        scenario_id: str,
+        frenet_state: FrenetState, 
+        max_target_speed: float, 
+        obstacles: list, 
+        time_step_now: int = 0, 
+        current_state: InitialState = None, 
+        collect_data: bool = False) -> FrenetTrajectory:
+
+        self.collect_data = collect_data
+        
         # reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed
@@ -297,11 +335,29 @@ class FrenetOptimalPlanner(object):
 
         # find minimum cost path
         min_cost = float("inf")
-        for fp in fplist:
+        for fp in fplist[0]:
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final
                 self.best_traj = fp
-                        
+                
+        if collect_data:
+            self.sampled_vars["scenario"].extend([scenario_id]*len(fplist[0]))
+            self.sampled_vars["time_step"].extend([time_step_now]*len(fplist[0]))
+            for sample in fplist[1]:
+                self.sampled_vars["t"].append(sample[0])
+                self.sampled_vars["d"].append(sample[1])
+                self.sampled_vars["v"].append(sample[2])
+                
+            self.conditions["scenario"].extend([scenario_id]*len(fplist[0]))
+            self.conditions["time_step"].extend([time_step_now]*len(fplist[0]))
+            for _ in range(len(fplist[0])):
+                self.conditions["x"].append(current_state.position[0])
+                self.conditions["y"].append(current_state.position[1])
+                self.conditions["theta"].append(current_state.orientation)
+                self.conditions["velocity"].append(current_state.velocity)
+                self.conditions["acceleration"].append(current_state.acceleration)
+                self.conditions["yaw_rate"].append(current_state.yaw_rate)
+                                        
         return self.best_traj
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
@@ -311,3 +367,35 @@ class FrenetOptimalPlanner(object):
         ref_yaw = [self.cubic_spline.calc_yaw(i_s) for i_s in s]
         ref_rk = [self.cubic_spline.calc_curvature(i_s) for i_s in s]
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))
+    
+    def save_data(self, output_dir: str):
+        
+        if not self.collect_data:
+            print("Data collection is not enabled.")
+            return
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        df_samples_new = pd.DataFrame(self.sampled_vars)
+        df_conditions_new = pd.DataFrame(self.conditions)
+        
+        samples_path = os.path.join(output_dir, f'sampled_vars.parquet')
+        conditions_path = os.path.join(output_dir, f'conditions.parquet')
+        
+        #  if there was previous data, append the current scenario data and save again 
+        if os.path.exists(samples_path):
+            df_samples_existing = pd.read_parquet(samples_path)
+            df_samples = pd.concat([df_samples_existing, df_samples_new], ignore_index=True)
+        else:
+            df_samples = df_samples_new
+            
+        if os.path.exists(conditions_path):
+            df_conditions_existing = pd.read_parquet(conditions_path)
+            df_conditions = pd.concat([df_conditions_existing, df_conditions_new], ignore_index=True)
+        else:
+            df_conditions = df_conditions_new
+        
+        df_samples.to_parquet(samples_path, index=False)
+        df_conditions.to_parquet(conditions_path, index=False)
+        
+        print(f"Data for scenario {self.sampled_vars['scenario'][-1]} was saved to {output_dir}.")
