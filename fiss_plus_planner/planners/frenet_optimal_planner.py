@@ -67,6 +67,8 @@ class FrenetOptimalPlannerSettings(object):
 
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries
+        
+        self.data_save_dir = "data/fop_data/"
 
 class FrenetOptimalPlanner(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle):
@@ -368,19 +370,19 @@ class FrenetOptimalPlanner(object):
         ref_rk = [self.cubic_spline.calc_curvature(i_s) for i_s in s]
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))
     
-    def save_data(self, output_dir: str):
+    def save_data(self):
         
         if not self.collect_data:
             print("Data collection is not enabled.")
             return
         
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(self.settings.data_save_dir, exist_ok=True)
         
         df_samples_new = pd.DataFrame(self.sampled_vars)
         df_conditions_new = pd.DataFrame(self.conditions)
         
-        samples_path = os.path.join(output_dir, f'sampled_vars.parquet')
-        conditions_path = os.path.join(output_dir, f'conditions.parquet')
+        samples_path = os.path.join(self.settings.data_save_dir, f'sampled_vars.parquet')
+        conditions_path = os.path.join(self.settings.data_save_dir, f'conditions.parquet')
         
         #  if there was previous data, append the current scenario data and save again 
         if os.path.exists(samples_path):
@@ -398,4 +400,4 @@ class FrenetOptimalPlanner(object):
         df_samples.to_parquet(samples_path, index=False)
         df_conditions.to_parquet(conditions_path, index=False)
         
-        print(f"Data for scenario {self.sampled_vars['scenario'][-1]} was saved to {output_dir}.")
+        print(f"Data for scenario {self.sampled_vars['scenario'][-1]} was saved to {self.settings.data_save_dir}.")
