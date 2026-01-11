@@ -15,6 +15,9 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision
 
+from fiss_plus_planner.planners.common.utils import configure_numba_threads
+
+
 
 class Stats(object):
     def __init__(self):

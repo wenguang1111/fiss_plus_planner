@@ -32,6 +32,7 @@ from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, Spa
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
+from fiss_plus_planner.planners.common.utils import configure_numba_threads
 
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str):
@@ -299,6 +300,9 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
     num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
     save_gif = cfg['SAVE_GIF']
+    #set number of threads for numba parallel collision checker
+    number_threads = cfg['Num_Threads_For_CollisionChecker']
+    configure_numba_threads(number_threads)
 
     vehicle_type = VehicleType.VW_VANAGON  # FORD_ESCORT, BMW_320i, VW_VANAGON
     vehicle_params = VehicleParameterMapping[vehicle_type.name].value
