@@ -304,7 +304,7 @@ class FrenetOptimalPlanner(object):
         """
         return self.check_collisions_parallel(trajs, obstacles, time_step_now, check_resolution=1)
     
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, verts: NDArray[np.float32] = None, initial_state: InitialState = None) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         # reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed
