@@ -15,8 +15,6 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision
 
-from fiss_plus_planner.planners.common.utils import configure_numba_threads
-
 
 
 class Stats(object):
@@ -237,23 +235,10 @@ class FrenetOptimalPlanner(object):
         time_step_now: int = 0,
         check_resolution: int = 1
     ) -> list:
-        """
-        使用多线程并行碰撞检测过滤轨迹
-        
-        Args:
-            trajs: 轨迹列表
-            obstacles: 障碍物列表
-            time_step_now: 当前时间步
-            check_resolution: 检查间隔（每隔 n 个点检查一次）
-        
-        Returns:
-            通过碰撞检测的轨迹列表
-        """
         if len(trajs) == 0 or len(obstacles) == 0:
             return trajs
         
         try:
-            # 调用多线程碰撞检测函数
             collision_mask, num_checks = check_trajectories_collision(
                 trajs,
                 obstacles,
@@ -262,18 +247,15 @@ class FrenetOptimalPlanner(object):
                 time_step_now=time_step_now,
                 check_resolution=check_resolution
             )
-            
-            # 更新统计信息
+
             self.stats.num_collison_checks = num_checks
-            
-            # 返回未碰撞的轨迹
+
             passed_indices = np.where(~collision_mask)[0]
             return [trajs[i] for i in passed_indices]
         
         except Exception as e:
             print(f"Error in parallel collision detection: {e}")
             print("Falling back to sequential collision detection...")
-            # 如果并行检测失败，回退到顺序检测
             return self.check_collisions_sequential(trajs, obstacles, time_step_now)
 
     def check_collisions_sequential(
@@ -282,9 +264,6 @@ class FrenetOptimalPlanner(object):
         obstacles: list,
         time_step_now: int = 0
     ) -> list:
-        """
-        顺序碰撞检测（备用方案，兼容原有逻辑）
-        """
         passed = []
         for i, traj in enumerate(trajs):
             collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
@@ -294,17 +273,6 @@ class FrenetOptimalPlanner(object):
         return [trajs[i] for i in passed]
 
     def check_collisions(self, trajs: list, obstacles: list, time_step_now: int = 0) -> list:
-        """
-        碰撞检测主函数 - 使用多线程并行版本
-        
-        Args:
-            trajs: 轨迹列表
-            obstacles: 障碍物列表
-            time_step_now: 当前时间步
-        
-        Returns:
-            通过碰撞检测的轨迹列表
-        """
         return self.check_collisions_parallel(trajs, obstacles, time_step_now, check_resolution=1)
     
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:

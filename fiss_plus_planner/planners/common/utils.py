@@ -1,11 +1,3 @@
-"""
-Collision detection utilities for trajectory planning with Numba JIT compilation
-支持任意多边形（不限于四边形）
-
-轨迹数据格式: [num_trajs, num_states, 3] 其中最后一维为 [x, y, yaw]
-障碍物数据格式: list of Polygon objects (Shapely Polygon)
-"""
-
 from numba import njit, prange
 import numpy as np
 from typing import Tuple, List
@@ -15,23 +7,8 @@ def configure_numba_threads(n: int) -> None:
     if n and n > 0:
         numba.set_num_threads(n)
 
-
-# ============================================================================
-# 基础碰撞检测函数（JIT 编译）
-# ============================================================================
-
 @njit
 def point_in_polygon(point: np.ndarray, polygon: np.ndarray) -> bool:
-    """
-    使用射线投射法检测点是否在多边形内
-    
-    Args:
-        point: 点坐标，形状 (2,)
-        polygon: 多边形顶点，形状 (n, 2) 其中 n 可以是任意数
-    
-    Returns:
-        True 如果点在多边形内，否则 False
-    """
     x, y = point[0], point[1]
     n = polygon.shape[0]
     inside = False
@@ -61,16 +38,6 @@ def segments_intersect(
     p3: np.ndarray,
     p4: np.ndarray
 ) -> bool:
-    """
-    检测两条线段是否相交（使用 CCW 方法）
-    
-    Args:
-        p1, p2: 第一条线段的端点
-        p3, p4: 第二条线段的端点
-    
-    Returns:
-        True 如果相交，否则 False
-    """
     def ccw(A, B, C):
         return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
     
@@ -82,27 +49,14 @@ def polygon_collision(
     poly1: np.ndarray,
     poly2: np.ndarray
 ) -> bool:
-    """
-    检测两个任意多边形是否碰撞
-    
-    Args:
-        poly1: 多边形1顶点，形状 (n, 2)
-        poly2: 多边形2顶点，形状 (m, 2)
-    
-    Returns:
-        True 如果碰撞，否则 False
-    """
-    # 检查 poly1 的任何顶点是否在 poly2 内
     for i in range(poly1.shape[0]):
         if point_in_polygon(poly1[i], poly2):
             return True
     
-    # 检查 poly2 的任何顶点是否在 poly1 内
     for i in range(poly2.shape[0]):
         if point_in_polygon(poly2[i], poly1):
             return True
-    
-    # 检查边是否相交
+
     for i in range(poly1.shape[0]):
         for j in range(poly2.shape[0]):
             p1 = poly1[i]
@@ -124,21 +78,8 @@ def compute_vehicle_polygon(
     vehicle_length: float,
     vehicle_width: float
 ) -> np.ndarray:
-    """
-    计算车辆的多边形顶点（矩形，4个顶点）
-    
-    Args:
-        x, y: 车辆中心位置
-        yaw: 车辆偏航角
-        vehicle_length: 车辆长度
-        vehicle_width: 车辆宽度
-    
-    Returns:
-        多边形顶点，形状 (4, 2)
-    """
     poly = np.zeros((4, 2), dtype=np.float32)
     
-    # 定义矩形角点相对于中心的偏移
     corner_offsets = np.array([
         [vehicle_length / 2, vehicle_width / 2],
         [vehicle_length / 2, -vehicle_width / 2],
@@ -146,11 +87,9 @@ def compute_vehicle_polygon(
         [-vehicle_length / 2, vehicle_width / 2]
     ], dtype=np.float32)
     
-    # 旋转矩阵
     cos_yaw = np.cos(yaw)
     sin_yaw = np.sin(yaw)
     
-    # 计算旋转后的顶点
     for i in range(4):
         x_offset = corner_offsets[i, 0]
         y_offset = corner_offsets[i, 1]
@@ -164,69 +103,42 @@ def compute_vehicle_polygon(
     return poly
 
 
-# ============================================================================
-# 高性能多线程碰撞检测函数
-# ============================================================================
-
-@njit(parallel=True)
-def check_trajectories_collision_parallel(
-    trajectories: np.ndarray,           # shape (num_trajs, num_states, 3) - x, y, yaw
-    obstacles_polygons: List,           # List of np.ndarray, 每个形状 (n, 2)
-    vehicle_length: float,
-    vehicle_width: float,
-    check_resolution: int = 1
-) -> Tuple[np.ndarray, int]:
-    """
-    并行检测多条轨迹与任意多边形障碍物的碰撞（多线程版本）
+# @njit(parallel=True)
+# def check_trajectories_collision_parallel(
+#     trajectories: np.ndarray,
+#     obstacles_polygons: List,
+#     vehicle_length: float,
+#     vehicle_width: float,
+#     check_resolution: int = 1
+# ) -> Tuple[np.ndarray, int]:
+#     num_trajs = trajectories.shape[0]
+#     num_states = trajectories.shape[1]
+#     num_obstacles = len(obstacles_polygons)
     
-    直接在 frenet_optimal_planner 中使用
+#     collision_results = np.zeros(num_trajs, dtype=np.bool_)
+#     total_checks = 0
     
-    Args:
-        trajectories: 轨迹集合，形状 (num_trajs, num_states, 3)
-                     每个轨迹包含 num_states 个状态点，每个点有 (x, y, yaw)
-        obstacles_polygons: 障碍物多边形列表，每个元素形状 (n, 2)
-        vehicle_length: 车辆长度
-        vehicle_width: 车辆宽度
-        check_resolution: 检查间隔（每隔 n 个状态检查一次）
-    
-    Returns:
-        Tuple[np.ndarray, int]: 
-        - collision_results: 碰撞结果数组，形状 (num_trajs,)，True 表示碰撞
-        - total_checks: 执行的碰撞检查总数
-    """
-    num_trajs = trajectories.shape[0]
-    num_states = trajectories.shape[1]
-    num_obstacles = len(obstacles_polygons)
-    
-    collision_results = np.zeros(num_trajs, dtype=np.bool_)
-    total_checks = 0
-    
-    # 并行处理每条轨迹
-    for traj_idx in prange(num_trajs):
-        trajectory = trajectories[traj_idx]  # shape (num_states, 3)
+#     for traj_idx in prange(num_trajs):
+#         trajectory = trajectories[traj_idx]  # shape (num_states, 3)
         
-        # 按间隔检查轨迹上的每个状态点
-        for state_idx in range(0, num_states, check_resolution):
-            x = trajectory[state_idx, 0]
-            y = trajectory[state_idx, 1]
-            yaw = trajectory[state_idx, 2]
+#         for state_idx in range(0, num_states, check_resolution):
+#             x = trajectory[state_idx, 0]
+#             y = trajectory[state_idx, 1]
+#             yaw = trajectory[state_idx, 2]
             
-            # 计算车辆在此状态的多边形
-            ego_poly = compute_vehicle_polygon(
-                x, y, yaw, vehicle_length, vehicle_width
-            )
+#             ego_poly = compute_vehicle_polygon(
+#                 x, y, yaw, vehicle_length, vehicle_width
+#             )
             
-            # 检查与每个障碍物的碰撞
-            for obs_idx in range(num_obstacles):
-                obstacle_poly = obstacles_polygons[obs_idx]
-                total_checks += 1
+#             for obs_idx in range(num_obstacles):
+#                 obstacle_poly = obstacles_polygons[obs_idx]
+#                 total_checks += 1
                 
-                # 检测碰撞
-                if polygon_collision(ego_poly, obstacle_poly):
-                    collision_results[traj_idx] = True
-                    break
+#                 if polygon_collision(ego_poly, obstacle_poly):
+#                     collision_results[traj_idx] = True
+#                     break
     
-    return collision_results, total_checks
+#     return collision_results, total_checks
 
 
 @njit(parallel=True)
@@ -239,23 +151,6 @@ def check_trajectories_collision_parallel_static(
     vehicle_width: float,
     check_resolution: int = 1
 ) -> Tuple[np.ndarray, int]:
-    """
-    并行检测多条轨迹与任意多边形障碍物的碰撞（时间序列数组版本）
-    
-    使用预分配的时间序列数组，避免动态内存分配
-    
-    Args:
-        trajectories: 轨迹集合，形状 (num_trajs, num_states, 3)
-        traj_lengths: 每条轨迹的实际长度，形状 (num_trajs,)
-        obstacles_array: 预分配的障碍物数组，形状 (num_time_steps, num_obstacles, max_vertices, 2)
-        num_vertices: 每个障碍物的实际顶点数，形状 (num_time_steps, num_obstacles)
-        vehicle_length: 车辆长度
-        vehicle_width: 车辆宽度
-        check_resolution: 检查间隔
-    
-    Returns:
-        Tuple[collision_results, total_checks]
-    """
     num_trajs = trajectories.shape[0]
     num_states = trajectories.shape[1]
     num_time_steps = obstacles_array.shape[0]
@@ -264,7 +159,6 @@ def check_trajectories_collision_parallel_static(
     collision_results = np.zeros(num_trajs, dtype=np.bool_)
     checks = np.zeros(num_trajs, dtype=np.int64)
     
-    # 并行处理每条轨迹
     for traj_idx in prange(num_trajs):
         trajectory = trajectories[traj_idx]  # shape (num_states, 3)
         local_checks = 0
@@ -272,26 +166,21 @@ def check_trajectories_collision_parallel_static(
         traj_len = traj_lengths[traj_idx]
         max_steps = traj_len if traj_len < num_time_steps else num_time_steps
         
-        # 按间隔检查轨迹上的每个状态点
         for state_idx in range(0, max_steps, check_resolution):
             x = trajectory[state_idx, 0]
             y = trajectory[state_idx, 1]
             yaw = trajectory[state_idx, 2]
             
-            # 计算车辆在此状态的多边形
             ego_poly = compute_vehicle_polygon(
                 x, y, yaw, vehicle_length, vehicle_width
             )
-            
-            # 检查与每个障碍物的碰撞
+
             for obs_idx in range(num_obstacles):
-                # 只检查实际顶点数的部分
                 actual_verts = num_vertices[state_idx, obs_idx]
                 if actual_verts > 0:
                     obstacle_poly = obstacles_array[state_idx, obs_idx, :actual_verts, :]
                     local_checks += 1
                     
-                    # 检测碰撞
                     if polygon_collision(ego_poly, obstacle_poly):
                         collision_results[traj_idx] = True
                         break
@@ -304,23 +193,8 @@ def check_trajectories_collision_parallel_static(
     total_checks = checks.sum()
     return collision_results, total_checks
 
-
-# ============================================================================
-# 用于 FrenetOptimalPlanner 的包装函数
-# ============================================================================
-
 def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
-    """
-    将轨迹列表转换为 [num_trajs, num_states, 3] 格式的数组
-    
-    Args:
-        fplist: FrenetTrajectory 对象列表
-    
-    Returns:
-        trajectories: 形状 (num_trajs, num_states, 3) 的 NumPy 数组
-                     其中最后一维为 [x, y, yaw]
-        traj_lengths (optional): 形状 (num_trajs,) 的数组，记录每条轨迹的实际长度
-    """
+    # return array as [num_trajs, num_states, 3]
     num_trajs = len(fplist)
     if num_trajs == 0:
         empty_trajs = np.array([], dtype=np.float32).reshape(0, 0, 3)
@@ -328,19 +202,16 @@ def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
             return empty_trajs, np.array([], dtype=np.int32)
         return empty_trajs
     
-    # 获取最大轨迹长度
     traj_lengths = np.array([len(traj.x) for traj in fplist], dtype=np.int32)
     max_length = int(traj_lengths.max()) if traj_lengths.size > 0 else 0
     
-    # 创建输出数组
     trajectories = np.zeros((num_trajs, max_length, 3), dtype=np.float32)
     
-    # 填充数据
     for i, traj in enumerate(fplist):
         traj_len = len(traj.x)
-        trajectories[i, :traj_len, 0] = traj.x  # x 坐标
-        trajectories[i, :traj_len, 1] = traj.y  # y 坐标
-        trajectories[i, :traj_len, 2] = traj.yaw  # 偏航角
+        trajectories[i, :traj_len, 0] = traj.x
+        trajectories[i, :traj_len, 1] = traj.y
+        trajectories[i, :traj_len, 2] = traj.yaw
     
     if return_lengths:
         return trajectories, traj_lengths
@@ -352,42 +223,22 @@ def prepare_obstacles_polygons_static(
     time_step_now: int = 0,
     max_vertices: int = 10
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    为障碍物准备多边形顶点的静态数组版本（高性能）
-    
-    使用预分配的固定大小数组，避免动态 append
-    
-    Args:
-        obstacles: CommonRoad 障碍物列表
-        time_step_now: 当前时间步
-        max_vertices: 每个多边形最多的顶点数（预分配大小）
-    
-    Returns:
-        Tuple[obstacles_array, num_vertices]:
-        - obstacles_array: 形状 (num_obstacles, max_vertices, 2) 的静态数组
-        - num_vertices: 形状 (num_obstacles,) 的数组，记录每个障碍物的实际顶点数
-    """
     num_obstacles = len(obstacles)
     
     if num_obstacles == 0:
         return np.array([], dtype=np.float32).reshape(0, max_vertices, 2), np.array([], dtype=np.int32)
     
-    # 预分配静态数组
     obstacles_array = np.zeros((num_obstacles, max_vertices, 2), dtype=np.float32)
     num_vertices = np.zeros(num_obstacles, dtype=np.int32)
     
-    # 填充数据
     for obs_idx, obstacle in enumerate(obstacles):
         state = obstacle.state_at_time(time_step_now)
         if state is not None:
             try:
-                # 获取 obstacle 的 Shapely Polygon
                 shapely_poly = obstacle.obstacle_shape.shapely_object
                 
-                # 提取顶点坐标
                 coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
                 
-                # 限制顶点数不超过 max_vertices
                 num_verts = min(len(coords), max_vertices)
                 num_vertices[obs_idx] = num_verts
                 
@@ -421,20 +272,6 @@ def prepare_obstacles_polygons_time_series(
     time_step_now: int = 0,
     max_vertices: int = 10
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    为障碍物准备多边形顶点的时间序列数组（支持动态障碍物）
-    
-    Args:
-        obstacles: CommonRoad 障碍物列表
-        num_time_steps: 需要覆盖的时间步长度
-        time_step_now: 当前时间步
-        max_vertices: 每个多边形最多的顶点数（预分配大小）
-    
-    Returns:
-        Tuple[obstacles_array, num_vertices]:
-        - obstacles_array: 形状 (num_time_steps, num_obstacles, max_vertices, 2)
-        - num_vertices: 形状 (num_time_steps, num_obstacles)
-    """
     num_obstacles = len(obstacles)
     if num_obstacles == 0 or num_time_steps <= 0:
         return (
@@ -457,7 +294,7 @@ def prepare_obstacles_polygons_time_series(
             print(f"Error processing obstacle {obs_idx}: {e}")
             continue
         
-        # 对静态障碍物，使用初始状态填充所有时间步
+        # for static obstacles, use initial state if no prediction
         default_state = None
         if getattr(obstacle, "prediction", None) is None:
             default_state = getattr(obstacle, "initial_state", None)
@@ -495,36 +332,7 @@ def check_trajectories_collision(
     check_resolution: int = 1,
     max_vertices: int = None
 ) -> Tuple[np.ndarray, int]:
-    """
-    检测轨迹碰撞的主函数 - 直接在 frenet_optimal_planner.py 中调用
     
-    使用多线程 Numba JIT 编译实现高性能碰撞检测
-    支持任意多边形障碍物，使用时间序列数组处理动态障碍物
-    
-    Args:
-        fplist: FrenetTrajectory 对象列表
-        obstacles: CommonRoad 障碍物列表
-        vehicle_length: 车辆长度
-        vehicle_width: 车辆宽度
-        time_step_now: 当前时间步
-        check_resolution: 检查间隔（默认1表示检查所有点）
-        max_vertices: 每个多边形预分配的最大顶点数（性能权衡参数）
-                     如果为 None，将从 obstacles 中动态计算
-    
-    Returns:
-        Tuple[collision_mask, num_checks]:
-        - collision_mask: 布尔数组，形状 (num_trajs,)，True 表示碰撞
-        - num_checks: 执行的碰撞检查总数
-    
-    Example:
-        >>> fplist = [traj1, traj2, ...]
-        >>> obstacles = [obs1, obs2, ...]
-        >>> collision_mask, checks = check_trajectories_collision(
-        ...     fplist, obstacles, 4.5, 1.8, time_step_now=0
-        ... )
-        >>> safe_trajs = [fplist[i] for i, collide in enumerate(collision_mask) if not collide]
-    """
-    # 将轨迹转换为 [num_trajs, num_states, 3] 格式
     trajectories, traj_lengths = prepare_trajectory_array(fplist, return_lengths=True)
     
     if trajectories.size == 0 or len(obstacles) == 0:
@@ -532,12 +340,10 @@ def check_trajectories_collision(
     if traj_lengths.size == 0 or traj_lengths.max() == 0:
         return np.zeros(len(fplist), dtype=np.bool_), 0
     
-    # 如果 max_vertices 为 None，从 obstacles 中动态计算
     if max_vertices is None:
-        max_vertices = 10  # 默认最小值
+        max_vertices = 10 # default minimal value
         try:
             for obstacle in obstacles:
-                # 尝试获取 obstacle 的顶点数
                 try:
                     shapely_poly = obstacle.obstacle_shape.shapely_object
                     coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
@@ -545,7 +351,6 @@ def check_trajectories_collision(
                     if num_verts > max_vertices:
                         max_vertices = num_verts
                 except Exception:
-                    # 如果某个 obstacle 读取失败，继续处理下一个
                     continue
         except Exception as e:
             print(f"Warning: Failed to calculate max_vertices from obstacles: {e}")
@@ -553,7 +358,6 @@ def check_trajectories_collision(
     
     num_time_steps = int(traj_lengths.max())
     
-    # 准备障碍物多边形时间序列（支持动态障碍物）
     obstacles_array, num_vertices = prepare_obstacles_polygons_time_series(
         obstacles,
         num_time_steps=num_time_steps,
@@ -563,8 +367,7 @@ def check_trajectories_collision(
     
     if obstacles_array.shape[0] == 0 or obstacles_array.shape[1] == 0:
         return np.zeros(len(fplist), dtype=np.bool_), 0
-    
-    # 调用多线程碰撞检测
+
     return check_trajectories_collision_parallel_static(
         trajectories,
         traj_lengths,
