@@ -33,7 +33,8 @@ class FopPlusPlanner(FrenetOptimalPlanner):
             candidate = self.candidate_trajs.get()
             passed_candidate = self.check_constraints([candidate])
             self.stats.num_trajs_validated += 1
-            safe_candidate = self.check_collisions(passed_candidate, obstacles, time_step_now)
+            # safe_candidate = self.check_collisions(passed_candidate, obstacles, time_step_now)
+            safe_candidate = self.check_collision_multithread(passed_candidate, time_step_now)
             self.stats.num_collison_checks += 1
             # safe_candidate = self.check_collisions(passed_candidate, time_step_now)
             if safe_candidate:

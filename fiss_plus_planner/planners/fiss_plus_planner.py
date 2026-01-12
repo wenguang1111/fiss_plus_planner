@@ -134,7 +134,8 @@ class FissPlusPlanner(FissPlanner):
                 
                 if passed_candidate:
                     # Check for collisions
-                    safe_candidate = self.check_collisions(passed_candidate, obstacles, time_step_now)
+                    # safe_candidate = self.check_collisions(passed_candidate, obstacles, time_step_now)
+                    safe_candidate = self.check_collision_multithread(passed_candidate, time_step_now)
                     self.stats.num_collison_checks += 1
                     if safe_candidate:
                         best_traj_found = True
@@ -314,7 +315,8 @@ class FissPlusPlanner(FissPlanner):
             
             if passed_candidate:
                 # Check for collisions
-                safe_candidate = self.check_collisions(passed_candidate, obstacles, time_step_now)
+                # safe_candidate = self.check_collisions(passed_candidate, obstacles, time_step_now)
+                safe_candidate = self.check_collision_multithread(passed_candidate, time_step_now)
                 self.stats.num_collison_checks += 1
                 if safe_candidate:
                     # print("fiss+: Refined Trajectory Cost:", safe_candidate[0].cost_final, "Coarse Trajectory Cost:", traj.cost_final)

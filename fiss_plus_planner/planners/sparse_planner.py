@@ -101,7 +101,8 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
         # print(len(fplist), "trajectories passed constraint check")
-        fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        safe_candfplistidate = self.check_collision_multithread(fplist, time_step_now)
         # print(len(fplist), "trajectories passed collision check")
 
         # find minimum cost path

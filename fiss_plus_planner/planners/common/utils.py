@@ -150,7 +150,7 @@ def check_trajectories_collision_parallel_static(
     vehicle_length: float,
     vehicle_width: float,
     check_resolution: int = 1
-) -> Tuple[np.ndarray, int]:
+) -> Tuple[np.ndarray, np.ndarray]:
     num_trajs = trajectories.shape[0]
     num_states = trajectories.shape[1]
     num_time_steps = obstacles_array.shape[0]
@@ -164,7 +164,7 @@ def check_trajectories_collision_parallel_static(
         local_checks = 0
         
         traj_len = traj_lengths[traj_idx]
-        max_steps = traj_len if traj_len < num_time_steps else num_time_steps
+        max_steps = min(traj_len, num_time_steps)
         
         for state_idx in range(0, max_steps, check_resolution):
             x = trajectory[state_idx, 0]
@@ -190,8 +190,7 @@ def check_trajectories_collision_parallel_static(
         
         checks[traj_idx] = local_checks
     
-    total_checks = checks.sum()
-    return collision_results, total_checks
+    return collision_results, checks
 
 def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
     # return array as [num_trajs, num_states, 3]
@@ -288,7 +287,7 @@ def check_trajectories_collision(
     if traj_lengths.size == 0 or traj_lengths.max() == 0:
         return np.zeros(trajectories.shape[0], dtype=np.bool_), 0
 
-    return check_trajectories_collision_parallel_static(
+    collision_results, checks = check_trajectories_collision_parallel_static(
         trajectories,
         traj_lengths,
         obstacles_array,
@@ -297,3 +296,5 @@ def check_trajectories_collision(
         vehicle_width,
         check_resolution
     )
+    total_checks = checks.sum()
+    return collision_results, total_checks
