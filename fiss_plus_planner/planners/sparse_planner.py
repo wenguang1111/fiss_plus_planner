@@ -45,8 +45,9 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
         
 class SparsePlanner(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
-    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle):
-        super().__init__(planner_settings, ego_vehicle)
+    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle,
+                 obstacles_array=None, obstacles_num_vertices=None):
+        super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         self.cvae_model = CVAE(X_dim=3, 
                                    c_dim=planner_settings.c_dim, 
                                    z_dim=planner_settings.z_dim,
@@ -111,4 +112,3 @@ class SparsePlanner(FrenetOptimalPlanner):
                 self.best_traj = fp
 
         return self.best_traj
-    

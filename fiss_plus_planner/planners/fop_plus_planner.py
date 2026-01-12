@@ -10,8 +10,9 @@ from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlann
 
 
 class FopPlusPlanner(FrenetOptimalPlanner):
-    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle):
-        super().__init__(planner_settings, ego_vehicle)
+    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle,
+                 obstacles_array=None, obstacles_num_vertices=None):
+        super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         self.candidate_trajs = PriorityQueue()
 
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list[Obstacle], time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:

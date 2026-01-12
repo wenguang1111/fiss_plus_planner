@@ -23,8 +23,9 @@ class FissPlusPlannerSettings(FissPlannerSettings):
         self.decaying_factor = 0.5
 
 class FissPlusPlanner(FissPlanner):
-    def __init__(self, planner_settings: FissPlusPlannerSettings, ego_vehicle: Vehicle):
-        super().__init__(planner_settings, ego_vehicle)
+    def __init__(self, planner_settings: FissPlusPlannerSettings, ego_vehicle: Vehicle,
+                 obstacles_array=None, obstacles_num_vertices=None):
+        super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         self.frontier_idxs = PriorityQueue()
         self.refined_trajs = PriorityQueue()
         

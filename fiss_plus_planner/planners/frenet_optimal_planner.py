@@ -1,7 +1,7 @@
 import copy
 import math
 import time
-
+import numba
 from itertools import product
 import numpy as np
 from commonroad.scenario.scenario import Scenario
@@ -13,8 +13,9 @@ from fiss_plus_planner.planners.common.geometry.cubic_spline import CubicSpline2
 from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
-from fiss_plus_planner.planners.common.utils import check_trajectories_collision
-
+from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
+from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
+from typing import Tuple
 
 
 class Stats(object):
@@ -69,7 +70,8 @@ class FrenetOptimalPlannerSettings(object):
         self.check_boundary = True          # True if check collison with road boundaries
 
 class FrenetOptimalPlanner(object):
-    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle):
+    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
+                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None):
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
@@ -77,9 +79,13 @@ class FrenetOptimalPlanner(object):
         self.best_traj = None
         self.all_trajs = []
         
+        # Pre-processed obstacles data (optional)
+        self.obstacles_array = obstacles_array
+        self.obstacles_num_vertices = obstacles_num_vertices
+        
         # Statistics
         self.stats = Stats()
-        
+
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
         
@@ -228,42 +234,8 @@ class FrenetOptimalPlanner(object):
 
         return False, num_polys
 
-    def check_collisions_parallel(
-        self,
-        trajs: list,
-        obstacles: list,
-        time_step_now: int = 0,
-        check_resolution: int = 1
-    ) -> list:
-        if len(trajs) == 0 or len(obstacles) == 0:
-            return trajs
-        
-        try:
-            collision_mask, num_checks = check_trajectories_collision(
-                trajs,
-                obstacles,
-                vehicle_length=self.vehicle.l,
-                vehicle_width=self.vehicle.w,
-                time_step_now=time_step_now,
-                check_resolution=check_resolution
-            )
-
-            self.stats.num_collison_checks = num_checks
-
-            passed_indices = np.where(~collision_mask)[0]
-            return [trajs[i] for i in passed_indices]
-        
-        except Exception as e:
-            print(f"Error in parallel collision detection: {e}")
-            print("Falling back to sequential collision detection...")
-            return self.check_collisions_sequential(trajs, obstacles, time_step_now)
-
-    def check_collisions_sequential(
-        self,
-        trajs: list,
-        obstacles: list,
-        time_step_now: int = 0
-    ) -> list:
+    def check_collisions(self, trajs: list, obstacles: list, time_step_now: int = 0) -> list:
+        """Sequential collision detection (base version for all planners)."""
         passed = []
         for i, traj in enumerate(trajs):
             collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
@@ -272,9 +244,33 @@ class FrenetOptimalPlanner(object):
             passed.append(i)
         return [trajs[i] for i in passed]
 
-    def check_collisions(self, trajs: list, obstacles: list, time_step_now: int = 0) -> list:
-        return self.check_collisions_parallel(trajs, obstacles, time_step_now, check_resolution=1)
-    
+    def check_collision_multithread(self, trajs: list, time_step_now: int = 0) -> list:
+        """Multi-threaded collision detection using pre-processed obstacle data."""
+        if len(trajs) == 0 or self.obstacles_array is None or self.obstacles_num_vertices is None:
+            return trajs
+        
+        # Prepare trajectory data
+        trajectories, traj_lengths = prepare_trajectory_array(trajs, return_lengths=True)
+        
+        # Use multi-threaded collision detection
+        if len(trajs) == 0 or trajectories.shape[0] == 0:
+            return trajs
+        
+        collision_mask, num_checks = check_trajectories_collision(
+            trajectories,
+            traj_lengths,
+            self.obstacles_array,
+            self.obstacles_num_vertices,
+            vehicle_length=self.vehicle.l,
+            vehicle_width=self.vehicle.w,
+            check_resolution=1
+        )
+
+        self.stats.num_collison_checks = num_checks
+
+        passed_indices = np.where(~collision_mask)[0]
+        return [trajs[i] for i in passed_indices]
+
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         # reset stats
         self.stats = Stats()
@@ -286,9 +282,9 @@ class FrenetOptimalPlanner(object):
         self.stats.num_trajs_validated = len(fplist)
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
-        # print(len(fplist), "trajectories passed constraint check")
-        fplist = self.check_collisions(fplist, obstacles, time_step_now)
-        # print(len(fplist), "trajectories passed collision check")
+        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        fplist = self.check_collision_multithread(fplist, time_step_now)
+        # check_trajectories_collision_parallel_static.parallel_diagnostics(level=4)
 
         # find minimum cost path
         min_cost = float("inf")

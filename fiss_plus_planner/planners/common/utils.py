@@ -217,55 +217,6 @@ def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
         return trajectories, traj_lengths
     return trajectories
 
-
-def prepare_obstacles_polygons_static(
-    obstacles: list,
-    time_step_now: int = 0,
-    max_vertices: int = 10
-) -> Tuple[np.ndarray, np.ndarray]:
-    num_obstacles = len(obstacles)
-    
-    if num_obstacles == 0:
-        return np.array([], dtype=np.float32).reshape(0, max_vertices, 2), np.array([], dtype=np.int32)
-    
-    obstacles_array = np.zeros((num_obstacles, max_vertices, 2), dtype=np.float32)
-    num_vertices = np.zeros(num_obstacles, dtype=np.int32)
-    
-    for obs_idx, obstacle in enumerate(obstacles):
-        state = obstacle.state_at_time(time_step_now)
-        if state is not None:
-            try:
-                shapely_poly = obstacle.obstacle_shape.shapely_object
-                
-                coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
-                
-                num_verts = min(len(coords), max_vertices)
-                num_vertices[obs_idx] = num_verts
-                
-                # 平移和旋转到当前位置和方向
-                obs_x = state.position[0]
-                obs_y = state.position[1]
-                obs_yaw = state.orientation
-                
-                # 旋转坐标
-                cos_yaw = np.cos(obs_yaw)
-                sin_yaw = np.sin(obs_yaw)
-                
-                # 直接写入到预分配的数组
-                for i in range(num_verts):
-                    dx = coords[i, 0]
-                    dy = coords[i, 1]
-                    obstacles_array[obs_idx, i, 0] = dx * cos_yaw - dy * sin_yaw + obs_x
-                    obstacles_array[obs_idx, i, 1] = dx * sin_yaw + dy * cos_yaw + obs_y
-            
-            except Exception as e:
-                print(f"Error processing obstacle {obs_idx}: {e}")
-                num_vertices[obs_idx] = 0
-                continue
-    
-    return obstacles_array, num_vertices
-
-
 def prepare_obstacles_polygons_time_series(
     obstacles: list,
     num_time_steps: int,
@@ -324,49 +275,18 @@ def prepare_obstacles_polygons_time_series(
 
 
 def check_trajectories_collision(
-    fplist: list,
-    obstacles: list,
+    trajectories: np.ndarray,           # shape (num_trajs, num_states, 3) - preprocessed
+    traj_lengths: np.ndarray,           # shape (num_trajs,) - trajectory lengths
+    obstacles_array: np.ndarray,        # shape (num_time_steps, num_obstacles, max_vertices, 2) - preprocessed
+    num_vertices: np.ndarray,           # shape (num_time_steps, num_obstacles) - actual vertices count
     vehicle_length: float,
     vehicle_width: float,
-    time_step_now: int = 0,
-    check_resolution: int = 1,
-    max_vertices: int = None
+    check_resolution: int = 1
 ) -> Tuple[np.ndarray, int]:
-    
-    trajectories, traj_lengths = prepare_trajectory_array(fplist, return_lengths=True)
-    
-    if trajectories.size == 0 or len(obstacles) == 0:
+    if trajectories.size == 0 or obstacles_array.shape[0] == 0:
         return np.array([], dtype=np.bool_), 0
     if traj_lengths.size == 0 or traj_lengths.max() == 0:
-        return np.zeros(len(fplist), dtype=np.bool_), 0
-    
-    if max_vertices is None:
-        max_vertices = 10 # default minimal value
-        try:
-            for obstacle in obstacles:
-                try:
-                    shapely_poly = obstacle.obstacle_shape.shapely_object
-                    coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
-                    num_verts = len(coords)
-                    if num_verts > max_vertices:
-                        max_vertices = num_verts
-                except Exception:
-                    continue
-        except Exception as e:
-            print(f"Warning: Failed to calculate max_vertices from obstacles: {e}")
-            max_vertices = 10
-    
-    num_time_steps = int(traj_lengths.max())
-    
-    obstacles_array, num_vertices = prepare_obstacles_polygons_time_series(
-        obstacles,
-        num_time_steps=num_time_steps,
-        time_step_now=time_step_now,
-        max_vertices=max_vertices
-    )
-    
-    if obstacles_array.shape[0] == 0 or obstacles_array.shape[1] == 0:
-        return np.zeros(len(fplist), dtype=np.bool_), 0
+        return np.zeros(trajectories.shape[0], dtype=np.bool_), 0
 
     return check_trajectories_collision_parallel_static(
         trajectories,

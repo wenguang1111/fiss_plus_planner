@@ -19,8 +19,9 @@ class FissPlannerSettings(FrenetOptimalPlannerSettings):
         self.vis_all_candidates = False
         
 class FissPlanner(FrenetOptimalPlanner):
-    def __init__(self, planner_settings: FissPlannerSettings, ego_vehicle: Vehicle):
-        super().__init__(planner_settings, ego_vehicle)
+    def __init__(self, planner_settings: FissPlannerSettings, ego_vehicle: Vehicle,
+                 obstacles_array=None, obstacles_num_vertices=None):
+        super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         self.sampling_res = np.empty(3)
         self.sampling_min = np.empty(3)
         self.sampling_max = np.empty(3)
