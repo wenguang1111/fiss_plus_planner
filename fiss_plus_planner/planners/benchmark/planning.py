@@ -182,7 +182,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
     # Initial state
     initial_state = planning_problem.initial_state
-    print(initial_state)
+    # print(initial_state)
     start_state = State(t=0.0, x=initial_state.position[0], y=initial_state.position[1],
                         yaw=initial_state.orientation, v=initial_state.velocity, a=initial_state.acceleration)
     current_frenet_state = FrenetState()
@@ -208,7 +208,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         best_traj_ego = planner.plan(
             current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
-        if best_traj_ego is None:
+        if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
             break
 

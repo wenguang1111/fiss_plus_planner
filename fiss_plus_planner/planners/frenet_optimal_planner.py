@@ -256,17 +256,16 @@ class FrenetOptimalPlanner(object):
         if len(trajs) == 0 or trajectories.shape[0] == 0:
             return trajs
         
-        collision_mask, num_checks = check_trajectories_collision(
+        collision_mask = check_trajectories_collision(
             trajectories,
             traj_lengths,
             self.obstacles_array,
             self.obstacles_num_vertices,
             vehicle_length=self.vehicle.l,
             vehicle_width=self.vehicle.w,
+            time_step_now=time_step_now,
             check_resolution=1
         )
-
-        self.stats.num_collison_checks = num_checks
 
         passed_indices = np.where(~collision_mask)[0]
         return [trajs[i] for i in passed_indices]
