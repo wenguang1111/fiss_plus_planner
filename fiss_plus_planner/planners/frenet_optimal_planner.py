@@ -62,8 +62,8 @@ class FrenetOptimalPlannerSettings(object):
         self.lowest_speed = 0.0             # lowest sampling speed [m/s]
         self.num_speed = num_speed          # speed sampling number
         
-        self.min_t = 8.0                    # min prediction time [m]
-        self.max_t = 10.0                   # max prediction time [m]
+        self.min_t = 3.0                    # min prediction time [m]
+        self.max_t = 5.0                   # max prediction time [m]
         self.num_t = num_t                  # time sampling number
 
         self.check_obstacle = True          # True if check collison with obstacles
@@ -175,7 +175,7 @@ class FrenetOptimalPlanner(object):
                 
                 passed_fplist.append(fp)
 
-        return fplist
+        return passed_fplist
     
     def check_constraints(self, trajs: list) -> list:
         passed = []

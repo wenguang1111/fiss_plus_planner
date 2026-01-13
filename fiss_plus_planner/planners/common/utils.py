@@ -212,7 +212,7 @@ def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
         traj_len = len(traj.x)
         trajectories[i, :traj_len, 0] = traj.x
         trajectories[i, :traj_len, 1] = traj.y
-        trajectories[i, :traj_len, 2] = traj.yaw if traj.yaw is not None else 0.0
+        trajectories[i, :traj_len, 2] = traj.yaw 
     
     if return_lengths:
         return trajectories, traj_lengths

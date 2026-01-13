@@ -376,7 +376,7 @@ def multiline(xs, ys, c, ax=None, **kwargs):
     return lc
 
 
-def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
+def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     # Global benchmark settings
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
     num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
