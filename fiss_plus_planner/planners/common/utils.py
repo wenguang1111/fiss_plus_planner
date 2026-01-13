@@ -282,10 +282,10 @@ def check_trajectories_collision(
     vehicle_width: float,
     check_resolution: int = 1
 ) -> Tuple[np.ndarray, int]:
-    if trajectories.size == 0 or obstacles_array.shape[0] == 0:
-        return np.array([], dtype=np.bool_), 0
-    if traj_lengths.size == 0 or traj_lengths.max() == 0:
-        return np.zeros(trajectories.shape[0], dtype=np.bool_), 0
+    # if trajectories.size == 0 or obstacles_array.shape[0] == 0:
+    #     return np.array([], dtype=np.bool_), 0
+    # if traj_lengths.size == 0 or traj_lengths.max() == 0:
+    #     return np.zeros(trajectories.shape[0], dtype=np.bool_), 0
 
     collision_results, checks = check_trajectories_collision_parallel_static(
         trajectories,

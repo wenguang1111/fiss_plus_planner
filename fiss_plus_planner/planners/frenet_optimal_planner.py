@@ -238,7 +238,7 @@ class FrenetOptimalPlanner(object):
         """Sequential collision detection (base version for all planners)."""
         passed = []
         for i, traj in enumerate(trajs):
-            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
+            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 1)
             if collision:
                 continue
             passed.append(i)
