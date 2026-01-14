@@ -22,7 +22,7 @@ class ScenarioDrawer:
     """Render CommonRoad scenarios to image files."""
 
     def __init__(self, scenario_name: str, scenario_dir: str | Path, save_dir: str | Path = None):
-        self.save_dir = Path(save_dir) if save_dir is not None else None
+        self.save_dir = Path(save_dir + "imgs/") if save_dir is not None else None
         self.scenario_dir = Path(scenario_dir)
         self.scenario_name = scenario_name
         self.ego_params = DynamicObstacleParams()
@@ -94,65 +94,57 @@ class ScenarioDrawer:
         self,
         trajectory
     ) -> None:
-        """
-        save an image of the scenarios at a specific timestep.
-        
-        Args:
-                Scenarios path.
-                Img save directory.
-                Scenario name.
-                Ego vehicle id.
-                Time step.
-        """
 
         os.makedirs(os.path.join(self.save_dir, self.scenario_name), exist_ok=True)
 
         ego_params = DynamicObstacleParams()
         ego_params.vehicle_shape.occupancy.shape.facecolor = "#ff0000"
-        ego_params.trajectory.facecolor = "#00B427"
-        ego_params.trajectory.line_width = 0.25
+        # ego_params.trajectory.facecolor = "#00B427"
+        # ego_params.trajectory.line_width = 0.25
         ego_params.draw_icon = True
         
+        ego_trajectory = Trajectory(
+            initial_time_step=trajectory[0].time_step,
+            state_list=trajectory
+        )
+        ego_prediction = TrajectoryPrediction(
+            trajectory=ego_trajectory, 
+            shape=Rectangle(length=4.3, width=1.8)
+        )
         ego_id = self.scenario.generate_object_id()
+        ego_vehicle = DynamicObstacle(
+            obstacle_id=ego_id,
+            obstacle_type=ObstacleType.CAR,
+            obstacle_shape=Rectangle(width=1.8, length=4.3),
+            initial_state=trajectory[0],
+            prediction=ego_prediction
+        )
         
-        for timestep, ego_state in enumerate(trajectory):
-            # plt.figure(figsize=(6, 6))
-            ego_vehicle = DynamicObstacle(
-                ego_id,
-                ObstacleType.CAR,
-                Rectangle(width=1.8, length=4.3),
-                ego_state,
-            )
+        for i in range(len(trajectory)):
+            plt.figure(figsize=(6, 6))
 
-            # loop through all time steps and save images
-            # for ts in range(0, no_time_step + 1):
             renderer = MPRenderer()
-            # focus on ego vehicle
             renderer.focus_obstacle_id = ego_id
             renderer.draw_params.axis_visible = False
-            renderer.draw_params.time_begin = timestep
-            renderer.draw_params.dynamic_obstacle.draw_shape = True
+            renderer.draw_params.time_begin = i
             renderer.draw_params.dynamic_obstacle.draw_icon = True
-            renderer.draw_params.dynamic_obstacle.trajectory.line_width = 0.25
-            
-            ego_params.time_begin = timestep
-            
+            # renderer.draw_params.dynamic_obstacle.trajectory.line_width = 0.25
+                        
             self.scenario.draw(renderer)
-            # pp.draw(renderer)
             
+            ego_params.time_begin = i
             ego_vehicle.draw(renderer, draw_params=ego_params)
             
             plt.gca().set_aspect("equal")
             renderer.render()
             
-            # save img without padding
             plt.savefig(
-                os.path.join(self.save_dir, self.scenario_name, f"{timestep}.png"),
+                os.path.join(self.save_dir, self.scenario_name, f"{i}.png"),
                 bbox_inches='tight',
                 pad_inches=0,
                 dpi=300,
             )
-            plt.clf()
+            plt.close()
 
     def save_single_time_step(self, time_step: int, ego_state: State, ego_trajectory: TrajectoryPrediction = None) -> Path:
         """Render one time step and save as PNG."""
