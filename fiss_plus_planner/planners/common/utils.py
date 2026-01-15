@@ -45,10 +45,36 @@ def segments_intersect(
 
 
 @njit
+def aabb_collision(
+    poly1: np.ndarray,
+    poly2: np.ndarray
+) -> bool:
+    min_x1 = poly1[:, 0].min()
+    max_x1 = poly1[:, 0].max()
+    min_y1 = poly1[:, 1].min()
+    max_y1 = poly1[:, 1].max()
+    
+    min_x2 = poly2[:, 0].min()
+    max_x2 = poly2[:, 0].max()
+    min_y2 = poly2[:, 1].min()
+    max_y2 = poly2[:, 1].max()
+    
+    if max_x1 < min_x2 or max_x2 < min_x1:
+        return False
+    if max_y1 < min_y2 or max_y2 < min_y1:
+        return False
+    
+    return True
+
+
+@njit
 def polygon_collision(
     poly1: np.ndarray,
     poly2: np.ndarray
 ) -> bool:
+    if not aabb_collision(poly1, poly2):
+        return False
+    
     for i in range(poly1.shape[0]):
         if point_in_polygon(poly1[i], poly2):
             return True
@@ -69,16 +95,15 @@ def polygon_collision(
     
     return False
 
-
 @njit
 def compute_vehicle_polygon(
     x: float,
     y: float,
     yaw: float,
     vehicle_length: float,
-    vehicle_width: float
+    vehicle_width: float,
+    poly: np.ndarray
 ) -> np.ndarray:
-    poly = np.zeros((4, 2), dtype=np.float32)
     
     corner_offsets = np.array([
         [vehicle_length / 2, vehicle_width / 2],
@@ -101,45 +126,6 @@ def compute_vehicle_polygon(
         poly[i, 1] = rotated_y + y
     
     return poly
-
-
-# @njit(parallel=True)
-# def check_trajectories_collision_parallel(
-#     trajectories: np.ndarray,
-#     obstacles_polygons: List,
-#     vehicle_length: float,
-#     vehicle_width: float,
-#     check_resolution: int = 1
-# ) -> Tuple[np.ndarray, int]:
-#     num_trajs = trajectories.shape[0]
-#     num_states = trajectories.shape[1]
-#     num_obstacles = len(obstacles_polygons)
-    
-#     collision_results = np.zeros(num_trajs, dtype=np.bool_)
-#     total_checks = 0
-    
-#     for traj_idx in prange(num_trajs):
-#         trajectory = trajectories[traj_idx]  # shape (num_states, 3)
-        
-#         for state_idx in range(0, num_states, check_resolution):
-#             x = trajectory[state_idx, 0]
-#             y = trajectory[state_idx, 1]
-#             yaw = trajectory[state_idx, 2]
-            
-#             ego_poly = compute_vehicle_polygon(
-#                 x, y, yaw, vehicle_length, vehicle_width
-#             )
-            
-#             for obs_idx in range(num_obstacles):
-#                 obstacle_poly = obstacles_polygons[obs_idx]
-#                 total_checks += 1
-                
-#                 if polygon_collision(ego_poly, obstacle_poly):
-#                     collision_results[traj_idx] = True
-#                     break
-    
-#     return collision_results, total_checks
-
 
 @njit(parallel=True)
 def check_trajectories_collision_parallel_static(
@@ -166,14 +152,14 @@ def check_trajectories_collision_parallel_static(
         
         traj_len = traj_lengths[traj_idx]
         max_steps = min(traj_len, num_time_steps-time_step_now)
-        
+        ego_poly =  np.zeros((4, 2), dtype=np.float32)
         for state_idx in range(0, max_steps, check_resolution):
             x = trajectory[state_idx, 0]
             y = trajectory[state_idx, 1]
             yaw = trajectory[state_idx, 2]
-            
-            ego_poly = compute_vehicle_polygon(
-                x, y, yaw, vehicle_length, vehicle_width
+    
+            compute_vehicle_polygon(
+                x, y, yaw, vehicle_length, vehicle_width, ego_poly
             )
 
             for obs_idx in range(num_obstacles):

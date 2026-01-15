@@ -198,6 +198,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     time_list = []
     stats = Stats()
     goal_reached = False
+
+    #------------Initial compiling for Numba optimization, should not counted as runtime ------------
+    planner.plan(
+            current_frenet_state, max_speed, obstacles_all, 0, initial_state)
+    #------------------------------------------------------------------------------------------------
+    
     for i in range(final_time_step):
         num_cycles += 1
         
