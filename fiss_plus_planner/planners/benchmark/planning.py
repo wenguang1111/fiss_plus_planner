@@ -143,6 +143,7 @@ def frenet_optimal_planning(scenario: Scenario,
             # current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
         if best_traj_ego is None:
+            print(f"Scenario {scenario.scenario_id} planning failed at time step {i}.")
             stats.time_step_have_to_break = i
             break
 
@@ -202,14 +203,15 @@ def frenet_optimal_planning(scenario: Scenario,
             #     print("Error!")
             #     raise BaseException
 
-    # save data for the planned scenario
-    scenario_drawer = ScenarioDrawer(
-        scenario_name=scenario.scenario_id.__str__(),
-        scenario_dir=input_dir,
-        save_dir=planner.settings.data_save_dir
-    )
-    scenario_drawer.save_scenario_imgs(state_list)
-    planner.save_data()
+    # save data for the planned scenario if all timesteps are planned
+    if len(state_list) == final_time_step:
+        scenario_drawer = ScenarioDrawer(
+            scenario_name=scenario.scenario_id.__str__(),
+            scenario_dir=input_dir,
+            save_dir=planner.settings.data_save_dir
+        )
+        scenario_drawer.save_scenario_imgs(state_list)
+        planner.save_data()
     
     # print("Success!")
     stats.success = True
