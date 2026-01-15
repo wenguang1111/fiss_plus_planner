@@ -290,14 +290,15 @@ def frenet_optimal_planning(scenario: Scenario,
             #     print("Error!")
             #     raise BaseException
 
-    # save data for the planned scenario
-    scenario_drawer = ScenarioDrawer(
-        scenario_name=scenario.scenario_id.__str__(),
-        scenario_dir=input_dir,
-        save_dir=planner.settings.data_save_dir
-    )
-    scenario_drawer.save_scenario_imgs(state_list)
-    planner.save_data()
+    # save data for the planned scenario if all timesteps are planned
+    if len(state_list) == final_time_step:
+        scenario_drawer = ScenarioDrawer(
+            scenario_name=scenario.scenario_id.__str__(),
+            scenario_dir=input_dir,
+            save_dir=planner.settings.data_save_dir
+        )
+        scenario_drawer.save_scenario_imgs(state_list)
+        planner.save_data()
     
     # print("Success!")
     stats.success = True
