@@ -45,8 +45,9 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
         
 class SparsePlanner(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
-    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle):
-        super().__init__(planner_settings, ego_vehicle)
+    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle,
+                 obstacles_array=None, obstacles_num_vertices=None):
+        super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         self.cvae_model = CVAE(X_dim=3, 
                                    c_dim=planner_settings.c_dim, 
                                    z_dim=planner_settings.z_dim,
@@ -100,7 +101,8 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
         # print(len(fplist), "trajectories passed constraint check")
-        fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        safe_candfplistidate = self.check_collision_multithread(fplist, time_step_now)
         # print(len(fplist), "trajectories passed collision check")
 
         # find minimum cost path
@@ -111,4 +113,3 @@ class SparsePlanner(FrenetOptimalPlanner):
                 self.best_traj = fp
 
         return self.best_traj
-    

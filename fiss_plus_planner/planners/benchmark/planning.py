@@ -34,6 +34,65 @@ from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, M
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 
+from fiss_plus_planner.planners.common.utils import configure_numba_threads
+from typing import Tuple
+
+
+def prepare_obstacles_polygons_time_series(
+    obstacles: list,
+    num_time_steps: int,
+    time_step_now: int = 0,
+    max_vertices: int = 10
+) -> Tuple[np.ndarray, np.ndarray]:
+    num_obstacles = len(obstacles)
+    if num_obstacles == 0 or num_time_steps <= 0:
+        return (
+            np.array([], dtype=np.float32).reshape(0, 0, max_vertices, 2),
+            np.array([], dtype=np.int32).reshape(0, 0)
+        )
+    
+    obstacles_array = np.zeros(
+        (num_time_steps, num_obstacles, max_vertices, 2),
+        dtype=np.float32
+    )
+    num_vertices = np.zeros((num_time_steps, num_obstacles), dtype=np.int32)
+    
+    for obs_idx, obstacle in enumerate(obstacles):
+        try:
+            shapely_poly = obstacle.obstacle_shape.shapely_object
+            coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
+            num_verts = min(len(coords), max_vertices)
+        except Exception as e:
+            print(f"Error processing obstacle {obs_idx}: {e}")
+            continue
+        
+        # for static obstacles, use initial state if no prediction
+        default_state = None
+        if getattr(obstacle, "prediction", None) is None:
+            default_state = getattr(obstacle, "initial_state", None)
+        
+        for t in range(num_time_steps):
+            state = obstacle.state_at_time(time_step_now + t)
+            if state is None and default_state is not None:
+                state = default_state
+            if state is None:
+                continue
+            
+            num_vertices[t, obs_idx] = num_verts
+            obs_x = state.position[0]
+            obs_y = state.position[1]
+            obs_yaw = state.orientation if state.orientation is not None else 0.0
+            
+            cos_yaw = np.cos(obs_yaw)
+            sin_yaw = np.sin(obs_yaw)
+            
+            for i in range(num_verts):
+                dx = coords[i, 0]
+                dy = coords[i, 1]
+                obstacles_array[t, obs_idx, i, 0] = dx * cos_yaw - dy * sin_yaw + obs_x
+                obstacles_array[t, obs_idx, i, 1] = dx * sin_yaw + dy * cos_yaw + obs_y
+    
+    return obstacles_array, num_vertices
 
 
 def frenet_optimal_planning(scenario: Scenario, 
@@ -83,23 +142,46 @@ def frenet_optimal_planning(scenario: Scenario,
     vehicle = Vehicle(vehicle_params)
     num_width, num_speed, num_t = num_samples
 
+    # Prepare obstacles data once before creating planner
+    max_vertices = 10  # default minimal value
+    try:
+        for obstacle in obstacles_all:
+            try:
+                shapely_poly = obstacle.obstacle_shape.shapely_object
+                coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
+                num_verts = len(coords)
+                if num_verts > max_vertices:
+                    max_vertices = num_verts
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"Warning: Failed to calculate max_vertices from obstacles: {e}")
+        max_vertices = 10
+    
+    obstacles_array, obstacles_num_vertices = prepare_obstacles_polygons_time_series(
+        obstacles_all,
+        num_time_steps=final_time_step,
+        time_step_now=0,
+        max_vertices=max_vertices
+    )
+
     if method == 'FOP':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
-        planner = FrenetOptimalPlanner(planner_settings, vehicle)
+        planner = FrenetOptimalPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
     elif method == 'FOP+':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
-        planner = FopPlusPlanner(planner_settings, vehicle)
+        planner = FopPlusPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
     elif method == 'FISS':
         planner_settings = FissPlannerSettings(num_width, num_speed, num_t)
-        planner = FissPlanner(planner_settings, vehicle)
+        planner = FissPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
-        planner = FissPlusPlanner(planner_settings, vehicle)
+        planner = FissPlusPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
     elif method == 'Sparse':
         planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
-        planner = SparsePlanner(planner_settings, vehicle)
+        planner = SparsePlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
@@ -108,7 +190,7 @@ def frenet_optimal_planning(scenario: Scenario,
 
     # Initial state
     initial_state = planning_problem.initial_state
-    print(initial_state)
+    # print(initial_state)
     start_state = State(t=0.0, x=initial_state.position[0], y=initial_state.position[1],
                         yaw=initial_state.orientation, v=initial_state.velocity, a=initial_state.acceleration)
     current_frenet_state = FrenetState()
@@ -124,6 +206,12 @@ def frenet_optimal_planning(scenario: Scenario,
     time_list = []
     stats = Stats()
     goal_reached = False
+
+    #------------Initial compiling for Numba optimization, should not counted as runtime ------------
+    planner.plan(
+            current_frenet_state, max_speed, obstacles_all, 0, initial_state)
+    #------------------------------------------------------------------------------------------------
+    
     for i in range(final_time_step):
         num_cycles += 1
         
@@ -142,7 +230,7 @@ def frenet_optimal_planning(scenario: Scenario,
         )
             # current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
-        if best_traj_ego is None:
+        if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
             break
 
@@ -312,11 +400,14 @@ def multiline(xs, ys, c, ax=None, **kwargs):
     return lc
 
 
-def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> None:
+def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     # Global benchmark settings
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
     num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
     save_gif = cfg['SAVE_GIF']
+    #set number of threads for numba parallel collision checker
+    number_threads = cfg['Num_Threads_For_CollisionChecker']
+    configure_numba_threads(number_threads)
 
     vehicle_type = VehicleType.VW_VANAGON  # FORD_ESCORT, BMW_320i, VW_VANAGON
     vehicle_params = VehicleParameterMapping[vehicle_type.name].value

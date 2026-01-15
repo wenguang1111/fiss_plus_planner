@@ -2,7 +2,7 @@ import copy
 import math
 import time
 import os
-
+import numba
 from itertools import product
 import numpy as np
 import pandas as pd
@@ -15,6 +15,9 @@ from fiss_plus_planner.planners.common.geometry.cubic_spline import CubicSpline2
 from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
+from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
+from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
+from typing import Tuple
 
 
 class Stats(object):
@@ -61,8 +64,8 @@ class FrenetOptimalPlannerSettings(object):
         self.lowest_speed = 0.0             # lowest sampling speed [m/s]
         self.num_speed = num_speed          # speed sampling number
         
-        self.min_t = 8.0                    # min prediction time [m]
-        self.max_t = 10.0                   # max prediction time [m]
+        self.min_t = 3.0                    # min prediction time [m]
+        self.max_t = 5.0                   # max prediction time [m]
         self.num_t = num_t                  # time sampling number
 
         self.check_obstacle = True          # True if check collison with obstacles
@@ -71,13 +74,18 @@ class FrenetOptimalPlannerSettings(object):
         self.data_save_dir = "data/fop_data/"
 
 class FrenetOptimalPlanner(object):
-    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle):
+    def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
+                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None):
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
         self.cubic_spline = None
         self.best_traj = None
         self.all_trajs = []
+        
+        # Pre-processed obstacles data (optional)
+        self.obstacles_array = obstacles_array
+        self.obstacles_num_vertices = obstacles_num_vertices
         
         # Statistics
         self.stats = Stats()
@@ -196,7 +204,7 @@ class FrenetOptimalPlanner(object):
                 
                 passed_fplist.append(fp)
 
-        return fplist
+        return passed_fplist
     
     def check_constraints(self, trajs: list) -> list:
         passed = []
@@ -254,18 +262,17 @@ class FrenetOptimalPlanner(object):
                                 return True, num_polys
 
         return False, num_polys
-    
 
     def check_collisions(self, trajs: list, obstacles: list, time_step_now: int = 0) -> list:
+        """Sequential collision detection (base version for all planners)."""
         passed = []
         #TODO: print the runtime with number of total trajectories
         # time_s = time.time()
         for i, traj in enumerate(trajs[0]):
             # Collision check
-            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 2)
+            collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 1)
             if collision:
                 continue
-
             passed.append(i)
         # time_s = time.time() - time_s
         # print(f"Collision checking time for {len(trajs)} trajectories: {time_s:.4f}s, avg {time_s/len(trajs):.6f}s per trajectory, total polygons checked: {num_polys}")
@@ -330,10 +337,9 @@ class FrenetOptimalPlanner(object):
         self.stats.num_trajs_validated = len(fplist)
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
-        # print(len(fplist), "trajectories passed constraint check")
-        fplist = self.check_collisions(fplist, obstacles, time_step_now)
-        # fplist = self.check_collisions(fplist, time_step_now)
-        # print(len(fplist), "trajectories passed collision check")
+        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        fplist = self.check_collision_multithread(fplist, time_step_now)
+        # check_trajectories_collision_parallel_static.parallel_diagnostics(level=4)
 
         # find minimum cost path
         min_cost = float("inf")
