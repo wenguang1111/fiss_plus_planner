@@ -35,6 +35,8 @@ from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_
 from fiss_plus_planner.planners.common.utils import configure_numba_threads
 from typing import Tuple
 
+from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
+
 
 def prepare_obstacles_polygons_time_series(
     obstacles: list,
@@ -177,6 +179,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
+    
+    # pass scenario id to planner
+    planner.scenario_id = scenario.scenario_id.__str__()
 
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
 
@@ -207,7 +212,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     for i in range(final_time_step):
         num_cycles += 1
         
-        # print(f"Time step {i}:")
+        print(f"Time step {i}:")
 
         # Plan!
         start_time = time.time()
@@ -250,7 +255,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                                'velocity_y': current_frenet_state.d_d,
                                # 'steering_angle': None
                                })
-        state_list.append(state)
+        state_list.append(initial_state)
         time_list.append(end_time - start_time)
 
         if show_animation:  # pragma: no cover
@@ -280,6 +285,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             # else:
             #     print("Error!")
             #     raise BaseException
+            
+    # save data for the planned scenario if all timesteps are planned
+    if len(state_list) == final_time_step:
+        scenario_drawer = ScenarioDrawer(
+            scenario_name=scenario.scenario_id.__str__(),
+            scenario_dir=input_dir,
+            save_dir=planner.settings.data_save_dir
+        )
+        scenario_drawer.save_scenario_imgs(state_list)
+        planner.save_data()
 
     # print("Success!")
     stats.success = True

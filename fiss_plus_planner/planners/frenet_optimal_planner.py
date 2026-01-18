@@ -1,9 +1,11 @@
 import copy
 import math
+import os
 import time
 import numba
 from itertools import product
 import numpy as np
+import pandas as pd
 from commonroad.scenario.scenario import Scenario
 from commonroad.scenario.state import InitialState
 from shapely import Polygon, affinity
@@ -68,10 +70,14 @@ class FrenetOptimalPlannerSettings(object):
 
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries
+        
+        self.collect_data = True
+        self.data_save_dir = "data/fop_data/"
 
 class FrenetOptimalPlanner(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
                  obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None):
+        self.scenario_id: str = None
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
@@ -85,6 +91,25 @@ class FrenetOptimalPlanner(object):
         
         # Statistics
         self.stats = Stats()
+        
+        # data storage
+        self.sampled_vars = {
+            "scenario": [],
+            "time_step": [],
+            "t": [],
+            "d": [],
+            "v": []
+        }
+        self.conditions = {
+            "scenario": [],
+            "time_step": [],
+            "x": [],
+            "y": [],
+            "theta": [],
+            "velocity": [],
+            "acceleration": [],
+            "yaw_rate": []
+        }
 
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
@@ -131,6 +156,9 @@ class FrenetOptimalPlanner(object):
             tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
             tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
+            
+            # store the samples used to generate this trajectory in the trajectory object
+            tfp.samples = (di, tv, Ti)
             
             # Compute the final cost
             tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
@@ -271,6 +299,7 @@ class FrenetOptimalPlanner(object):
         return [trajs[i] for i in passed_indices]
 
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+        
         # reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed
@@ -285,6 +314,12 @@ class FrenetOptimalPlanner(object):
         fplist = self.check_collision_multithread(fplist, time_step_now)
         # check_trajectories_collision_parallel_static.parallel_diagnostics(level=4)
 
+        self.collect_data(
+            time_step=time_step_now,
+            trajectories=fplist,
+            current_state=initial_state
+        )
+        
         # find minimum cost path
         min_cost = float("inf")
         for fp in fplist:
@@ -301,3 +336,62 @@ class FrenetOptimalPlanner(object):
         ref_yaw = [self.cubic_spline.calc_yaw(i_s) for i_s in s]
         ref_rk = [self.cubic_spline.calc_curvature(i_s) for i_s in s]
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))
+    
+    def collect_data(self, time_step: int, trajectories: list, current_state: FrenetState):
+        if not self.settings.collect_data:
+            print("Data collection is not enabled.")
+            return
+        
+        for traj in trajectories:
+            
+            self.sampled_vars["scenario"].append([self.scenario_id])
+            self.sampled_vars["time_step"].append([time_step])
+
+            di, tv, Ti = traj.samples
+            
+            self.sampled_vars["d"].append(di)
+            self.sampled_vars["t"].append(Ti)
+            self.sampled_vars["v"].append(tv)
+        
+            self.conditions["scenario"].append([self.scenario_id])
+            self.conditions["time_step"].append([time_step])
+            
+            self.conditions["x"].append(current_state.position[0])
+            self.conditions["y"].append(current_state.position[1])
+            self.conditions["theta"].append(current_state.orientation)
+            self.conditions["velocity"].append(current_state.velocity)
+            self.conditions["acceleration"].append(current_state.acceleration)
+            self.conditions["yaw_rate"].append(current_state.yaw_rate)
+        
+
+    def save_data(self):
+        
+        if not self.settings.collect_data:
+            print("Data collection is not enabled.")
+            return
+        
+        os.makedirs(self.settings.data_save_dir, exist_ok=True)
+        
+        df_samples_new = pd.DataFrame(self.sampled_vars)
+        df_conditions_new = pd.DataFrame(self.conditions)
+        
+        samples_path = os.path.join(self.settings.data_save_dir, f'sampled_vars.parquet')
+        conditions_path = os.path.join(self.settings.data_save_dir, f'conditions.parquet')
+        
+        #  if there was previous data, append the current scenario data and save again 
+        if os.path.exists(samples_path):
+            df_samples_existing = pd.read_parquet(samples_path)
+            df_samples = pd.concat([df_samples_existing, df_samples_new], ignore_index=True)
+        else:
+            df_samples = df_samples_new
+            
+        if os.path.exists(conditions_path):
+            df_conditions_existing = pd.read_parquet(conditions_path)
+            df_conditions = pd.concat([df_conditions_existing, df_conditions_new], ignore_index=True)
+        else:
+            df_conditions = df_conditions_new
+        
+        df_samples.to_parquet(samples_path, index=False)
+        df_conditions.to_parquet(conditions_path, index=False)
+        
+        print(f"Data for scenario {self.sampled_vars['scenario'][-1]} was saved to {self.settings.data_save_dir}.")

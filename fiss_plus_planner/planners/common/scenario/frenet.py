@@ -147,6 +147,8 @@ class FrenetTrajectory(object):
         self.c_d = []
         self.c_dd = []
         
+        self.samples = None  # [di, tv, Ti]
+        
     def __eq__(self, other):
         return (self.cost_final == other.cost_final)
 
