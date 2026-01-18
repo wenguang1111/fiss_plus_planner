@@ -21,7 +21,7 @@ from matplotlib.collections import LineCollection
 from omegaconf import DictConfig
 from PIL import Image
 
-from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, State
+from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, State, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.commonroad_interface.global_planner import GlobalPlanner
 from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSettings
@@ -45,20 +45,20 @@ def prepare_obstacles_polygons_time_series(
     num_obstacles = len(obstacles)
     if num_obstacles == 0 or num_time_steps <= 0:
         return (
-            np.array([], dtype=np.float32).reshape(0, 0, max_vertices, 2),
+            np.array([], dtype=np.float64).reshape(0, 0, max_vertices, 2),
             np.array([], dtype=np.int32).reshape(0, 0)
         )
     
     obstacles_array = np.zeros(
         (num_time_steps, num_obstacles, max_vertices, 2),
-        dtype=np.float32
+        dtype=np.float64
     )
     num_vertices = np.zeros((num_time_steps, num_obstacles), dtype=np.int32)
     
     for obs_idx, obstacle in enumerate(obstacles):
         try:
             shapely_poly = obstacle.obstacle_shape.shapely_object
-            coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
+            coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float64)
             num_verts = min(len(coords), max_vertices)
         except Exception as e:
             print(f"Error processing obstacle {obs_idx}: {e}")
@@ -124,7 +124,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
     for t_step in range(final_time_step):
         frame_positions = []
-        # frame_obstacles = []
         for obstacle in obstacles_all:
             if obstacle.state_at_time(t_step) is not None:
                 frame_positions.append(obstacle.state_at_time(t_step).position)
@@ -140,7 +139,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         for obstacle in obstacles_all:
             try:
                 shapely_poly = obstacle.obstacle_shape.shapely_object
-                coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
+                coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float64)
                 num_verts = len(coords)
                 if num_verts > max_vertices:
                     max_vertices = num_verts
@@ -157,32 +156,43 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         max_vertices=max_vertices
     )
 
+    # Create planner based on method
     if method == 'FOP':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
         planner = FrenetOptimalPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False  # Python FOP planner
     elif method == 'FOP+':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
         planner = FopPlusPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     elif method == 'FISS':
         planner_settings = FissPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     elif method == 'FISS+':
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     elif method == 'Sparse':
         planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
         planner = SparsePlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method == 'FOP_CPP':
+        # Use C++ Frenet Optimal Planner with pybind11
+        planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        planner = FrenetOptimalPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, use_cpp=True)
+        use_cpp_planner = planner.use_cpp  # Check if C++ planner was successfully initialized
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
 
+    # Generate Frenet frame for all planners (Python creates cubic_spline, C++ stores centerline internally)
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
 
     # Initial state
     initial_state = planning_problem.initial_state
-    # print(initial_state)
     start_state = State(t=0.0, x=initial_state.position[0], y=initial_state.position[1],
                         yaw=initial_state.orientation, v=initial_state.velocity, a=initial_state.acceleration)
     current_frenet_state = FrenetState()
@@ -198,21 +208,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     time_list = []
     stats = Stats()
     goal_reached = False
-
-    #------------Initial compiling for Numba optimization, should not counted as runtime ------------
-    planner.plan(
-            current_frenet_state, max_speed, obstacles_all, 0, initial_state)
-    #------------------------------------------------------------------------------------------------
     
     for i in range(final_time_step):
         num_cycles += 1
-        
-        # print(f"Time step {i}:")
-
-        # Plan!
         start_time = time.time()
-        best_traj_ego = planner.plan(
-            current_frenet_state, max_speed, obstacles_all, i, initial_state)
+        best_traj_ego = planner.plan(current_frenet_state, max_speed, i, initial_state)     
         end_time = time.time()
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
@@ -222,7 +222,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         stats.runtime_history.append(processing_time)
         stats.average_runtime += processing_time
         stats.best_traj_costs.append(best_traj_ego.cost_final)
-        stats += planner.stats
+        if not use_cpp_planner:
+            stats += planner.stats
 
         # Update and record the vehicle's trajectory
         next_step_idx = 1
@@ -248,7 +249,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                                'orientation': current_state.yaw,
                                'velocity': current_frenet_state.s_d,
                                'velocity_y': current_frenet_state.d_d,
-                               # 'steering_angle': None
                                })
         state_list.append(state)
         time_list.append(end_time - start_time)
@@ -261,7 +261,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 lambda event: [exit(0) if event.key == 'escape' else None])
             plt.plot(ref_ego_lane_pts[:, 0], ref_ego_lane_pts[:, 1])
             if len(obstacle_positions) > i:
-                # print('total time steps:', len(obstacle_positions), '# of obstacle:', obstacle_markers.shape[0])
                 obstacle_markers = np.array(obstacle_positions[i])
                 plt.plot(obstacle_markers[:, 0], obstacle_markers[:, 1], "X")
                 plt.plot(best_traj_ego.x[next_step_idx:],
@@ -277,20 +276,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                     "v[km/h]:" + str(best_traj_ego.s_d[next_step_idx] * 3.6)[0:4])
                 plt.grid(True)
                 plt.pause(0.0001)
-            # else:
-            #     print("Error!")
-            #     raise BaseException
 
     # print("Success!")
     stats.success = True
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)
-
-    if show_animation and best_traj_ego is not None:  # pragma: no cover
-        plt.grid(True)
-        plt.pause(0.0001)
-        plt.show()
 
     # create the planned trajectory starting at time step 0
     if state_list:

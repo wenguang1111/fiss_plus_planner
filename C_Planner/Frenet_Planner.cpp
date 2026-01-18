@@ -1,0 +1,553 @@
+#include "Frenet_Planner.h"
+#include "common/collision/collision_checker.h"
+#include "Recorder4Cpp/recorder.h"
+#include <algorithm>
+#include <cmath>
+#include <thread>
+#include <mutex>
+#include <limits>
+#include <iostream>
+
+Frenet_Planner::Frenet_Planner(const SettingParameters& settings_param, 
+                               const VehicleParams& vehicle_param,
+                               const double* obs_array,
+                               const int* num_verts,
+                               int n_time_steps,
+                               int n_obstacles,
+                               int max_verts)
+    : settings(settings_param), 
+      vehicle_params(vehicle_param), 
+      cost_function("WX1"), 
+      cubic_spline(nullptr),
+      obstacles_array(obs_array),
+      num_vertices_array(num_verts),
+      num_time_steps(n_time_steps),
+      num_obstacles(n_obstacles),
+      max_vertices(max_verts) {
+        // recordObstacleArray();
+}
+
+Frenet_Planner::~Frenet_Planner() {
+    if (cubic_spline != nullptr) {
+        delete cubic_spline;
+    }
+}
+
+void Frenet_Planner::recordObstacleArray()
+{
+    #ifdef USE_RECORDER
+        for (int t = 0; t < num_time_steps; ++t) {
+            for (int obs = 0; obs < num_obstacles; ++obs) {
+                int num_verts = num_vertices_array[t * num_obstacles + obs];
+                for (int v = 0; v < max_vertices; ++v) {
+                    int idx = t * num_obstacles * max_vertices * 2
+                            + obs * max_vertices * 2
+                            + v * 2;
+                    Recorder::getInstance()->saveData<int>("obstacles.t", t);
+                    Recorder::getInstance()->saveData<int>("obstacles.obs", obs);
+                    Recorder::getInstance()->saveData<int>("obstacles.v", v);
+                    Recorder::getInstance()->saveData<int>("obstacles.num_vertices", num_verts);
+                    Recorder::getInstance()->saveData<double>("obstacles.x", obstacles_array[idx]);
+                    Recorder::getInstance()->saveData<double>("obstacles.y", obstacles_array[idx + 1]);
+                }
+            }
+        }
+    #endif
+}
+
+std::vector<std::tuple<double, double, double>> Frenet_Planner::get_samples() {
+    // TODO: Generate sampling parameters (d, s_d, t)
+    // Calculate sampling range for lateral position
+    double sampling_width = settings.max_road_width - vehicle_params.w;
+    
+    std::vector<double> d_samples;
+    for (int i = 0; i < settings.num_width; i++) {
+        double d = -sampling_width / 2.0 + i * sampling_width / (settings.num_width - 1);
+        d_samples.push_back(d);
+    }
+    
+    std::vector<double> s_d_samples;
+    for (int i = 0; i < settings.num_speed; i++) {
+        double s_d = settings.lowest_speed + i * (settings.highest_speed - settings.lowest_speed) / (settings.num_speed - 1);
+        s_d_samples.push_back(s_d);
+    }
+    
+    std::vector<double> t_samples;
+    for (int i = 0; i < settings.num_t; i++) {
+        double t = settings.min_t + i * (settings.max_t - settings.min_t) / (settings.num_t - 1);
+        t_samples.push_back(t);
+    }
+    
+    // Generate all combinations
+    std::vector<std::tuple<double, double, double>> samples;
+    for (double d : d_samples) {
+        for (double s_d : s_d_samples) {
+            for (double t : t_samples) {
+                samples.push_back(std::make_tuple(d, s_d, t));
+            }
+        }
+    }
+    
+    return samples;
+}
+
+std::vector<FrenetTrajectory> Frenet_Planner::calc_frenet_paths(const FrenetState& frenet_state,
+                                                                  const std::vector<std::tuple<double, double, double>>* samples) {
+    // TODO: Calculate Frenet frame trajectories using quintic and quartic polynomials
+    std::vector<FrenetTrajectory> frenet_paths;
+    
+    std::vector<std::tuple<double, double, double>> local_samples;
+    if (samples == nullptr) {
+        local_samples = get_samples();
+    } else {
+        local_samples = *samples;
+    }
+    
+    for (const auto& sample : local_samples) {
+        double di = std::get<0>(sample);      // target lateral position
+        double tv = std::get<1>(sample);      // target velocity
+        double Ti = std::get<2>(sample);      // time horizon
+        
+        // Ensure Ti is at least tick_t
+        Ti = std::max(Ti, settings.tick_t);
+        
+        FrenetTrajectory fp;
+        
+        // Lateral trajectory using quintic polynomial
+        QuinticPolynomial lat_qp(frenet_state.d, frenet_state.d_d, frenet_state.d_dd,
+                                 di, 0.0f, 0.0f, Ti);
+        
+        // Generate time steps
+        for (double t = 0.0; t < Ti; t += settings.tick_t) {
+            fp.t.push_back(t);
+            fp.d.push_back(lat_qp.calc_point(t));
+            fp.d_d.push_back(lat_qp.calc_first_derivative(t));
+            fp.d_dd.push_back(lat_qp.calc_second_derivative(t));
+            fp.d_ddd.push_back(lat_qp.calc_third_derivative(t));
+        }
+        
+        // Longitudinal trajectory using quartic polynomial
+        QuarticPolynomial lon_qp(frenet_state.s, frenet_state.s_d, frenet_state.s_dd,
+                                 tv, 0.0f, Ti);
+        
+        for (size_t i = 0; i < fp.t.size(); i++) {
+            double t = fp.t[i];
+            fp.s.push_back(lon_qp.calc_point(t));
+            fp.s_d.push_back(lon_qp.calc_first_derivative(t));
+            fp.s_dd.push_back(lon_qp.calc_second_derivative(t));
+            fp.s_ddd.push_back(lon_qp.calc_third_derivative(t));
+        }
+        
+        // Compute final cost
+        fp.cost_final = cost_function.cost_total(fp, settings.highest_speed);
+        fp.is_generated = true;
+        
+        frenet_paths.push_back(fp);
+    }
+    
+    // Store trajectories per timestep
+    all_trajs.push_back(frenet_paths);
+    
+    return frenet_paths;
+}
+
+std::vector<FrenetTrajectory> Frenet_Planner::calc_global_paths(const std::vector<FrenetTrajectory>& fplist) {
+    // TODO: Convert Frenet paths to global (x, y) coordinates using cubic spline
+    std::vector<FrenetTrajectory> passed_fplist;
+    
+    if (cubic_spline == nullptr) {
+        std::cerr << "Cubic spline is not initialized!" << std::endl;
+        return passed_fplist;
+    }
+    
+    for (auto fp : fplist) {
+        bool valid = true;
+        
+        // Calculate global positions
+        for (size_t i = 0; i < fp.s.size(); i++) {
+            auto [ix, iy] = cubic_spline->calc_position(fp.s[i]);
+            
+            // Check if position is valid (within spline range)
+            if (std::isnan(ix) || std::isnan(iy)) {
+                valid = false;
+                break;
+            }
+            
+            double i_yaw = cubic_spline->calc_yaw(fp.s[i]);
+            double di = fp.d[i];
+            
+            // Convert from Frenet to Cartesian coordinates
+            double fx = ix + di * std::cos(i_yaw + M_PI / 2.0);
+            double fy = iy + di * std::sin(i_yaw + M_PI / 2.0);
+            
+            fp.x.push_back(fx);
+            fp.y.push_back(fy);
+        }
+        
+        if (!valid || fp.x.size() < 2) {
+            continue;
+        }
+        
+        // Calculate yaw and ds
+        for (size_t i = 0; i < fp.x.size() - 1; i++) {
+            double dx = fp.x[i + 1] - fp.x[i];
+            double dy = fp.y[i + 1] - fp.y[i];
+            fp.yaw.push_back(std::atan2(dy, dx));
+            fp.ds.push_back(std::sqrt(dx * dx + dy * dy));
+        }
+        
+
+        fp.yaw.push_back(fp.yaw.back());
+
+        
+        // Calculate curvature
+        double dt = settings.tick_t;
+        std::vector<double> c, c_d, c_dd;
+        
+        if (fp.ds.size() > 0) {
+            for (size_t i = 0; i < fp.yaw.size() - 1; i++) {
+                if (fp.ds[i] > 1e-6) {
+                    c.push_back((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i]);
+                } else {
+                    c.push_back(0.0);
+                }
+            }
+            
+            for (size_t i = 0; i < c.size() - 1; i++) {
+                c_d.push_back((c[i + 1] - c[i]) / dt);
+            }
+            
+            for (size_t i = 0; i < c_d.size() - 1; i++) {
+                c_dd.push_back((c_d[i + 1] - c_d[i]) / dt);
+            }
+            
+            fp.c = c;
+            fp.c_d = c_d;
+            fp.c_dd = c_dd;
+        }
+        
+        passed_fplist.push_back(fp);
+    }
+    
+    return passed_fplist;
+}
+
+std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vector<FrenetTrajectory>& trajs) {
+    // Check trajectory constraints (speed, acceleration, etc.)
+    std::vector<FrenetTrajectory> passed;
+    
+    for (const auto& traj : trajs) {
+        bool valid = true;
+        
+        // Check max speed
+        for (double v : traj.s_d) {
+            if (v > vehicle_params.max_speed) {
+                valid = false;
+                break;
+            }
+        }
+        
+        if (!valid) continue;
+        
+        // Check max acceleration
+        for (double a : traj.s_dd) {
+            if (std::abs(a) > vehicle_params.max_accel) {
+                valid = false;
+                break;
+            }
+        }
+        
+        if (valid) {
+            passed.push_back(traj);
+        }
+    }
+    
+    return passed;
+}
+
+std::vector<FrenetTrajectory> Frenet_Planner::check_collision_multithread(const std::vector<FrenetTrajectory>& trajs,
+                                                                          int time_step_now) {
+    // Multi-threaded collision detection using pre-processed obstacle data
+    // If no obstacles data available, return all trajectories as valid
+    if (trajs.empty() || obstacles_array == nullptr || num_vertices_array == nullptr ||
+        num_time_steps <= 0 || num_obstacles <= 0) {
+        return trajs;
+    }
+    
+    std::vector<FrenetTrajectory> passed;
+    std::vector<bool> collision_flags(trajs.size(), false);
+    std::mutex collision_mutex;
+    
+    // Process each trajectory in parallel
+    std::vector<std::thread> threads;
+    int num_threads = std::thread::hardware_concurrency();
+    if (num_threads == 0) num_threads = 4;  // fallback default
+    
+    int trajs_per_thread = (trajs.size() + num_threads - 1) / num_threads;
+    
+    for (int t = 0; t < num_threads && t * trajs_per_thread < (int)trajs.size(); t++) {
+        threads.emplace_back([this, &trajs, &collision_flags, &collision_mutex, time_step_now, t, trajs_per_thread]() {
+            int start_idx = t * trajs_per_thread;
+            int end_idx = std::min(start_idx + trajs_per_thread, (int)trajs.size());
+            
+            for (int i = start_idx; i < end_idx; i++) {
+                const auto& traj = trajs[i];
+                bool has_collision = false;
+                
+                // Check collision for this trajectory
+                int t_step_max = std::min((int)traj.x.size(), num_time_steps - time_step_now);
+                
+                for (int t_check = 0; t_check < t_step_max && !has_collision; t_check++) {
+                    int t_step = t_check + time_step_now;
+                    if (t_step >= num_time_steps) break;
+                    
+                    // Check ego vehicle position against all obstacles at this time step
+                    double ego_x = traj.x[t_check];
+                    double ego_y = traj.y[t_check];
+                    
+                    // Simple AABB collision check as a placeholder
+                    // In a real implementation, this would use polygon intersection
+                    for (int obs_idx = 0; obs_idx < num_obstacles; obs_idx++) {
+                        int num_verts = num_vertices_array[t_step * num_obstacles + obs_idx];
+                        if (num_verts <= 0) continue;
+                        
+                        // Get obstacle polygon vertices
+                        double min_x = 1e6, max_x = -1e6;
+                        double min_y = 1e6, max_y = -1e6;
+                        
+                        for (int v = 0; v < num_verts; v++) {
+                            int idx = t_step * num_obstacles * max_vertices * 2 + obs_idx * max_vertices * 2 + v * 2;
+                            double vx = obstacles_array[idx];
+                            double vy = obstacles_array[idx + 1];
+                            min_x = std::min(min_x, vx);
+                            max_x = std::max(max_x, vx);
+                            min_y = std::min(min_y, vy);
+                            max_y = std::max(max_y, vy);
+                        }
+                        
+                        // AABB collision check with vehicle bounding box
+                        double ego_min_x = ego_x - vehicle_params.w / 2.0;
+                        double ego_max_x = ego_x + vehicle_params.w / 2.0;
+                        double ego_min_y = ego_y - vehicle_params.l / 2.0;
+                        double ego_max_y = ego_y + vehicle_params.l / 2.0;
+                        
+                        if (!(ego_max_x < min_x || ego_min_x > max_x ||
+                              ego_max_y < min_y || ego_min_y > max_y)) {
+                            has_collision = true;
+                            break;
+                        }
+                    }
+                }
+                
+                {
+                    std::lock_guard<std::mutex> lock(collision_mutex);
+                    collision_flags[i] = has_collision;
+                }
+            }
+        });
+    }
+    
+    // Wait for all threads to complete
+    for (auto& thread : threads) {
+        thread.join();
+    }
+    
+    // Collect non-colliding trajectories
+    for (size_t i = 0; i < trajs.size(); i++) {
+        if (!collision_flags[i]) {
+            passed.push_back(trajs[i]);
+        }
+    }
+    
+    return passed;
+}
+
+void Frenet_Planner::recordTrajectory(const FrenetTrajectory& traj)
+{
+    #ifdef USE_RECORDER
+    Recorder::getInstance()->saveData<double>("traj.cost_fix", traj.cost_fix);
+    Recorder::getInstance()->saveData<double>("traj.cost_dyn", traj.cost_dyn);
+    Recorder::getInstance()->saveData<double>("traj.cost_heu", traj.cost_heu);
+    Recorder::getInstance()->saveData<double>("traj.cost_est", traj.cost_est);
+    Recorder::getInstance()->saveData<double>("traj.cost_final", traj.cost_final);
+
+    Recorder::getInstance()->saveData<int>("traj.idx0", traj.idx[0]);
+    Recorder::getInstance()->saveData<int>("traj.idx1", traj.idx[1]);
+    Recorder::getInstance()->saveData<int>("traj.idx2", traj.idx[2]);
+    Recorder::getInstance()->saveData<int>("traj.lane_id", traj.lane_id);
+    Recorder::getInstance()->saveData<int>("traj.is_generated", traj.is_generated ? 1 : 0);
+    Recorder::getInstance()->saveData<int>("traj.is_searched", traj.is_searched ? 1 : 0);
+    Recorder::getInstance()->saveData<int>("traj.constraint_passed", traj.constraint_passed ? 1 : 0);
+    Recorder::getInstance()->saveData<int>("traj.collision_passed", traj.collision_passed ? 1 : 0);
+
+    Recorder::getInstance()->saveData<int>("traj.t.size", static_cast<int>(traj.t.size()));
+    for (size_t i = 0; i < traj.t.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.t.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.t", traj.t[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.s.size", static_cast<int>(traj.s.size()));
+    for (size_t i = 0; i < traj.s.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.s.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.s", traj.s[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.s_d.size", static_cast<int>(traj.s_d.size()));
+    for (size_t i = 0; i < traj.s_d.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.s_d.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.s_d", traj.s_d[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.s_dd.size", static_cast<int>(traj.s_dd.size()));
+    for (size_t i = 0; i < traj.s_dd.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.s_dd.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.s_dd", traj.s_dd[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.s_ddd.size", static_cast<int>(traj.s_ddd.size()));
+    for (size_t i = 0; i < traj.s_ddd.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.s_ddd.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.s_ddd", traj.s_ddd[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.d.size", static_cast<int>(traj.d.size()));
+    for (size_t i = 0; i < traj.d.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.d.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.d", traj.d[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.d_d.size", static_cast<int>(traj.d_d.size()));
+    for (size_t i = 0; i < traj.d_d.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.d_d.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.d_d", traj.d_d[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.d_dd.size", static_cast<int>(traj.d_dd.size()));
+    for (size_t i = 0; i < traj.d_dd.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.d_dd.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.d_dd", traj.d_dd[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.d_ddd.size", static_cast<int>(traj.d_ddd.size()));
+    for (size_t i = 0; i < traj.d_ddd.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.d_ddd.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.d_ddd", traj.d_ddd[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.x.size", static_cast<int>(traj.x.size()));
+    for (size_t i = 0; i < traj.x.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.x.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.x", traj.x[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.y.size", static_cast<int>(traj.y.size()));
+    for (size_t i = 0; i < traj.y.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.y.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.y", traj.y[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.yaw.size", static_cast<int>(traj.yaw.size()));
+    for (size_t i = 0; i < traj.yaw.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.yaw.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.yaw", traj.yaw[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.ds.size", static_cast<int>(traj.ds.size()));
+    for (size_t i = 0; i < traj.ds.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.ds.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.ds", traj.ds[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.c.size", static_cast<int>(traj.c.size()));
+    for (size_t i = 0; i < traj.c.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.c.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.c", traj.c[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.c_d.size", static_cast<int>(traj.c_d.size()));
+    for (size_t i = 0; i < traj.c_d.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.c_d.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.c_d", traj.c_d[i]);
+    }
+
+    Recorder::getInstance()->saveData<int>("traj.c_dd.size", static_cast<int>(traj.c_dd.size()));
+    for (size_t i = 0; i < traj.c_dd.size(); ++i) {
+        Recorder::getInstance()->saveData<int>("traj.c_dd.step", static_cast<int>(i));
+        Recorder::getInstance()->saveData<double>("traj.c_dd", traj.c_dd[i]);
+    }
+    #endif
+}
+
+FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
+                                      double max_target_speed,
+                                      int time_step_now) {
+    // Main planning function
+    settings.highest_speed = max_target_speed;
+    // Generate all candidate trajectories
+    auto fplist = calc_frenet_paths(frenet_state);
+    
+    // Convert to global coordinates
+    fplist = calc_global_paths(fplist);
+    
+    // Check constraints
+    fplist = check_constraints(fplist);
+    
+    // Check collisions - no nullptr check needed
+    fplist = check_collision(
+        fplist,
+        obstacles_array,
+        num_vertices_array,
+        num_time_steps,
+        num_obstacles,
+        max_vertices,
+        vehicle_params.l,
+        vehicle_params.w,
+        time_step_now,
+        1  // check_resolution
+    );
+    
+    // Find minimum cost path
+    best_traj = FrenetTrajectory();
+    best_traj.cost_final = std::numeric_limits<double>::infinity();
+    
+    for (const auto& fp : fplist) {
+        if (fp.cost_final < best_traj.cost_final) {
+            best_traj = fp;
+        }
+    }
+    
+    recordTrajectory(best_traj);
+    #ifdef USE_RECORDER
+        Recorder::getInstance()->writeDataToCSV();
+    #endif
+    std::cout <<"using cpp frenet"<<std::endl;
+    
+    return best_traj;
+}
+
+void Frenet_Planner::generate_frenet_frame(const double* centerline_pts, int num_points, int pts_dim) {
+    // TODO: Generate Frenet frame from centerline points
+    // Expected input: centerline_pts is a flat array of shape [num_points, pts_dim]
+    // pts_dim should be 2 (x, y coordinates)
+    
+    if (centerline_pts == nullptr || num_points < 2 || pts_dim != 2) {
+        return;
+    }
+    
+    std::vector<double> x_coords, y_coords;
+    for (int i = 0; i < num_points; i++) {
+        x_coords.push_back(centerline_pts[i * pts_dim]);
+        y_coords.push_back(centerline_pts[i * pts_dim + 1]);
+        // #ifdef USE_RECORDER
+        //     Recorder::getInstance()->saveData<double>("centerline_pts.x", centerline_pts[i * pts_dim]);
+        //     Recorder::getInstance()->saveData<double>("centerline_pts.y", centerline_pts[i * pts_dim + 1]);
+        // #endif
+    }
+    
+    if (cubic_spline != nullptr) {
+        delete cubic_spline;
+    }
+    
+    cubic_spline = new CubicSpline2D(x_coords, y_coords);
+
+}

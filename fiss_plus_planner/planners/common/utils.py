@@ -110,7 +110,7 @@ def compute_vehicle_polygon(
         [vehicle_length / 2, -vehicle_width / 2],
         [-vehicle_length / 2, -vehicle_width / 2],
         [-vehicle_length / 2, vehicle_width / 2]
-    ], dtype=np.float32)
+    ], dtype=np.float64)
     
     cos_yaw = np.cos(yaw)
     sin_yaw = np.sin(yaw)
@@ -152,7 +152,7 @@ def check_trajectories_collision_parallel_static(
         
         traj_len = traj_lengths[traj_idx]
         max_steps = min(traj_len, num_time_steps-time_step_now)
-        ego_poly =  np.zeros((4, 2), dtype=np.float32)
+        ego_poly =  np.zeros((4, 2), dtype=np.float64)
         for state_idx in range(0, max_steps, check_resolution):
             x = trajectory[state_idx, 0]
             y = trajectory[state_idx, 1]
@@ -184,7 +184,7 @@ def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
     # return array as [num_trajs, num_states, 3]
     num_trajs = len(fplist)
     if num_trajs == 0:
-        empty_trajs = np.array([], dtype=np.float32).reshape(0, 0, 3)
+        empty_trajs = np.array([], dtype=np.float64).reshape(0, 0, 3)
         if return_lengths:
             return empty_trajs, np.array([], dtype=np.int32)
         return empty_trajs
@@ -192,7 +192,7 @@ def prepare_trajectory_array(fplist: list, return_lengths: bool = False):
     traj_lengths = np.array([len(traj.x) for traj in fplist], dtype=np.int32)
     max_length = int(traj_lengths.max()) if traj_lengths.size > 0 else 0
     
-    trajectories = np.zeros((num_trajs, max_length, 3), dtype=np.float32)
+    trajectories = np.zeros((num_trajs, max_length, 3), dtype=np.float64)
     
     for i, traj in enumerate(fplist):
         traj_len = len(traj.x)
@@ -213,20 +213,20 @@ def prepare_obstacles_polygons_time_series(
     num_obstacles = len(obstacles)
     if num_obstacles == 0 or num_time_steps <= 0:
         return (
-            np.array([], dtype=np.float32).reshape(0, 0, max_vertices, 2),
+            np.array([], dtype=np.float64).reshape(0, 0, max_vertices, 2),
             np.array([], dtype=np.int32).reshape(0, 0)
         )
     
     obstacles_array = np.zeros(
         (num_time_steps, num_obstacles, max_vertices, 2),
-        dtype=np.float32
+        dtype=np.float64
     )
     num_vertices = np.zeros((num_time_steps, num_obstacles), dtype=np.int32)
     
     for obs_idx, obstacle in enumerate(obstacles):
         try:
             shapely_poly = obstacle.obstacle_shape.shapely_object
-            coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float32)
+            coords = np.array(shapely_poly.exterior.coords[:-1], dtype=np.float64)
             num_verts = min(len(coords), max_vertices)
         except Exception as e:
             print(f"Error processing obstacle {obs_idx}: {e}")

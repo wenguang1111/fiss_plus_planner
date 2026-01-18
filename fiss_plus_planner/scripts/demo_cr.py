@@ -15,6 +15,8 @@ if __name__ == '__main__':
         cfg = yaml.safe_load(file)
         file.close()
 
+    print(os.getpid())
+
     save_measurments = cfg['SAVE_MEASUREMENTS']
         
     output_dir = os.path.join(os.getcwd(), cfg['OUTPUT_DIR'])

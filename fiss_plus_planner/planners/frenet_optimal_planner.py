@@ -1,7 +1,8 @@
 import copy
+import csv
+import os
 import math
 import time
-import numba
 from itertools import product
 import numpy as np
 from commonroad.scenario.scenario import Scenario
@@ -16,6 +17,32 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
 from typing import Tuple
+import sys
+from pathlib import Path
+
+# Try to import C++ pybind11 module
+try:
+    # Get the project root directory
+    # frenet_optimal_planner.py is at: fiss_plus_planner/planners/frenet_optimal_planner.py
+    # Project root: /home/wenguang/workplace/fiss_plus_planner/
+    # So: __file__.parent.parent.parent = project root
+    project_root = Path(__file__).parent.parent.parent
+    cpp_planner_build = project_root / 'C_Planner' / 'build'
+    
+    if cpp_planner_build.exists():
+        # Add the build directory directly to sys.path so Python can find the .so file
+        sys.path.insert(0, str(cpp_planner_build))
+    
+    import frenet_planner_cpp
+    CPP_MODULE_AVAILABLE = True
+except (ImportError, ModuleNotFoundError) as e:
+    import traceback
+    traceback.print_exc()
+    CPP_MODULE_AVAILABLE = False
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    CPP_MODULE_AVAILABLE = False
 
 
 class Stats(object):
@@ -68,10 +95,10 @@ class FrenetOptimalPlannerSettings(object):
 
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries
-
 class FrenetOptimalPlanner(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
-                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None):
+                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None,
+                 use_cpp: bool = False):
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
@@ -85,6 +112,72 @@ class FrenetOptimalPlanner(object):
         
         # Statistics
         self.stats = Stats()
+        
+        # C++ planner instance (optional)
+        self.cpp_planner = None
+        self.use_cpp = use_cpp and CPP_MODULE_AVAILABLE
+        
+        if self.use_cpp:
+            self._init_cpp_planner()
+    
+    def _init_cpp_planner(self):
+        """Initialize C++ planner using pybind11 bindings"""
+        try:
+            # Create C++ SettingParameters
+            cpp_settings = frenet_planner_cpp.SettingParameters(
+                self.settings.num_width,
+                self.settings.num_speed,
+                self.settings.num_t
+            )
+            cpp_settings.tick_t = self.settings.tick_t
+            cpp_settings.max_road_width = self.settings.max_road_width
+            cpp_settings.highest_speed = self.settings.highest_speed
+            cpp_settings.lowest_speed = self.settings.lowest_speed
+            cpp_settings.min_t = self.settings.min_t
+            cpp_settings.max_t = self.settings.max_t
+            cpp_settings.check_obstacle = self.settings.check_obstacle
+            cpp_settings.check_boundary = self.settings.check_boundary
+            
+            # Create C++ VehicleParams
+            cpp_vehicle = frenet_planner_cpp.VehicleParams()
+            cpp_vehicle.l = self.vehicle.l
+            cpp_vehicle.w = self.vehicle.w
+            cpp_vehicle.a = self.vehicle.a
+            cpp_vehicle.b = self.vehicle.b
+            cpp_vehicle.T_f = self.vehicle.T_f
+            cpp_vehicle.T_r = self.vehicle.T_r
+            cpp_vehicle.max_speed = self.vehicle.max_speed
+            cpp_vehicle.max_accel = self.vehicle.max_accel
+            cpp_vehicle.max_steering_angle = self.vehicle.max_steering_angle
+            cpp_vehicle.max_steering_rate = self.vehicle.max_steering_rate
+            
+            # Prepare obstacle arrays
+            if self.obstacles_array is not None and self.obstacles_num_vertices is not None:
+                obs_array = np.asarray(self.obstacles_array, dtype=np.float64)
+                num_verts_array = np.asarray(self.obstacles_num_vertices, dtype=np.int32)
+            else:
+                # Create empty obstacle arrays
+                obs_array = np.zeros((1, 1, 10, 2), dtype=np.float64)
+                num_verts_array = np.zeros((1, 1), dtype=np.int32)
+            
+            num_time_steps = obs_array.shape[0]
+            num_obstacles = obs_array.shape[1]
+            max_vertices = obs_array.shape[2]
+            
+            # Create C++ planner
+            self.cpp_planner = frenet_planner_cpp.FrenetPlanner(
+                cpp_settings,
+                cpp_vehicle,
+                obs_array,
+                num_verts_array,
+                num_time_steps,
+                num_obstacles,
+                max_vertices
+            )
+        except Exception as e:
+            print(f"Warning: Failed to initialize C++ planner: {e}")
+            self.use_cpp = False
+            self.cpp_planner = None
 
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
@@ -100,6 +193,45 @@ class FrenetOptimalPlanner(object):
         return samples
 
     def calc_frenet_paths(self, frenet_state: FrenetState, samples = None) -> list:
+        """Calculate Frenet paths - can use C++ or Python implementation"""
+        if self.use_cpp and self.cpp_planner is not None:
+            # Use C++ implementation
+            try:
+                cpp_state = frenet_planner_cpp.FrenetState()
+                cpp_state.t = frenet_state.t
+                cpp_state.s = frenet_state.s
+                cpp_state.s_d = frenet_state.s_d
+                cpp_state.s_dd = frenet_state.s_dd
+                cpp_state.s_ddd = frenet_state.s_ddd
+                cpp_state.d = frenet_state.d
+                cpp_state.d_d = frenet_state.d_d
+                cpp_state.d_dd = frenet_state.d_dd
+                cpp_state.d_ddd = frenet_state.d_ddd
+                
+                cpp_trajs = self.cpp_planner.calc_frenet_paths(cpp_state)
+                
+                # Convert C++ trajectories back to Python
+                frenet_paths = []
+                for cpp_traj in cpp_trajs:
+                    fp = FrenetTrajectory()
+                    fp.t = list(cpp_traj.t)
+                    fp.s = list(cpp_traj.s)
+                    fp.s_d = list(cpp_traj.s_d)
+                    fp.s_dd = list(cpp_traj.s_dd)
+                    fp.s_ddd = list(cpp_traj.s_ddd)
+                    fp.d = list(cpp_traj.d)
+                    fp.d_d = list(cpp_traj.d_d)
+                    fp.d_dd = list(cpp_traj.d_dd)
+                    fp.d_ddd = list(cpp_traj.d_ddd)
+                    fp.cost_final = cpp_traj.cost_final
+                    frenet_paths.append(fp)
+                
+                self.all_trajs.append(frenet_paths)
+                return frenet_paths
+            except Exception as e:
+                print(f"Warning: C++ calc_frenet_paths failed: {e}, falling back to Python")
+        
+        # -----------Python implementation (fallback or primary)-----------------
         frenet_paths = []
 
         if samples is None:
@@ -144,6 +276,55 @@ class FrenetOptimalPlanner(object):
         return frenet_paths
 
     def calc_global_paths(self, fplist: list) -> list:
+        """Convert Frenet paths to global coordinates - can use C++ or Python implementation"""
+        if self.use_cpp and self.cpp_planner is not None:
+            # Use C++ implementation
+            try:
+                cpp_trajs = []
+                for fp in fplist:
+                    cpp_traj = frenet_planner_cpp.FrenetTrajectory()
+                    cpp_traj.t = list(fp.t)
+                    cpp_traj.s = list(fp.s)
+                    cpp_traj.s_d = list(fp.s_d)
+                    cpp_traj.s_dd = list(fp.s_dd)
+                    cpp_traj.s_ddd = list(fp.s_ddd)
+                    cpp_traj.d = list(fp.d)
+                    cpp_traj.d_d = list(fp.d_d)
+                    cpp_traj.d_dd = list(fp.d_dd)
+                    cpp_traj.d_ddd = list(fp.d_ddd)
+                    cpp_traj.cost_final = fp.cost_final
+                    cpp_trajs.append(cpp_traj)
+                
+                cpp_result = self.cpp_planner.calc_global_paths(cpp_trajs)
+                
+                # Convert back to Python
+                passed_fplist = []
+                for cpp_traj in cpp_result:
+                    fp = FrenetTrajectory()
+                    fp.t = list(cpp_traj.t)
+                    fp.s = list(cpp_traj.s)
+                    fp.s_d = list(cpp_traj.s_d)
+                    fp.s_dd = list(cpp_traj.s_dd)
+                    fp.s_ddd = list(cpp_traj.s_ddd)
+                    fp.d = list(cpp_traj.d)
+                    fp.d_d = list(cpp_traj.d_d)
+                    fp.d_dd = list(cpp_traj.d_dd)
+                    fp.d_ddd = list(cpp_traj.d_ddd)
+                    fp.x = list(cpp_traj.x)
+                    fp.y = list(cpp_traj.y)
+                    fp.yaw = list(cpp_traj.yaw)
+                    fp.ds = list(cpp_traj.ds)
+                    fp.c = list(cpp_traj.c)
+                    fp.c_d = list(cpp_traj.c_d)
+                    fp.c_dd = list(cpp_traj.c_dd)
+                    fp.cost_final = cpp_traj.cost_final
+                    passed_fplist.append(fp)
+                
+                return passed_fplist
+            except Exception as e:
+                print(f"Warning: C++ calc_global_paths failed: {e}, falling back to Python")
+        
+        # -----------------Python implementation (fallback or primary)-------------------
         passed_fplist = []
         for fp in fplist:
             # calc global positions
@@ -178,6 +359,32 @@ class FrenetOptimalPlanner(object):
         return passed_fplist
     
     def check_constraints(self, trajs: list) -> list:
+        """Check trajectory constraints - can use C++ or Python implementation"""
+        if self.use_cpp and self.cpp_planner is not None:
+            # Use C++ implementation
+            try:
+                cpp_trajs = []
+                for traj in trajs:
+                    cpp_traj = frenet_planner_cpp.FrenetTrajectory()
+                    cpp_traj.s_d = list(traj.s_d)
+                    cpp_traj.s_dd = list(traj.s_dd)
+                    cpp_trajs.append(cpp_traj)
+                
+                cpp_result = self.cpp_planner.check_constraints(cpp_trajs)
+                
+                # Map results back to original trajectories
+                result_indices = set()
+                for cpp_traj in cpp_result:
+                    for i, traj in enumerate(trajs):
+                        if list(cpp_traj.s_d) == traj.s_d and list(cpp_traj.s_dd) == traj.s_dd:
+                            result_indices.add(i)
+                            break
+                
+                return [trajs[i] for i in sorted(result_indices)]
+            except Exception as e:
+                print(f"Warning: C++ check_constraints failed: {e}, falling back to Python")
+        
+        # ---------------------Python implementation (fallback or primary)----------------------
         passed = []
 
         for i, traj in enumerate(trajs):
@@ -246,6 +453,34 @@ class FrenetOptimalPlanner(object):
 
     def check_collision_multithread(self, trajs: list, time_step_now: int = 0) -> list:
         """Multi-threaded collision detection using pre-processed obstacle data."""
+        # ----------------------Try C++ implementation first-----------------
+        if self.use_cpp and self.cpp_planner is not None:
+            try:
+                cpp_trajs = []
+                for traj in trajs:
+                    cpp_traj = frenet_planner_cpp.FrenetTrajectory()
+                    cpp_traj.t = list(traj.t)
+                    cpp_traj.x = list(traj.x)
+                    cpp_traj.y = list(traj.y)
+                    cpp_traj.yaw = list(traj.yaw)
+                    cpp_traj.s = list(traj.s)
+                    cpp_traj.s_d = list(traj.s_d)
+                    cpp_traj.s_dd = list(traj.s_dd)
+                    cpp_traj.d = list(traj.d)
+                    cpp_traj.d_d = list(traj.d_d)
+                    cpp_traj.d_dd = list(traj.d_dd)
+                    cpp_traj.cost_final = traj.cost_final
+                    cpp_trajs.append(cpp_traj)
+                
+                cpp_result = self.cpp_planner.check_collision_multithread(cpp_trajs, time_step_now)
+                
+                # Map results back - use cost_final as unique identifier
+                result_costs = set(cpp_traj.cost_final for cpp_traj in cpp_result)
+                return [traj for traj in trajs if traj.cost_final in result_costs]
+            except Exception as e:
+                print(f"Warning: C++ check_collision_multithread failed: {e}, falling back to Python")
+        
+        # ----------------Python implementation (fallback or primary)-----------------
         if len(trajs) == 0 or self.obstacles_array is None or self.obstacles_num_vertices is None:
             return trajs
         
@@ -270,7 +505,125 @@ class FrenetOptimalPlanner(object):
         passed_indices = np.where(~collision_mask)[0]
         return [trajs[i] for i in passed_indices]
 
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+    def recordPathForDebug(self, path: FrenetTrajectory, output_path: str = "py_traj_debug.csv"):
+        if path is None:
+            return
+
+        data = {}
+
+        def save(key, value):
+            data.setdefault(key, []).append(value)
+
+        def save_seq(name, seq):
+            save(f"{name}.size", len(seq))
+            for i, val in enumerate(seq):
+                save(f"{name}.step", i)
+                save(name, val)
+
+        save("traj.cost_fix", path.cost_fix)
+        save("traj.cost_dyn", path.cost_dyn)
+        save("traj.cost_heu", path.cost_heu)
+        save("traj.cost_est", path.cost_est)
+        save("traj.cost_final", path.cost_final)
+
+        save("traj.idx0", int(path.idx[0]))
+        save("traj.idx1", int(path.idx[1]))
+        save("traj.idx2", int(path.idx[2]))
+        save("traj.lane_id", int(path.lane_id))
+        save("traj.is_generated", 1 if path.is_generated else 0)
+        save("traj.is_searched", 1 if path.is_searched else 0)
+        save("traj.constraint_passed", 1 if path.constraint_passed else 0)
+        save("traj.collision_passed", 1 if path.collision_passed else 0)
+
+        save_seq("traj.t", path.t)
+        save_seq("traj.s", path.s)
+        save_seq("traj.s_d", path.s_d)
+        save_seq("traj.s_dd", path.s_dd)
+        save_seq("traj.s_ddd", path.s_ddd)
+        save_seq("traj.d", path.d)
+        save_seq("traj.d_d", path.d_d)
+        save_seq("traj.d_dd", path.d_dd)
+        save_seq("traj.d_ddd", path.d_ddd)
+        save_seq("traj.x", path.x)
+        save_seq("traj.y", path.y)
+        save_seq("traj.yaw", path.yaw)
+        save_seq("traj.ds", path.ds)
+        save_seq("traj.c", path.c)
+        save_seq("traj.c_d", path.c_d)
+        save_seq("traj.c_dd", path.c_dd)
+
+        keys = sorted(data.keys())
+        max_len = max(len(values) for values in data.values()) if data else 0
+
+        def format_value(value):
+            if value is None:
+                return ""
+            if isinstance(value, (int, np.integer)):
+                return str(int(value))
+            return f"{float(value):.15f}"
+
+        file_exists = os.path.exists(output_path)
+        with open(output_path, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            if not file_exists or os.path.getsize(output_path) == 0:
+                writer.writerow(keys)
+            for i in range(max_len):
+                row = []
+                for key in keys:
+                    values = data[key]
+                    if i < len(values):
+                        row.append(format_value(values[i]))
+                    else:
+                        row.append("")
+                writer.writerow(row)
+
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+        #-----------CPP-------------------------------------------
+        if self.use_cpp and self.cpp_planner is not None:
+            # Call C++ planner's plan method
+            try:
+                # Convert Python FrenetState to C++ FrenetState
+                cpp_state = frenet_planner_cpp.FrenetState()
+                cpp_state.t = frenet_state.t
+                cpp_state.s = frenet_state.s
+                cpp_state.s_d = frenet_state.s_d
+                cpp_state.s_dd = frenet_state.s_dd
+                cpp_state.s_ddd = frenet_state.s_ddd
+                cpp_state.d = frenet_state.d
+                cpp_state.d_d = frenet_state.d_d
+                cpp_state.d_dd = frenet_state.d_dd
+                cpp_state.d_ddd = frenet_state.d_ddd
+                
+                # Call C++ plan method
+                cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now)
+                
+                # Convert C++ FrenetTrajectory back to Python FrenetTrajectory
+                if cpp_traj.is_generated:
+                    py_traj = FrenetTrajectory()
+                    py_traj.t = list(cpp_traj.t)
+                    py_traj.s = list(cpp_traj.s)
+                    py_traj.s_d = list(cpp_traj.s_d)
+                    py_traj.s_dd = list(cpp_traj.s_dd)
+                    py_traj.s_ddd = list(cpp_traj.s_ddd)
+                    py_traj.d = list(cpp_traj.d)
+                    py_traj.d_d = list(cpp_traj.d_d)
+                    py_traj.d_dd = list(cpp_traj.d_dd)
+                    py_traj.d_ddd = list(cpp_traj.d_ddd)
+                    py_traj.x = list(cpp_traj.x)
+                    py_traj.y = list(cpp_traj.y)
+                    py_traj.yaw = list(cpp_traj.yaw)
+                    py_traj.ds = list(cpp_traj.ds)
+                    py_traj.c = list(cpp_traj.c)
+                    py_traj.c_d = list(cpp_traj.c_d)
+                    py_traj.c_dd = list(cpp_traj.c_dd)
+                    py_traj.cost_final = cpp_traj.cost_final
+                    self.best_traj = py_traj
+                    return py_traj
+                else:
+                    return None
+            except Exception as e:
+                print(f"Warning: C++ plan failed: {e}, falling back to Python")
+        #-----------Python Implementation-------------------------------------------
         # reset stats
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed
@@ -291,13 +644,28 @@ class FrenetOptimalPlanner(object):
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final
                 self.best_traj = fp
-                        
+
+        self.recordPathForDebug(self.best_traj)
         return self.best_traj
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
+        # Python implementation
         self.cubic_spline = CubicSpline2D(centerline_pts[:, 0], centerline_pts[:, 1])
         s = np.arange(0, self.cubic_spline.s[-1], 0.1)
         ref_xy = [self.cubic_spline.calc_position(i_s) for i_s in s]
         ref_yaw = [self.cubic_spline.calc_yaw(i_s) for i_s in s]
         ref_rk = [self.cubic_spline.calc_curvature(i_s) for i_s in s]
+        #-----------CPP start-------------------------------------------
+        # C++ implementation: pass centerline directly to C++ planner
+        # C++ planner will internally create and store the cubic spline
+        if self.cpp_planner is not None:
+            try:
+                centerline_pts_cpp = np.asarray(centerline_pts, dtype=np.float64)
+                centerline_pts_xy = np.column_stack(
+                    (centerline_pts_cpp[:, 0], centerline_pts_cpp[:, 1])
+                )
+                self.cpp_planner.generate_frenet_frame(centerline_pts_xy)
+            except Exception as e:
+                print(f"Warning: Failed to set C++ planner frenet frame: {e}")
+        #-----------CPP end-------------------------------------------
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))
