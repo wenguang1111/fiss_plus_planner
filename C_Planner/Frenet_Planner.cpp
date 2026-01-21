@@ -535,25 +535,30 @@ PlanResult Frenet_Planner::plan_multithread(
     std::vector<std::thread> threads;
     std::vector<std::vector<FrenetTrajectory>> thread_frenet_paths(num_threads);
     std::vector<std::vector<FrenetTrajectory>> thread_collision_free_paths(num_threads);
+    std::vector<PlanStats> thread_stats(num_threads);  // Statistics for each thread
 
     // Process samples in parallel
     for (int t = 0; t < num_threads; t++) {
-        threads.emplace_back([this, &samples_per_thread_vec, &thread_frenet_paths, &thread_collision_free_paths, &frenet_state, t, time_step_now]() {
+        threads.emplace_back([this, &samples_per_thread_vec, &thread_frenet_paths, &thread_collision_free_paths, &thread_stats, &frenet_state, t, time_step_now]() {
             const auto& thread_samples = samples_per_thread_vec[t];
-
+            PlanStats local_stats;
+            
             // Step 1: Generate Frenet paths
             std::vector<FrenetTrajectory> frenet_paths = calc_frenet_paths(frenet_state, thread_samples);
 
             // Store frenet_paths for this thread
             thread_frenet_paths[t] = frenet_paths;
+            local_stats.num_trajs_generated = frenet_paths.size();
 
             // Step 2: Convert to global coordinates
             std::vector<FrenetTrajectory> global_paths = calc_global_paths(frenet_paths);
 
             // Step 3: Check constraints
             std::vector<FrenetTrajectory> constrained_paths = check_constraints(global_paths);
+            local_stats.num_trajs_validated = constrained_paths.size();
 
             // Step 4: Check collisions (within each thread for better cache locality)
+            local_stats.num_collision_checks = constrained_paths.size();
             std::vector<FrenetTrajectory> collision_free_paths = check_collision(
                 constrained_paths,
                 obstacles_array,
@@ -569,6 +574,9 @@ PlanResult Frenet_Planner::plan_multithread(
 
             // Store collision_free_paths for this thread
             thread_collision_free_paths[t] = collision_free_paths;
+            
+            // Store statistics for this thread
+            thread_stats[t] = local_stats;
         });
     }
 
@@ -583,6 +591,12 @@ PlanResult Frenet_Planner::plan_multithread(
     }
     for (const auto& paths : thread_collision_free_paths) {
         result.collision_free_paths.insert(result.collision_free_paths.end(), paths.begin(), paths.end());
+    }
+    
+    // Aggregate statistics from all threads
+    last_stats = PlanStats();  // Reset stats
+    for (const auto& stats : thread_stats) {
+        last_stats += stats;
     }
 
     return result;

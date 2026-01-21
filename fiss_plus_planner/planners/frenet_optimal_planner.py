@@ -274,14 +274,13 @@ class FrenetOptimalPlanner(object):
         self.settings.highest_speed = max_target_speed
         
         fplist = self.calc_frenet_paths(frenet_state)
-        fplist = self.calc_global_paths(fplist)
         self.stats.num_trajs_generated = len(fplist)
+        fplist = self.calc_global_paths(fplist)
         self.stats.num_trajs_validated = len(fplist)
-        self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
+        self.stats.num_collison_checks = len(fplist)
         # fplist = self.check_collisions(fplist, obstacles, time_step_now)
         fplist = self.check_collision_multithread(fplist, time_step_now)
-        # check_trajectories_collision_parallel_static.parallel_diagnostics(level=4)
 
         # find minimum cost path
         min_cost = float("inf")

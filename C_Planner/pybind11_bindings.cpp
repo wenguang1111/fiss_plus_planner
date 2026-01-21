@@ -80,6 +80,13 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("c_d", &FrenetTrajectory::c_d)
         .def_readwrite("c_dd", &FrenetTrajectory::c_dd);
 
+    // Bind PlanStats struct
+    py::class_<PlanStats>(m, "PlanStats")
+        .def(py::init<>())
+        .def_readwrite("num_trajs_generated", &PlanStats::num_trajs_generated)
+        .def_readwrite("num_trajs_validated", &PlanStats::num_trajs_validated)
+        .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks);
+
     // Bind Frenet_Planner class
     py::class_<Frenet_Planner>(m, "FrenetPlanner")
         .def(py::init([](const SettingParameters& settings,
@@ -147,6 +154,7 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("trajs"),
              py::arg("time_step_now") = 0)
         .def("getAllSuccessfulTrajectories", &Frenet_Planner::getAllSuccessfulTrajectories)
+        .def("get_stats", &Frenet_Planner::get_stats)
         .def_readwrite("settings", &Frenet_Planner::settings)
         .def_readwrite("vehicle_params", &Frenet_Planner::vehicle_params)
         .def_readwrite("best_traj", &Frenet_Planner::best_traj);

@@ -163,6 +163,19 @@ class FOP_CPP_Wrapper(object):
             print(f"Warning: Failed to initialize C++ planner: {e}")
             self.cpp_planner = None
 
+    def get_stats(self) -> Stats:
+        """Get statistics from C++ planner and convert to Python Stats object"""
+        stats = Stats()
+        if self.cpp_planner is not None:
+            try:
+                cpp_stats = self.cpp_planner.get_stats()
+                stats.num_trajs_generated = cpp_stats.num_trajs_generated
+                stats.num_trajs_validated = cpp_stats.num_trajs_validated
+                stats.num_collison_checks = cpp_stats.num_collision_checks
+            except Exception as e:
+                print(f"Warning: Failed to get stats from C++ planner: {e}")
+        return stats
+
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
         

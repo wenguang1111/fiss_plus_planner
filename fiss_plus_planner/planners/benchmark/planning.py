@@ -223,6 +223,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         stats.best_traj_costs.append(best_traj_ego.cost_final)
         if not use_cpp_planner:
             stats += planner.stats
+        else:
+            stats += planner.get_stats()
 
         # Update and record the vehicle's trajectory
         next_step_idx = 1

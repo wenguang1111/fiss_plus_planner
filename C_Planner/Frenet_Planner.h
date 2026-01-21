@@ -65,6 +65,23 @@ struct PlanResult {
     std::vector<FrenetTrajectory> collision_free_paths; // Paths that passed collision check
 };
 
+// Statistics structure for planning
+struct PlanStats {
+    int num_trajs_generated;    // Number of frenet paths generated
+    int num_trajs_validated;    // Number of trajectories that passed constraint check
+    int num_collision_checks;   // Number of collision checks performed
+    
+    PlanStats() : num_trajs_generated(0), num_trajs_validated(0), num_collision_checks(0) {}
+    
+    // Accumulate stats from another PlanStats
+    PlanStats& operator+=(const PlanStats& other) {
+        num_trajs_generated += other.num_trajs_generated;
+        num_trajs_validated += other.num_trajs_validated;
+        num_collision_checks += other.num_collision_checks;
+        return *this;
+    }
+};
+
 class Frenet_Planner {
 public:
     SettingParameters settings;
@@ -74,6 +91,9 @@ public:
     FrenetTrajectory best_traj;
     std::vector<std::vector<FrenetTrajectory>> all_trajs;
     std::vector<FrenetTrajectory> last_fplist;
+    
+    // Statistics for the last planning cycle
+    PlanStats last_stats;
     
     // Obstacle data members
     const double* obstacles_array;
@@ -125,6 +145,12 @@ public:
     std::vector<FrenetTrajectory> getAllSuccessfulTrajectories() const {
         return last_fplist;
     }
+    
+    // Get statistics from the last planning cycle
+    PlanStats get_stats() const {
+        return last_stats;
+    }
+    
     // Generate Frenet frame from centerline points
     void generate_frenet_frame(const double* centerline_pts, int num_points, int pts_dim);
 };
