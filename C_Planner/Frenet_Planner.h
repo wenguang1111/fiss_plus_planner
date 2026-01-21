@@ -3,6 +3,9 @@
 
 #include <vector>
 #include <memory>
+#include <tuple>
+#include <thread>
+#include <mutex>
 #include "common/scenario/frenet.h"
 #include "common/geometry/cubic_spline.h"
 #include "common/geometry/polynomial.h"
@@ -56,6 +59,12 @@ struct VehicleParams {
     double max_steering_rate;   // maximum steering rate [rad/s]
 };
 
+// Result structure for plan_multithread
+struct PlanResult {
+    std::vector<FrenetTrajectory> frenet_paths;       // All generated frenet paths
+    std::vector<FrenetTrajectory> collision_free_paths; // Paths that passed collision check
+};
+
 class Frenet_Planner {
 public:
     SettingParameters settings;
@@ -89,7 +98,7 @@ public:
     
     // Calculate Frenet frame trajectories
     std::vector<FrenetTrajectory> calc_frenet_paths(const FrenetState& frenet_state,
-                                                     const std::vector<std::tuple<double, double, double>>* samples = nullptr);
+                                                     const std::vector<std::tuple<double, double, double>>& samples);
     
     // Convert Frenet paths to global (x, y) coordinates using cubic spline
     std::vector<FrenetTrajectory> calc_global_paths(const std::vector<FrenetTrajectory>& fplist);
@@ -104,9 +113,15 @@ public:
     // Main planning function - simplified interface
     FrenetTrajectory plan(const FrenetState& frenet_state,
                          double max_target_speed,
-                         int time_step_now = 0);
+                         int time_step_now = 0,
+                         int num_threads=1);
 
-    
+    // Multithreaded planning function
+    PlanResult plan_multithread(
+        const std::vector<std::vector<std::tuple<double, double, double>>>& samples_per_thread_vec,
+        const FrenetState& frenet_state,
+        int time_step_now);
+
     std::vector<FrenetTrajectory> getAllSuccessfulTrajectories() const {
         return last_fplist;
     }

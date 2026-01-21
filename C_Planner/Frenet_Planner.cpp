@@ -93,18 +93,11 @@ std::vector<std::tuple<double, double, double>> Frenet_Planner::get_samples() {
 }
 
 std::vector<FrenetTrajectory> Frenet_Planner::calc_frenet_paths(const FrenetState& frenet_state,
-                                                                  const std::vector<std::tuple<double, double, double>>* samples) {
+                                                                  const std::vector<std::tuple<double, double, double>>& samples) {
     // TODO: Calculate Frenet frame trajectories using quintic and quartic polynomials
     std::vector<FrenetTrajectory> frenet_paths;
     
-    std::vector<std::tuple<double, double, double>> local_samples;
-    if (samples == nullptr) {
-        local_samples = get_samples();
-    } else {
-        local_samples = *samples;
-    }
-    
-    for (const auto& sample : local_samples) {
+    for (const auto& sample : samples) {
         double di = std::get<0>(sample);      // target lateral position
         double tv = std::get<1>(sample);      // target velocity
         double Ti = std::get<2>(sample);      // time horizon
@@ -145,9 +138,6 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_frenet_paths(const FrenetStat
         
         frenet_paths.push_back(fp);
     }
-    
-    // Store trajectories per timestep
-    all_trajs.push_back(frenet_paths);
     
     return frenet_paths;
 }
@@ -263,101 +253,102 @@ std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vecto
     return passed;
 }
 
+//FIXME: may need delete this if not needed in python
 std::vector<FrenetTrajectory> Frenet_Planner::check_collision_multithread(const std::vector<FrenetTrajectory>& trajs,
-                                                                          int time_step_now) {
-    // Multi-threaded collision detection using pre-processed obstacle data
-    // If no obstacles data available, return all trajectories as valid
-    if (trajs.empty() || obstacles_array == nullptr || num_vertices_array == nullptr ||
-        num_time_steps <= 0 || num_obstacles <= 0) {
-        return trajs;
-    }
-    
-    std::vector<FrenetTrajectory> passed;
-    std::vector<bool> collision_flags(trajs.size(), false);
-    std::mutex collision_mutex;
-    
-    // Process each trajectory in parallel
-    std::vector<std::thread> threads;
-    int num_threads = std::thread::hardware_concurrency();
-    if (num_threads == 0) num_threads = 4;  // fallback default
-    
-    int trajs_per_thread = (trajs.size() + num_threads - 1) / num_threads;
-    
-    for (int t = 0; t < num_threads && t * trajs_per_thread < (int)trajs.size(); t++) {
-        threads.emplace_back([this, &trajs, &collision_flags, &collision_mutex, time_step_now, t, trajs_per_thread]() {
-            int start_idx = t * trajs_per_thread;
-            int end_idx = std::min(start_idx + trajs_per_thread, (int)trajs.size());
-            
-            for (int i = start_idx; i < end_idx; i++) {
-                const auto& traj = trajs[i];
-                bool has_collision = false;
-                
-                // Check collision for this trajectory
-                int t_step_max = std::min((int)traj.x.size(), num_time_steps - time_step_now);
-                
-                for (int t_check = 0; t_check < t_step_max && !has_collision; t_check++) {
-                    int t_step = t_check + time_step_now;
-                    if (t_step >= num_time_steps) break;
-                    
-                    // Check ego vehicle position against all obstacles at this time step
-                    double ego_x = traj.x[t_check];
-                    double ego_y = traj.y[t_check];
-                    
-                    // Simple AABB collision check as a placeholder
-                    // In a real implementation, this would use polygon intersection
-                    for (int obs_idx = 0; obs_idx < num_obstacles; obs_idx++) {
-                        int num_verts = num_vertices_array[t_step * num_obstacles + obs_idx];
-                        if (num_verts <= 0) continue;
-                        
-                        // Get obstacle polygon vertices
-                        double min_x = 1e6, max_x = -1e6;
-                        double min_y = 1e6, max_y = -1e6;
-                        
-                        for (int v = 0; v < num_verts; v++) {
-                            int idx = t_step * num_obstacles * max_vertices * 2 + obs_idx * max_vertices * 2 + v * 2;
-                            double vx = obstacles_array[idx];
-                            double vy = obstacles_array[idx + 1];
-                            min_x = std::min(min_x, vx);
-                            max_x = std::max(max_x, vx);
-                            min_y = std::min(min_y, vy);
-                            max_y = std::max(max_y, vy);
-                        }
-                        
-                        // AABB collision check with vehicle bounding box
-                        double ego_min_x = ego_x - vehicle_params.w / 2.0;
-                        double ego_max_x = ego_x + vehicle_params.w / 2.0;
-                        double ego_min_y = ego_y - vehicle_params.l / 2.0;
-                        double ego_max_y = ego_y + vehicle_params.l / 2.0;
-                        
-                        if (!(ego_max_x < min_x || ego_min_x > max_x ||
-                              ego_max_y < min_y || ego_min_y > max_y)) {
-                            has_collision = true;
-                            break;
-                        }
-                    }
-                }
-                
-                {
-                    std::lock_guard<std::mutex> lock(collision_mutex);
-                    collision_flags[i] = has_collision;
-                }
-            }
-        });
-    }
-    
-    // Wait for all threads to complete
-    for (auto& thread : threads) {
-        thread.join();
-    }
-    
-    // Collect non-colliding trajectories
-    for (size_t i = 0; i < trajs.size(); i++) {
-        if (!collision_flags[i]) {
-            passed.push_back(trajs[i]);
-        }
-    }
-    
-    return passed;
+    int time_step_now) {
+// Multi-threaded collision detection using pre-processed obstacle data
+// If no obstacles data available, return all trajectories as valid
+if (trajs.empty() || obstacles_array == nullptr || num_vertices_array == nullptr ||
+num_time_steps <= 0 || num_obstacles <= 0) {
+return trajs;
+}
+
+std::vector<FrenetTrajectory> passed;
+std::vector<bool> collision_flags(trajs.size(), false);
+std::mutex collision_mutex;
+
+// Process each trajectory in parallel
+std::vector<std::thread> threads;
+int num_threads = std::thread::hardware_concurrency();
+if (num_threads == 0) num_threads = 4;  // fallback default
+
+int trajs_per_thread = (trajs.size() + num_threads - 1) / num_threads;
+
+for (int t = 0; t < num_threads && t * trajs_per_thread < (int)trajs.size(); t++) {
+threads.emplace_back([this, &trajs, &collision_flags, &collision_mutex, time_step_now, t, trajs_per_thread]() {
+int start_idx = t * trajs_per_thread;
+int end_idx = std::min(start_idx + trajs_per_thread, (int)trajs.size());
+
+for (int i = start_idx; i < end_idx; i++) {
+const auto& traj = trajs[i];
+bool has_collision = false;
+
+// Check collision for this trajectory
+int t_step_max = std::min((int)traj.x.size(), num_time_steps - time_step_now);
+
+for (int t_check = 0; t_check < t_step_max && !has_collision; t_check++) {
+int t_step = t_check + time_step_now;
+if (t_step >= num_time_steps) break;
+
+// Check ego vehicle position against all obstacles at this time step
+double ego_x = traj.x[t_check];
+double ego_y = traj.y[t_check];
+
+// Simple AABB collision check as a placeholder
+// In a real implementation, this would use polygon intersection
+for (int obs_idx = 0; obs_idx < num_obstacles; obs_idx++) {
+int num_verts = num_vertices_array[t_step * num_obstacles + obs_idx];
+if (num_verts <= 0) continue;
+
+// Get obstacle polygon vertices
+double min_x = 1e6, max_x = -1e6;
+double min_y = 1e6, max_y = -1e6;
+
+for (int v = 0; v < num_verts; v++) {
+int idx = t_step * num_obstacles * max_vertices * 2 + obs_idx * max_vertices * 2 + v * 2;
+double vx = obstacles_array[idx];
+double vy = obstacles_array[idx + 1];
+min_x = std::min(min_x, vx);
+max_x = std::max(max_x, vx);
+min_y = std::min(min_y, vy);
+max_y = std::max(max_y, vy);
+}
+
+// AABB collision check with vehicle bounding box
+double ego_min_x = ego_x - vehicle_params.w / 2.0;
+double ego_max_x = ego_x + vehicle_params.w / 2.0;
+double ego_min_y = ego_y - vehicle_params.l / 2.0;
+double ego_max_y = ego_y + vehicle_params.l / 2.0;
+
+if (!(ego_max_x < min_x || ego_min_x > max_x ||
+ego_max_y < min_y || ego_min_y > max_y)) {
+has_collision = true;
+break;
+}
+}
+}
+
+{
+std::lock_guard<std::mutex> lock(collision_mutex);
+collision_flags[i] = has_collision;
+}
+}
+});
+}
+
+// Wait for all threads to complete
+for (auto& thread : threads) {
+thread.join();
+}
+
+// Collect non-colliding trajectories
+for (size_t i = 0; i < trajs.size(); i++) {
+if (!collision_flags[i]) {
+passed.push_back(trajs[i]);
+}
+}
+
+return passed;
 }
 
 void Frenet_Planner::recordTrajectory(const FrenetTrajectory& traj)
@@ -476,55 +467,120 @@ void Frenet_Planner::recordTrajectory(const FrenetTrajectory& traj)
     #endif
 }
 
-
-
 FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
                                       double max_target_speed,
-                                      int time_step_now) {
+                                      int time_step_now,
+                                      int num_threads) {
     // Main planning function
     settings.highest_speed = max_target_speed;
-    // Generate all candidate trajectories
-    auto fplist = calc_frenet_paths(frenet_state);
-    
-    // Convert to global coordinates
-    fplist = calc_global_paths(fplist);
-    
-    // Check constraints
-    fplist = check_constraints(fplist);
-    
-    // Check collisions - no nullptr check needed
-    fplist = check_collision(
-        fplist,
-        obstacles_array,
-        num_vertices_array,
-        num_time_steps,
-        num_obstacles,
-        max_vertices,
-        vehicle_params.l,
-        vehicle_params.w,
-        time_step_now,
-        1  // check_resolution
-    );
-    
-    last_fplist = fplist;
+
+    std::vector<std::tuple<double, double, double>> samples = get_samples();
+
+    int samples_per_thread = (samples.size() + num_threads - 1) / num_threads;
+
+    std::vector<std::vector<std::tuple<double, double, double>>> samples_per_thread_vec;
+    for (int t = 0; t < num_threads && t * samples_per_thread < (int)samples.size(); t++) {
+        int start_idx = t * samples_per_thread;
+        int end_idx = std::min(start_idx + samples_per_thread, (int)samples.size());
+
+        std::vector<std::tuple<double, double, double>> thread_samples(
+            samples.begin() + start_idx,
+            samples.begin() + end_idx
+        );
+        samples_per_thread_vec.push_back(thread_samples);
+    }
+
+    // Get collision-free paths from multithreaded planning
+    PlanResult plan_result = plan_multithread(samples_per_thread_vec, frenet_state, time_step_now);
+
+    // Store all frenet_paths to all_trajs (thread-safe here, single thread context)
+    all_trajs.push_back(plan_result.frenet_paths);
+
+    last_fplist = plan_result.collision_free_paths;
 
     // Find minimum cost path
     best_traj = FrenetTrajectory();
     best_traj.cost_final = std::numeric_limits<double>::infinity();
-    
-    for (const auto& fp : fplist) {
+
+    for (const auto& fp : plan_result.collision_free_paths) {
         if (fp.cost_final < best_traj.cost_final) {
             best_traj = fp;
         }
     }
-    
-    // recordTrajectory(best_traj);
+
     #ifdef USE_RECORDER
         Recorder::getInstance()->writeDataToCSV();
     #endif
-    std::cout <<"using cpp frenet"<<std::endl;
-    
+
     return best_traj;
+}
+
+PlanResult Frenet_Planner::plan_multithread(
+                                                   const std::vector<std::vector<std::tuple<double, double, double>>>& samples_per_thread_vec,
+                                                   const FrenetState& frenet_state,
+                                                   int time_step_now) {
+    PlanResult result;
+    
+    if (samples_per_thread_vec.empty()) {
+        return result;
+    }
+
+    int num_threads = samples_per_thread_vec.size();
+
+    std::vector<std::thread> threads;
+    std::vector<std::vector<FrenetTrajectory>> thread_frenet_paths(num_threads);
+    std::vector<std::vector<FrenetTrajectory>> thread_collision_free_paths(num_threads);
+
+    // Process samples in parallel
+    for (int t = 0; t < num_threads; t++) {
+        threads.emplace_back([this, &samples_per_thread_vec, &thread_frenet_paths, &thread_collision_free_paths, &frenet_state, t, time_step_now]() {
+            const auto& thread_samples = samples_per_thread_vec[t];
+
+            // Step 1: Generate Frenet paths
+            std::vector<FrenetTrajectory> frenet_paths = calc_frenet_paths(frenet_state, thread_samples);
+
+            // Store frenet_paths for this thread
+            thread_frenet_paths[t] = frenet_paths;
+
+            // Step 2: Convert to global coordinates
+            std::vector<FrenetTrajectory> global_paths = calc_global_paths(frenet_paths);
+
+            // Step 3: Check constraints
+            std::vector<FrenetTrajectory> constrained_paths = check_constraints(global_paths);
+
+            // Step 4: Check collisions (within each thread for better cache locality)
+            std::vector<FrenetTrajectory> collision_free_paths = check_collision(
+                constrained_paths,
+                obstacles_array,
+                num_vertices_array,
+                num_time_steps,
+                num_obstacles,
+                max_vertices,
+                vehicle_params.l,
+                vehicle_params.w,
+                time_step_now,
+                1  // check_resolution
+            );
+
+            // Store collision_free_paths for this thread
+            thread_collision_free_paths[t] = collision_free_paths;
+        });
+    }
+
+    // Wait for all threads to complete
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    // Merge all thread results
+    for (const auto& paths : thread_frenet_paths) {
+        result.frenet_paths.insert(result.frenet_paths.end(), paths.begin(), paths.end());
+    }
+    for (const auto& paths : thread_collision_free_paths) {
+        result.collision_free_paths.insert(result.collision_free_paths.end(), paths.begin(), paths.end());
+    }
+
+    return result;
 }
 
 void Frenet_Planner::generate_frenet_frame(const double* centerline_pts, int num_points, int pts_dim) {

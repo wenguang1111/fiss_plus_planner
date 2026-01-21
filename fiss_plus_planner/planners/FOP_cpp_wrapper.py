@@ -78,7 +78,7 @@ class Stats(object):
 
 class FOP_CPP_Wrapper(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
-                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None, runtime_measurement: bool = False):
+                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None, number_threads: int = 1 ,runtime_measurement: bool = False):
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
@@ -86,6 +86,7 @@ class FOP_CPP_Wrapper(object):
         self.best_traj = None
         self.all_trajs = []
         self.doing_runtime_measurement = runtime_measurement
+        self.number_threads = number_threads
         
         # Pre-processed obstacles data (optional)
         self.obstacles_array = obstacles_array
@@ -620,7 +621,7 @@ class FOP_CPP_Wrapper(object):
                         row.append("")
                 writer.writerow(row)
 
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         if self.cpp_planner is not None:
             try:
                 cpp_state = frenet_planner_cpp.FrenetState()
@@ -634,7 +635,7 @@ class FOP_CPP_Wrapper(object):
                 cpp_state.d_dd = frenet_state.d_dd
                 cpp_state.d_ddd = frenet_state.d_ddd
                 
-                cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now)
+                cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads)
                 
                 
                 if self.doing_runtime_measurement:

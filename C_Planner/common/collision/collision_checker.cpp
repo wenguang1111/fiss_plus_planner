@@ -130,7 +130,6 @@ std::vector<Eigen::Vector2d> compute_vehicle_polygon(double x, double y, double 
     return polygon;
 }
 
-// Main single-threaded collision checker
 std::vector<FrenetTrajectory> check_collision(
     const std::vector<FrenetTrajectory>& trajs,
     const double* obstacles_array,

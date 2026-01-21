@@ -94,7 +94,7 @@ def prepare_obstacles_polygons_time_series(
     return obstacles_array, num_vertices
 
 
-def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str, runtime_measurement: bool) -> Tuple[bool, Trajectory, float, list, Stats, list]:
+def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str, number_threads: int, runtime_measurement: bool) -> Tuple[bool, Trajectory, float, list, Stats, list]:
     # Plan a global route
     global_planner = GlobalPlanner()
     global_plan = global_planner.plan_global_route(scenario, planning_problem)
@@ -157,9 +157,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         max_vertices=max_vertices
     )
 
-    
-
-    # Create planner based on method
     if method == 'FOP':
         planner_settings = FrenetOptimalPlannerSettings(
             num_width, num_speed, num_t)
@@ -185,14 +182,13 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
-        planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, runtime_measurement)
+        planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True  # Check if C++ planner was successfully initialized
         # planner.recordObstaclesForDebug("python_obstacle.csv")
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
 
-    # Generate Frenet frame for all planners (Python creates cubic_spline, C++ stores centerline internally)
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
 
     # Initial state
@@ -216,12 +212,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     for i in range(final_time_step):
         num_cycles += 1
         start_time = time.time()
-        best_traj_ego = planner.plan(current_frenet_state, max_speed, i, initial_state)     
+        best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
             break
-        
         processing_time = (end_time - start_time)
         stats.runtime_history.append(processing_time)
         stats.average_runtime += processing_time
@@ -405,7 +400,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 scenario, planning_problem, vehicle_params)
         else:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
-                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, runtime_measurement)
+                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, number_threads, runtime_measurement)
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

@@ -120,19 +120,22 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              [](Frenet_Planner& self,
                 const FrenetState& frenet_state,
                 double max_target_speed,
-                int time_step_now) {
-                auto best_traj = self.plan(frenet_state, max_target_speed, time_step_now);
+                int time_step_now,
+                int num_threads) {
+                auto best_traj = self.plan(frenet_state, max_target_speed, time_step_now, num_threads);
                return best_traj;
              },
              py::arg("frenet_state"),
              py::arg("max_target_speed"),
-             py::arg("time_step_now") = 0)
+             py::arg("time_step_now") = 0,
+             py::arg("num_threads") =1)
         .def("get_samples", &Frenet_Planner::get_samples)
-        .def("calc_frenet_paths",
-             [](Frenet_Planner& self, const FrenetState& frenet_state) {
-                return self.calc_frenet_paths(frenet_state, nullptr);
-             },
-             py::arg("frenet_state"))
+     //    .def("calc_frenet_paths",
+     //         [](Frenet_Planner& self, const FrenetState& frenet_state) {
+     //            std::vector<std::tuple<double, double, double>> empty_samples;
+     //            return self.calc_frenet_paths(frenet_state, empty_samples);
+     //         },
+     //         py::arg("frenet_state"))
         .def("calc_global_paths",
              &Frenet_Planner::calc_global_paths,
              py::arg("fplist"))
