@@ -276,8 +276,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 plt.grid(True)
                 plt.pause(0.0001)
 
-    # print("Success!")
-    stats.success = True
+        if i == final_time_step-1:
+            stats.success = True
+            goal_reached = True
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)

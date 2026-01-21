@@ -193,6 +193,7 @@ std::vector<FrenetTrajectory> check_collision(
         // Add trajectory to result if no collision
         if (!has_collision) {
             passed_trajs.push_back(traj);
+            passed_trajs.back().collision_passed = true;
         }
     }
     

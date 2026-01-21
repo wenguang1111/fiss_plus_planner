@@ -152,68 +152,59 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_global_paths(const std::vecto
     }
     
     for (auto fp : fplist) {
+        size_t n = std::min(fp.s.size(), fp.d.size());
+        if (n == 0) {
+            continue;
+        }
+
         // Calculate global positions
-        for (size_t i = 0; i < fp.s.size(); i++) {
+        for (size_t i = 0; i < n; i++) {
             auto [ix, iy] = cubic_spline->calc_position(fp.s[i]);
-            
+
             // Stop adding points if position is invalid
-            if (std::isnan(ix)) {
+            if (std::isnan(ix) || std::isnan(iy)) {
                 break;
             }
-            
+
             double i_yaw = cubic_spline->calc_yaw(fp.s[i]);
             double di = fp.d[i];
-            
+
             // Convert from Frenet to Cartesian coordinates
             double fx = ix + di * std::cos(i_yaw + M_PI / 2.0);
             double fy = iy + di * std::sin(i_yaw + M_PI / 2.0);
-            
+
             fp.x.push_back(fx);
             fp.y.push_back(fy);
         }
-        
+
         if (fp.x.size() < 2) {
             continue;
         }
-        
+
         // Calculate yaw and ds
-        for (size_t i = 0; i < fp.x.size() - 1; i++) {
+        for (size_t i = 0; i + 1 < fp.x.size(); i++) {
             double dx = fp.x[i + 1] - fp.x[i];
             double dy = fp.y[i + 1] - fp.y[i];
             fp.yaw.push_back(std::atan2(dy, dx));
             fp.ds.push_back(std::sqrt(dx * dx + dy * dy));
         }
-        
 
         fp.yaw.push_back(fp.yaw.back());
 
-        
         // Calculate curvature
         double dt = settings.tick_t;
-        std::vector<double> c, c_d, c_dd;
-        
-        if (fp.ds.size() > 0) {
-            for (size_t i = 0; i < fp.yaw.size() - 1; i++) {
-                if (fp.ds[i] > 1e-6) {
-                    c.push_back((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i]);
-                } else {
-                    c.push_back(0.0);
-                }
-            }
-            
-            for (size_t i = 0; i < c.size() - 1; i++) {
-                c_d.push_back((c[i + 1] - c[i]) / dt);
-            }
-            
-            for (size_t i = 0; i < c_d.size() - 1; i++) {
-                c_dd.push_back((c_d[i + 1] - c_d[i]) / dt);
-            }
-            
-            fp.c = c;
-            fp.c_d = c_d;
-            fp.c_dd = c_dd;
+        for (size_t i = 0; i + 1 < fp.yaw.size(); i++) {
+            fp.c.push_back((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i]);
         }
-        
+
+        for (size_t i = 0; i + 1 < fp.c.size(); i++) {
+            fp.c_d.push_back((fp.c[i + 1] - fp.c[i]) / dt);
+        }
+
+        for (size_t i = 0; i + 1 < fp.c_d.size(); i++) {
+            fp.c_dd.push_back((fp.c_d[i + 1] - fp.c_d[i]) / dt);
+        }
+
         passed_fplist.push_back(fp);
     }
     
@@ -247,6 +238,7 @@ std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vecto
         
         if (valid) {
             passed.push_back(traj);
+            passed.back().constraint_passed = true;
         }
     }
     
@@ -474,7 +466,20 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
     // Main planning function
     settings.highest_speed = max_target_speed;
 
+    // Ensure num_threads is at least 1
+    if (num_threads <= 0) {
+        num_threads = std::thread::hardware_concurrency();
+        std::cerr<<"Thread number was 0"<<std::endl;
+        if (num_threads <= 0) num_threads = 1;  // fallback default
+    }
+
     std::vector<std::tuple<double, double, double>> samples = get_samples();
+
+    // Handle edge case: no samples
+    if (samples.empty()) {
+        std::cerr<<"empty samples"<<std::endl;
+        return FrenetTrajectory();
+    }
 
     int samples_per_thread = (samples.size() + num_threads - 1) / num_threads;
 

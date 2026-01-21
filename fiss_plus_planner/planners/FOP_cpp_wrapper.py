@@ -637,32 +637,6 @@ class FOP_CPP_Wrapper(object):
                 
                 cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads)
                 
-                
-                if self.doing_runtime_measurement:
-                    cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
-                    py_fplist = []
-                    for cpp_fp in cpp_fplist:
-                        fp = FrenetTrajectory()
-                        fp.t = list(cpp_fp.t)
-                        fp.s = list(cpp_fp.s)
-                        fp.s_d = list(cpp_fp.s_d)
-                        fp.s_dd = list(cpp_fp.s_dd)
-                        fp.s_ddd = list(cpp_fp.s_ddd)
-                        fp.d = list(cpp_fp.d)
-                        fp.d_d = list(cpp_fp.d_d)
-                        fp.d_dd = list(cpp_fp.d_dd)
-                        fp.d_ddd = list(cpp_fp.d_ddd)
-                        fp.x = list(cpp_fp.x)
-                        fp.y = list(cpp_fp.y)
-                        fp.yaw = list(cpp_fp.yaw)
-                        fp.ds = list(cpp_fp.ds)
-                        fp.c = list(cpp_fp.c)
-                        fp.c_d = list(cpp_fp.c_d)
-                        fp.c_dd = list(cpp_fp.c_dd)
-                        fp.cost_final = cpp_fp.cost_final
-                        py_fplist.append(fp)
-                    self.all_trajs.append(py_fplist)
-                
                 if cpp_traj.is_generated:
                     py_traj = FrenetTrajectory()
                     py_traj.t = list(cpp_traj.t)
@@ -683,6 +657,32 @@ class FOP_CPP_Wrapper(object):
                     py_traj.c_dd = list(cpp_traj.c_dd)
                     py_traj.cost_final = cpp_traj.cost_final
                     self.best_traj = py_traj
+
+                    if self.doing_runtime_measurement:
+                        py_fplist = []
+                        cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
+                        for cpp_fp in cpp_fplist:
+                            fp = FrenetTrajectory()
+                            fp.t = list(cpp_fp.t)
+                            fp.s = list(cpp_fp.s)
+                            fp.s_d = list(cpp_fp.s_d)
+                            fp.s_dd = list(cpp_fp.s_dd)
+                            fp.s_ddd = list(cpp_fp.s_ddd)
+                            fp.d = list(cpp_fp.d)
+                            fp.d_d = list(cpp_fp.d_d)
+                            fp.d_dd = list(cpp_fp.d_dd)
+                            fp.d_ddd = list(cpp_fp.d_ddd)
+                            fp.x = list(cpp_fp.x)
+                            fp.y = list(cpp_fp.y)
+                            fp.yaw = list(cpp_fp.yaw)
+                            fp.ds = list(cpp_fp.ds)
+                            fp.c = list(cpp_fp.c)
+                            fp.c_d = list(cpp_fp.c_d)
+                            fp.c_dd = list(cpp_fp.c_dd)
+                            fp.cost_final = cpp_fp.cost_final
+                            py_fplist.append(fp)
+                        self.all_trajs.append(py_fplist)
+                        
                     return py_traj
                 else:
                     return None
