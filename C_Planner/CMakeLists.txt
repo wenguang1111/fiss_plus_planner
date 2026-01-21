@@ -60,13 +60,27 @@ set(PLANNER_SOURCES
     ${UTILS_SOURCES}
 )
 
-# Create Python extension module using PyBind11
+# Source files for FISS+ planner (includes base planner sources)
+set(FISS_PLUS_PLANNER_SOURCES
+    Fiss_Plus_Planner.cpp
+    Frenet_Planner.cpp
+    ${GEOMETRY_SOURCES}
+    ${COST_SOURCES}
+    ${COLLISION_SOURCES}
+    ${UTILS_SOURCES}
+)
+
+# Create Python extension module using PyBind11 for Frenet Planner
 pybind11_add_module(frenet_planner_cpp pybind11_bindings.cpp ${PLANNER_SOURCES} ${recorder_file})
 target_link_libraries(frenet_planner_cpp PUBLIC Eigen3::Eigen)
 
+# Create Python extension module using PyBind11 for FISS+ Planner
+pybind11_add_module(fiss_plus_planner_cpp fiss_plus_pybind11_bindings.cpp ${FISS_PLUS_PLANNER_SOURCES} ${recorder_file})
+target_link_libraries(fiss_plus_planner_cpp PUBLIC Eigen3::Eigen)
+
 # Installation
-install(TARGETS frenet_planner_cpp
+install(TARGETS frenet_planner_cpp fiss_plus_planner_cpp
         LIBRARY DESTINATION lib)
 
-install(FILES Frenet_Planner.h DESTINATION include)
+install(FILES Frenet_Planner.h Fiss_Plus_Planner.h DESTINATION include)
 install(DIRECTORY common/ DESTINATION include/common)

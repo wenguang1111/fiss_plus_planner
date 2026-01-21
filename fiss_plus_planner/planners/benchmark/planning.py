@@ -30,6 +30,7 @@ from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
+from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
@@ -185,6 +186,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True  # Check if C++ planner was successfully initialized
         # planner.recordObstaclesForDebug("python_obstacle.csv")
+    elif method == 'FISS+_CPP':
+        # Use C++ FISS+ Planner with pybind11
+        planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
+        planner = FissPlusCppWrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
+        use_cpp_planner = True
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError

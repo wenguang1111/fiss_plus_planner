@@ -42,6 +42,17 @@ struct FrenetTrajectory {
     std::vector<double> c_d;    // curvature derivative [1/m/s]
     std::vector<double> c_dd;   // curvature second derivative [1/m/ss]
     
+    // End state for FISS+ planner
+    struct EndState {
+        double t = 0.0;
+        double s = 0.0;
+        double s_d = 0.0;
+        double s_dd = 0.0;
+        double d = 0.0;
+        double d_d = 0.0;
+        double d_dd = 0.0;
+    } end_state;
+    
     // Comparison operators for cost-based sorting
     bool operator<(const FrenetTrajectory& other) const {
         return cost_final < other.cost_final;
@@ -66,6 +77,15 @@ struct FrenetState {
     double d_d = 0.0;       // lateral velocity [m/s]
     double d_dd = 0.0;      // lateral acceleration [m/ss]
     double d_ddd = 0.0;     // lateral jerk [m/sss]
+    
+    // Default constructor
+    FrenetState() = default;
+    
+    // Constructor with all parameters
+    FrenetState(double t_, double s_, double s_d_, double s_dd_, double s_ddd_,
+                double d_, double d_d_, double d_dd_, double d_ddd_)
+        : t(t_), s(s_), s_d(s_d_), s_dd(s_dd_), s_ddd(s_ddd_),
+          d(d_), d_d(d_d_), d_dd(d_dd_), d_ddd(d_ddd_) {}
 };
 
 #endif // FRENET_H
