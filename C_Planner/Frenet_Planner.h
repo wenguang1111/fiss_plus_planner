@@ -64,6 +64,7 @@ public:
     CubicSpline2D* cubic_spline;
     FrenetTrajectory best_traj;
     std::vector<std::vector<FrenetTrajectory>> all_trajs;
+    std::vector<FrenetTrajectory> last_fplist;
     
     // Obstacle data members
     const double* obstacles_array;
@@ -104,7 +105,11 @@ public:
     FrenetTrajectory plan(const FrenetState& frenet_state,
                          double max_target_speed,
                          int time_step_now = 0);
+
     
+    std::vector<FrenetTrajectory> getAllSuccessfulTrajectories() const {
+        return last_fplist;
+    }
     // Generate Frenet frame from centerline points
     void generate_frenet_frame(const double* centerline_pts, int num_points, int pts_dim);
 };

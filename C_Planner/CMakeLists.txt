@@ -10,17 +10,11 @@ find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 # Find required packages
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-# Find pybind11 - try multiple methods
-find_package(pybind11 CONFIG QUIET)
-if(NOT pybind11_FOUND)
-  # Try to find pybind11 in Python site-packages
-  execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
-    OUTPUT_VARIABLE pybind11_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  find_package(pybind11 CONFIG REQUIRED)
-endif()
+# Set pybind11 cmake directory directly
+set(pybind11_DIR "/home/wenguang/.cache/pypoetry/virtualenvs/fiss-plus-planner-IsomLo2q-py3.10/lib/python3.10/site-packages/pybind11/share/cmake/pybind11")
+
+# Find pybind11
+find_package(pybind11 CONFIG REQUIRED)
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})

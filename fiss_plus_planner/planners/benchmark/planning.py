@@ -29,6 +29,7 @@ from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPl
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
+from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
@@ -93,7 +94,7 @@ def prepare_obstacles_polygons_time_series(
     return obstacles_array, num_vertices
 
 
-def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str):
+def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str, runtime_measurement: bool) -> Tuple[bool, Trajectory, float, list, Stats, list]:
     # Plan a global route
     global_planner = GlobalPlanner()
     global_plan = global_planner.plan_global_route(scenario, planning_problem)
@@ -156,6 +157,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         max_vertices=max_vertices
     )
 
+    
+
     # Create planner based on method
     if method == 'FOP':
         planner_settings = FrenetOptimalPlannerSettings(
@@ -182,8 +185,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
-        planner = FrenetOptimalPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, use_cpp=True)
-        use_cpp_planner = planner.use_cpp  # Check if C++ planner was successfully initialized
+        planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, runtime_measurement)
+        use_cpp_planner = True  # Check if C++ planner was successfully initialized
+        # planner.recordObstaclesForDebug("python_obstacle.csv")
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
@@ -217,7 +221,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
             break
-
+        
         processing_time = (end_time - start_time)
         stats.runtime_history.append(processing_time)
         stats.average_runtime += processing_time
@@ -380,6 +384,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     save_gif = cfg['SAVE_GIF']
     #set number of threads for numba parallel collision checker
     number_threads = cfg['Num_Threads_For_CollisionChecker']
+    runtime_measurement = cfg.get('Runtime_Measurement')
     configure_numba_threads(number_threads)
 
     vehicle_type = VehicleType.VW_VANAGON  # FORD_ESCORT, BMW_320i, VW_VANAGON
@@ -400,7 +405,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 scenario, planning_problem, vehicle_params)
         else:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
-                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file)
+                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, runtime_measurement)
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

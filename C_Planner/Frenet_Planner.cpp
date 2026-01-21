@@ -23,8 +23,9 @@ Frenet_Planner::Frenet_Planner(const SettingParameters& settings_param,
       num_vertices_array(num_verts),
       num_time_steps(n_time_steps),
       num_obstacles(n_obstacles),
-      max_vertices(max_verts) {
-        // recordObstacleArray();
+      max_vertices(max_verts) 
+{
+    // recordObstacleArray();
 }
 
 Frenet_Planner::~Frenet_Planner() {
@@ -43,10 +44,10 @@ void Frenet_Planner::recordObstacleArray()
                     int idx = t * num_obstacles * max_vertices * 2
                             + obs * max_vertices * 2
                             + v * 2;
-                    Recorder::getInstance()->saveData<int>("obstacles.t", t);
-                    Recorder::getInstance()->saveData<int>("obstacles.obs", obs);
-                    Recorder::getInstance()->saveData<int>("obstacles.v", v);
-                    Recorder::getInstance()->saveData<int>("obstacles.num_vertices", num_verts);
+                    Recorder::getInstance()->saveData<double>("obstacles.t", t);
+                    Recorder::getInstance()->saveData<double>("obstacles.obs", obs);
+                    Recorder::getInstance()->saveData<double>("obstacles.v", v);
+                    Recorder::getInstance()->saveData<double>("obstacles.num_vertices", num_verts);
                     Recorder::getInstance()->saveData<double>("obstacles.x", obstacles_array[idx]);
                     Recorder::getInstance()->saveData<double>("obstacles.y", obstacles_array[idx + 1]);
                 }
@@ -161,15 +162,12 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_global_paths(const std::vecto
     }
     
     for (auto fp : fplist) {
-        bool valid = true;
-        
         // Calculate global positions
         for (size_t i = 0; i < fp.s.size(); i++) {
             auto [ix, iy] = cubic_spline->calc_position(fp.s[i]);
             
-            // Check if position is valid (within spline range)
-            if (std::isnan(ix) || std::isnan(iy)) {
-                valid = false;
+            // Stop adding points if position is invalid
+            if (std::isnan(ix)) {
                 break;
             }
             
@@ -184,7 +182,7 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_global_paths(const std::vecto
             fp.y.push_back(fy);
         }
         
-        if (!valid || fp.x.size() < 2) {
+        if (fp.x.size() < 2) {
             continue;
         }
         
@@ -478,6 +476,8 @@ void Frenet_Planner::recordTrajectory(const FrenetTrajectory& traj)
     #endif
 }
 
+
+
 FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
                                       double max_target_speed,
                                       int time_step_now) {
@@ -506,6 +506,8 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
         1  // check_resolution
     );
     
+    last_fplist = fplist;
+
     // Find minimum cost path
     best_traj = FrenetTrajectory();
     best_traj.cost_final = std::numeric_limits<double>::infinity();
@@ -516,7 +518,7 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
         }
     }
     
-    recordTrajectory(best_traj);
+    // recordTrajectory(best_traj);
     #ifdef USE_RECORDER
         Recorder::getInstance()->writeDataToCSV();
     #endif

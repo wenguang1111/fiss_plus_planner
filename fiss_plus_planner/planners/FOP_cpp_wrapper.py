@@ -16,6 +16,7 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
+from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlannerSettings
 from typing import Tuple
 import sys
 from pathlib import Path
@@ -74,36 +75,17 @@ class Stats(object):
         if len(self.best_traj_costs) > 0:
             self.average_cost = np.mean(self.best_traj_costs)
         return self
-    
-class FrenetOptimalPlannerSettings(object):
-    def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5):
-        # time resolution between two planned waypoints
-        self.tick_t = 0.1  # time tick [s]
-        
-        # sampling parameters
-        self.max_road_width = 3.5           # maximum road width [m]
-        self.num_width = num_width          # road width sampling number
 
-        self.highest_speed = 13.4112        # highest sampling speed [m/s]
-        self.lowest_speed = 0.0             # lowest sampling speed [m/s]
-        self.num_speed = num_speed          # speed sampling number
-        
-        self.min_t = 3.0                    # min prediction time [m]
-        self.max_t = 5.0                   # max prediction time [m]
-        self.num_t = num_t                  # time sampling number
-
-        self.check_obstacle = True          # True if check collison with obstacles
-        self.check_boundary = True          # True if check collison with road boundaries
-class FrenetOptimalPlanner(object):
+class FOP_CPP_Wrapper(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
-                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None,
-                 use_cpp: bool = False):
+                 obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None, runtime_measurement: bool = False):
         self.settings = planner_settings
         self.vehicle = ego_vehicle
         self.cost_function = CostFunction("WX1")
         self.cubic_spline = None
         self.best_traj = None
         self.all_trajs = []
+        self.doing_runtime_measurement = runtime_measurement
         
         # Pre-processed obstacles data (optional)
         self.obstacles_array = obstacles_array
@@ -114,9 +96,9 @@ class FrenetOptimalPlanner(object):
         
         # C++ planner instance (optional)
         self.cpp_planner = None
-        self.use_cpp = use_cpp and CPP_MODULE_AVAILABLE
+        CPP_MODULE_AVAILABLE
         
-        if self.use_cpp:
+        if CPP_MODULE_AVAILABLE:
             self._init_cpp_planner()
     
     def _init_cpp_planner(self):
@@ -178,7 +160,6 @@ class FrenetOptimalPlanner(object):
             )
         except Exception as e:
             print(f"Warning: Failed to initialize C++ planner: {e}")
-            self.use_cpp = False
             self.cpp_planner = None
 
     def get_samples(self):
@@ -244,7 +225,6 @@ class FrenetOptimalPlanner(object):
             
             di, tv, Ti = s
             
-            # FIXME: ensure Ti is at least tick_t (temporary, these are not cvae dataset scenarios)
             Ti = max(Ti, self.settings.tick_t)
             
             fp = FrenetTrajectory()
@@ -641,11 +621,8 @@ class FrenetOptimalPlanner(object):
                 writer.writerow(row)
 
     def plan(self, frenet_state: FrenetState, max_target_speed: float, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
-        #-----------CPP-------------------------------------------
-        if self.use_cpp and self.cpp_planner is not None:
-            # Call C++ planner's plan method
+        if self.cpp_planner is not None:
             try:
-                # Convert Python FrenetState to C++ FrenetState
                 cpp_state = frenet_planner_cpp.FrenetState()
                 cpp_state.t = frenet_state.t
                 cpp_state.s = frenet_state.s
@@ -657,33 +634,34 @@ class FrenetOptimalPlanner(object):
                 cpp_state.d_dd = frenet_state.d_dd
                 cpp_state.d_ddd = frenet_state.d_ddd
                 
-                # Call C++ plan method
                 cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now)
-                cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
-                py_fplist = []
-                for cpp_fp in cpp_fplist:
-                    fp = FrenetTrajectory()
-                    fp.t = list(cpp_fp.t)
-                    fp.s = list(cpp_fp.s)
-                    fp.s_d = list(cpp_fp.s_d)
-                    fp.s_dd = list(cpp_fp.s_dd)
-                    fp.s_ddd = list(cpp_fp.s_ddd)
-                    fp.d = list(cpp_fp.d)
-                    fp.d_d = list(cpp_fp.d_d)
-                    fp.d_dd = list(cpp_fp.d_dd)
-                    fp.d_ddd = list(cpp_fp.d_ddd)
-                    fp.x = list(cpp_fp.x)
-                    fp.y = list(cpp_fp.y)
-                    fp.yaw = list(cpp_fp.yaw)
-                    fp.ds = list(cpp_fp.ds)
-                    fp.c = list(cpp_fp.c)
-                    fp.c_d = list(cpp_fp.c_d)
-                    fp.c_dd = list(cpp_fp.c_dd)
-                    fp.cost_final = cpp_fp.cost_final
-                    py_fplist.append(fp)
-                self.all_trajs.append(py_fplist)
                 
-                # Convert C++ FrenetTrajectory back to Python FrenetTrajectory
+                
+                if self.doing_runtime_measurement:
+                    cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
+                    py_fplist = []
+                    for cpp_fp in cpp_fplist:
+                        fp = FrenetTrajectory()
+                        fp.t = list(cpp_fp.t)
+                        fp.s = list(cpp_fp.s)
+                        fp.s_d = list(cpp_fp.s_d)
+                        fp.s_dd = list(cpp_fp.s_dd)
+                        fp.s_ddd = list(cpp_fp.s_ddd)
+                        fp.d = list(cpp_fp.d)
+                        fp.d_d = list(cpp_fp.d_d)
+                        fp.d_dd = list(cpp_fp.d_dd)
+                        fp.d_ddd = list(cpp_fp.d_ddd)
+                        fp.x = list(cpp_fp.x)
+                        fp.y = list(cpp_fp.y)
+                        fp.yaw = list(cpp_fp.yaw)
+                        fp.ds = list(cpp_fp.ds)
+                        fp.c = list(cpp_fp.c)
+                        fp.c_d = list(cpp_fp.c_d)
+                        fp.c_dd = list(cpp_fp.c_dd)
+                        fp.cost_final = cpp_fp.cost_final
+                        py_fplist.append(fp)
+                    self.all_trajs.append(py_fplist)
+                
                 if cpp_traj.is_generated:
                     py_traj = FrenetTrajectory()
                     py_traj.t = list(cpp_traj.t)
@@ -709,30 +687,6 @@ class FrenetOptimalPlanner(object):
                     return None
             except Exception as e:
                 print(f"Warning: C++ plan failed: {e}, falling back to Python")
-        #-----------Python Implementation-------------------------------------------
-        # reset stats
-        self.stats = Stats()
-        self.settings.highest_speed = max_target_speed
-        
-        fplist = self.calc_frenet_paths(frenet_state)
-        fplist = self.calc_global_paths(fplist)
-        self.stats.num_trajs_generated = len(fplist)
-        self.stats.num_trajs_validated = len(fplist)
-        self.stats.num_collison_checks = len(fplist)
-        fplist = self.check_constraints(fplist)
-        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
-        fplist = self.check_collision_multithread(fplist, time_step_now)
-        # check_trajectories_collision_parallel_static.parallel_diagnostics(level=4)
-
-        # find minimum cost path
-        min_cost = float("inf")
-        for fp in fplist:
-            if min_cost >= fp.cost_final:
-                min_cost = fp.cost_final
-                self.best_traj = fp
-
-        self.recordPathForDebug(self.best_traj)
-        return self.best_traj
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         # Python implementation
