@@ -8,6 +8,7 @@ import numpy as np
 from commonroad.scenario.scenario import Scenario
 from commonroad.scenario.state import InitialState
 from shapely import Polygon, affinity
+import pandas as pd
 
 from fiss_plus_planner.planners.common.cost.cost_function import CostFunction
 from fiss_plus_planner.planners.common.geometry.cubic_spline import CubicSpline2D
@@ -344,9 +345,12 @@ class FOP_CPP_Wrapper(object):
                     py_traj.c_d = list(cpp_traj.c_d)
                     py_traj.c_dd = list(cpp_traj.c_dd)
                     py_traj.cost_final = cpp_traj.cost_final
+                    py_traj.sampling_param.d = cpp_traj.sampling_param.d
+                    py_traj.sampling_param.s_d = cpp_traj.sampling_param.s_d
+                    py_traj.sampling_param.t = cpp_traj.sampling_param.t
                     self.best_traj = py_traj
 
-                    if self.doing_runtime_measurement:
+                    if self.doing_runtime_measurement==False:
                         py_fplist = []
                         cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
                         for cpp_fp in cpp_fplist:
@@ -368,6 +372,9 @@ class FOP_CPP_Wrapper(object):
                             fp.c_d = list(cpp_fp.c_d)
                             fp.c_dd = list(cpp_fp.c_dd)
                             fp.cost_final = cpp_fp.cost_final
+                            fp.sampling_param.d = cpp_fp.sampling_param.d
+                            fp.sampling_param.s_d = cpp_fp.sampling_param.s_d
+                            fp.sampling_param.t = cpp_fp.sampling_param.t
                             py_fplist.append(fp)
                         self.all_trajs.append(py_fplist)
                         

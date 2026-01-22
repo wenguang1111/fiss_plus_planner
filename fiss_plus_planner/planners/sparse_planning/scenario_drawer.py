@@ -33,7 +33,7 @@ class ScenarioDrawer:
         self.ego_id = None
         self.ego_type = ObstacleType.CAR
         self.shape = Rectangle(width=1.8, length=4.3)
-        self.scenario, _ = CommonRoadFileReader(os.path.join(self.scenario_dir, self.scenario_name)).open()
+        self.scenario, _ = CommonRoadFileReader(os.path.join(self.scenario_dir, self.scenario_name)+".xml").open()
         
         self._transform = transforms.Compose([
                 transforms.Resize((128, 128)),
@@ -81,19 +81,69 @@ class ScenarioDrawer:
         buf.close()
         return img
 
-    def save_single_time_step(self, time_step: int, ego_state: State, ego_trajectory: TrajectoryPrediction = None) -> Path:
+    def save_single_time_step(self, time_step: int, ego_state: State, scenario_name: str, ego_trajectory: TrajectoryPrediction = None) -> Path:
         """Render one time step and save as PNG."""
-        # genearate only figure around ego vehicle
-        png_bytes = self.generate_image_at_time_step(time_step, ego_state, ego_trajectory)
-
-        if  self.save_dir is None:
+        if self.save_dir is None:
             raise ValueError("save_dir is None, cannot save PNG to disk. Check the EnviromentDrawer initialization.")
-        else:
-            output_dir = self.save_dir / self.scenario_name
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"time_step_{time_step}.png"
-            output_path.write_bytes(png_bytes)
-            return output_path
+        
+        if self.ego_id == None:
+            self.ego_id = self.scenario.generate_object_id()
+
+        ego_vehicle = DynamicObstacle(
+                    self.ego_id,
+                    self.ego_type,
+                    self.shape,
+                    ego_state,
+                    ego_trajectory,
+                )
+        if self.scenario._is_object_id_used(self.ego_id) is False:
+            self.scenario.add_objects(ego_vehicle)
+
+        self.ego_params.time_begin = time_step
+
+        renderer = MPRenderer()        
+        renderer.focus_obstacle_id = self.ego_id
+        renderer.draw_params.axis_visible = False
+        renderer.draw_params.time_begin = time_step
+        renderer.draw_params.dynamic_obstacle.draw_shape = True
+        renderer.draw_params.dynamic_obstacle.draw_icon = True
+        renderer.draw_params.dynamic_obstacle.trajectory.line_width = 0.25
+
+        self.scenario.draw(renderer)
+        ego_vehicle.draw(renderer, draw_params=self.ego_params)
+
+        plt.gca().set_aspect("equal")
+        renderer.render()
+        
+        output_dir = self.save_dir / self.scenario_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{scenario_name}_{time_step}.png"
+        
+        fig = plt.gcf()
+        fig.savefig(output_path, format="png", bbox_inches="tight", pad_inches=0, dpi=300)
+        plt.close(fig)
+        
+        return output_path
+
+    def save_images_all_timesteps(self, state_list: List[State], scenario_name: str) -> List[Path]:
+        """Render all time steps and save as PNG files.
+        
+        Args:
+            state_list: List of ego vehicle states for each time step
+            scenario_name: Name of the scenario for file naming
+            
+        Returns:
+            List of paths to the saved PNG files
+        """
+        if self.save_dir is None:
+            raise ValueError("save_dir is None, cannot save PNG to disk. Check the ScenarioDrawer initialization.")
+        
+        saved_paths = []
+        for time_step, ego_state in enumerate(state_list):
+            output_path = self.save_single_time_step(time_step, ego_state, scenario_name)
+            saved_paths.append(output_path)
+        
+        return saved_paths
 
 
 #----------------------------- Example Usage -----------------------#
@@ -102,9 +152,9 @@ from commonroad.scenario.trajectory import Trajectory
 import numpy as np
 
 def main():
-    scenario_dir = "/home/wenguang/workplace/test/wenguang/fiss_plus_planner/data/demo"
-    save_dir = "/home/wenguang/workplace/test/wenguang/fiss_plus_planner/data/output/"
-    scenario_name = "ARG_Carcarana-1_2_T-1"
+    scenario_dir = "/home/wenguang/workplace/fiss_plus_planner/fiss_plus_planner/data/demo/FOP_CPP_Survived_Until_FinalTimeStep"
+    save_dir = "/home/wenguang/workplace/fiss_plus_planner/fiss_plus_planner/data/output/"
+    scenario_name = "AUT_Haag-1_1_T-7"
     drawer = ScenarioDrawer(scenario_name, scenario_dir, save_dir)
     scenario, planning_problem_set = CommonRoadFileReader(os.path.join(scenario_dir, scenario_name) + ".xml").open()
 
@@ -121,7 +171,7 @@ def main():
         traj = Trajectory(initial_time_step=time_step, state_list=[new_state])
         trajectory_prediction = TrajectoryPrediction(trajectory=traj, shape=Rectangle(length=1.0, width=1.0))
         # drawer.save_single_time_step(new_state, trajectory_prediction, time_step)
-        drawer.save_single_time_step(time_step, new_state, trajectory_prediction)
+        drawer.save_single_time_step(time_step, new_state, scenario_name, trajectory_prediction)
 
 
 if __name__ == "__main__":

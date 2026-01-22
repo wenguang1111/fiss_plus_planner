@@ -98,6 +98,12 @@ class FrenetState(object):
         
         return state
 
+class SamplingParam(object):
+    def __init__(self, d: float = 0.0, s_d: float = 0.0, t: float = 0.0):
+        self.d = d
+        self.s_d = s_d
+        self.t = t
+
 class FrenetTrajectory(object):
     """ FrenetTrajectory
 
@@ -146,6 +152,10 @@ class FrenetTrajectory(object):
         self.c = []
         self.c_d = []
         self.c_dd = []
+
+        self.sampling_param = SamplingParam()
+
+
         
     def __eq__(self, other):
         return (self.cost_final == other.cost_final)

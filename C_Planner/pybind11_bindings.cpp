@@ -54,6 +54,16 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("d_dd", &FrenetState::d_dd)
         .def_readwrite("d_ddd", &FrenetState::d_ddd);
 
+    // Bind SamplingParam struct
+    py::class_<SamplingParam>(m, "SamplingParam")
+        .def(py::init<double, double, double>(),
+             py::arg("d") = 0.0,
+             py::arg("s_d") = 0.0,
+             py::arg("t") = 0.0)
+        .def_readwrite("d", &SamplingParam::d)
+        .def_readwrite("s_d", &SamplingParam::s_d)
+        .def_readwrite("t", &SamplingParam::t);
+
     // Bind FrenetTrajectory struct
     py::class_<FrenetTrajectory>(m, "FrenetTrajectory")
         .def(py::init<>())
@@ -78,7 +88,9 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("ds", &FrenetTrajectory::ds)
         .def_readwrite("c", &FrenetTrajectory::c)
         .def_readwrite("c_d", &FrenetTrajectory::c_d)
-        .def_readwrite("c_dd", &FrenetTrajectory::c_dd);
+        .def_readwrite("c_dd", &FrenetTrajectory::c_dd)
+        // Sampling parameters
+        .def_readwrite("sampling_param", &FrenetTrajectory::sampling_param);
 
     // Bind PlanStats struct
     py::class_<PlanStats>(m, "PlanStats")

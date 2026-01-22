@@ -135,7 +135,7 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_frenet_paths(const FrenetStat
         // Compute final cost
         fp.cost_final = cost_function.cost_total(fp, settings.highest_speed);
         fp.is_generated = true;
-        
+        fp.sampling_param = SamplingParam(di, tv, Ti);
         frenet_paths.push_back(fp);
     }
     

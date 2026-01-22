@@ -5,6 +5,12 @@ import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Tuple
+from PIL import Image
+from omegaconf import DictConfig
+from matplotlib.collections import LineCollection
+import pandas as pd
+
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.common.solution import VehicleType
 from commonroad.geometry.shape import Rectangle
@@ -17,9 +23,6 @@ from commonroad.scenario.trajectory import Trajectory
 from commonroad.visualization.mp_renderer import MPRenderer
 from commonroad.scenario.state import InitialState
 from commonroad_dc.feasibility.vehicle_dynamics import VehicleParameterMapping
-from matplotlib.collections import LineCollection
-from omegaconf import DictConfig
-from PIL import Image
 
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, State, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
@@ -35,7 +38,9 @@ from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import Maneuver
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
 from fiss_plus_planner.planners.common.utils import configure_numba_threads
-from typing import Tuple
+from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
+
+
 
 
 def prepare_obstacles_polygons_time_series(
@@ -95,7 +100,9 @@ def prepare_obstacles_polygons_time_series(
     return obstacles_array, num_vertices
 
 
-def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, input_dir: str, file: str, number_threads: int, runtime_measurement: bool) -> Tuple[bool, Trajectory, float, list, Stats, list]:
+def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
+                            input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool
+                            ) -> Tuple[bool, Trajectory, float, list, Stats, list]:
     # Plan a global route
     global_planner = GlobalPlanner()
     global_plan = global_planner.plan_global_route(scenario, planning_problem)
@@ -213,6 +220,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     state_list = []
     time_list = []
     stats = Stats()
+    sampling_params_cross_all_scenarios = []
     goal_reached = False
     
     for i in range(final_time_step):
@@ -251,14 +259,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             yaw_rate=buf_yaw_rate[next_step_idx]
         )
         
-        state = CustomState(**{'time_step': i,
-                               'position': np.array([current_state.x, current_state.y]),
-                               'orientation': current_state.yaw,
-                               'velocity': current_frenet_state.s_d,
-                               'velocity_y': current_frenet_state.d_d,
-                               })
-        state_list.append(state)
+        
+        state_list.append(initial_state)
         time_list.append(end_time - start_time)
+        sampling_params_cross_all_scenarios.append(best_traj_ego.sampling_param)
 
         if show_animation:  # pragma: no cover
             plt.cla()
@@ -290,6 +294,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)
+
+    if collect_data_for_ml:
+        scenario_name = os.path.splitext(file)[0]
+        drawer = ScenarioDrawer(scenario_name, input_dir, output_dir)
+        collect_data(drawer, scenario_name, final_time_step, sampling_params_cross_all_scenarios, state_list, output_dir)
 
     # create the planned trajectory starting at time step 0
     if state_list:
@@ -389,6 +398,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     #set number of threads for numba parallel collision checker
     number_threads = cfg['Num_Threads_For_CollisionChecker']
     runtime_measurement = cfg.get('Runtime_Measurement')
+    collect_data_for_ml = cfg.get('Collect_Data_For_ML')
     configure_numba_threads(number_threads)
 
     vehicle_type = VehicleType.VW_VANAGON  # FORD_ESCORT, BMW_320i, VW_VANAGON
@@ -409,7 +419,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 scenario, planning_problem, vehicle_params)
         else:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
-                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, number_threads, runtime_measurement)
+                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, number_threads, runtime_measurement, collect_data_for_ml)
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
@@ -545,3 +555,90 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
         print("Gif saved to:", gif_filepath)
 
     return measurment
+
+def save_data(scenario_name: str, state_list: list, sampling_params: list, output_dir: str):
+    os.makedirs(output_dir, exist_ok=True)
+    
+    samples_path = os.path.join(output_dir, 'sampled_vars.parquet')
+    conditions_path = os.path.join(output_dir, 'conditions.parquet')
+    
+    # Check if scenario already exists in the parquet files
+    if os.path.exists(samples_path):
+        df_samples_existing = pd.read_parquet(samples_path)
+        if scenario_name in df_samples_existing['scenario'].values:
+            print(f"Scenario {scenario_name} already exists in data, skipping...")
+            return
+    else:
+        df_samples_existing = None
+        
+    if os.path.exists(conditions_path):
+        df_conditions_existing = pd.read_parquet(conditions_path)
+    else:
+        df_conditions_existing = None
+    
+    # Build sampled_vars data from sampling_params
+    sampled_vars = {
+        "scenario": [],
+        "time_step": [],
+        "t": [],
+        "d": [],
+        "v": []
+    }
+    
+    # Build conditions data from state_list
+    conditions = {
+        "scenario": [],
+        "time_step": [],
+        "x": [],
+        "y": [],
+        "theta": [],
+        "velocity": [],
+        "acceleration": [],
+        "yaw_rate": []
+    }
+    
+    for time_step, (state, sampling_param) in enumerate(zip(state_list, sampling_params)):
+        # Add sampling params
+        sampled_vars["scenario"].append(scenario_name)
+        sampled_vars["time_step"].append(time_step)
+        sampled_vars["t"].append(sampling_param.t)
+        sampled_vars["d"].append(sampling_param.d)
+        sampled_vars["v"].append(sampling_param.s_d)
+        
+        # Add conditions from state
+        conditions["scenario"].append(scenario_name)
+        conditions["time_step"].append(time_step)
+        conditions["x"].append(state.position[0])
+        conditions["y"].append(state.position[1])
+        conditions["theta"].append(state.orientation)
+        conditions["velocity"].append(state.velocity)
+        conditions["acceleration"].append(state.acceleration)
+        conditions["yaw_rate"].append(state.yaw_rate)
+    
+    df_samples_new = pd.DataFrame(sampled_vars)
+    df_conditions_new = pd.DataFrame(conditions)
+    
+    # Append to existing data if available
+    if df_samples_existing is not None:
+        df_samples = pd.concat([df_samples_existing, df_samples_new], ignore_index=True)
+    else:
+        df_samples = df_samples_new
+        
+    if df_conditions_existing is not None:
+        df_conditions = pd.concat([df_conditions_existing, df_conditions_new], ignore_index=True)
+    else:
+        df_conditions = df_conditions_new
+    
+    df_samples.to_parquet(samples_path, index=False)
+    df_conditions.to_parquet(conditions_path, index=False)
+    
+    print(f"Saved {len(state_list)} time steps for scenario {scenario_name}")
+
+
+def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list, state_list: list, output_dir: str):
+    save_data(scenario_name, state_list, sampling_params_cross_all_scenarios, str(output_dir))
+    
+    # Save images for all time steps
+    if drawer.save_dir is not None:
+        drawer.save_images_all_timesteps(state_list, scenario_name)
+        print(f"Saved images for scenario {scenario_name}")

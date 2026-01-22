@@ -123,6 +123,11 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 d["cost_final"] = traj.cost_final;
                 d["is_generated"] = traj.is_generated;
                 d["idx"] = std::vector<int>{traj.idx[0], traj.idx[1], traj.idx[2]};
+                py::dict sampling_param_dict;
+                sampling_param_dict["d"] = traj.sampling_param.d;
+                sampling_param_dict["s_d"] = traj.sampling_param.s_d;
+                sampling_param_dict["t"] = traj.sampling_param.t;
+                d["sampling_param"] = sampling_param_dict;
                 return d;
              },
              py::arg("frenet_state"),
@@ -153,6 +158,11 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                     d["cost_final"] = traj.cost_final;
                     d["is_generated"] = traj.is_generated;
                     d["idx"] = std::vector<int>{traj.idx[0], traj.idx[1], traj.idx[2]};
+                    py::dict sampling_param_dict;
+                    sampling_param_dict["d"] = traj.sampling_param.d;
+                    sampling_param_dict["s_d"] = traj.sampling_param.s_d;
+                    sampling_param_dict["t"] = traj.sampling_param.t;
+                    d["sampling_param"] = sampling_param_dict;
                     result.append(d);
                 }
                 return result;

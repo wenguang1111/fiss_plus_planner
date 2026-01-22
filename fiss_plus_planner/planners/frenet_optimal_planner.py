@@ -10,7 +10,7 @@ from shapely import Polygon, affinity
 from fiss_plus_planner.planners.common.cost.cost_function import CostFunction
 from fiss_plus_planner.planners.common.geometry.cubic_spline import CubicSpline2D
 from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
-from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
+from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory, SamplingParam
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
@@ -133,6 +133,8 @@ class FrenetOptimalPlanner(object):
             
             # Compute the final cost
             tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
+
+            tfp.sampling_param = SamplingParam(di, tv, Ti)
             frenet_paths.append(tfp)
             traj_per_timestep.append(tfp)
             

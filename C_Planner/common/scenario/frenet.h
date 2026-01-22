@@ -4,6 +4,25 @@
 #include <vector>
 #include <cmath>
 
+struct SamplingParam {
+    double d;     // lateral offset [m]
+    double s_d;   // longitudinal speed [m/s]
+    double t;     // time [s]
+    
+    // Default constructor
+    SamplingParam() : d(0.0), s_d(0.0), t(0.0) {}
+    
+    SamplingParam(double d_, double s_d_, double t_)
+        : d(d_), s_d(s_d_), t(t_) {}
+    //add = operator for assignment
+    SamplingParam& operator=(const SamplingParam& other) {
+        d = other.d;
+        s_d = other.s_d;
+        t = other.t;
+        return *this;
+    }
+};
+
 struct FrenetTrajectory {
     // Trajectory indices and metadata
     int idx[3] = {-1, -1, -1};          // trajectory id
@@ -52,6 +71,8 @@ struct FrenetTrajectory {
         double d_d = 0.0;
         double d_dd = 0.0;
     } end_state;
+
+    struct SamplingParam sampling_param; // sampling parameters (d, s_d, t)
     
     // Comparison operators for cost-based sorting
     bool operator<(const FrenetTrajectory& other) const {
