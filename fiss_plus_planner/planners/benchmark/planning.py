@@ -218,6 +218,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     processing_time = 0
     num_cycles = 0
     state_list = []
+    frenet_state_list = []
+    global_coordination_state_list = []
+
     time_list = []
     stats = Stats()
     sampling_params_cross_all_scenarios = []
@@ -225,6 +228,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     
     for i in range(final_time_step):
         num_cycles += 1
+        
+        frenet_state_list.append(current_frenet_state)
+        global_coordination_state_list.append(initial_state)
+
         start_time = time.time()
         best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, initial_state)
         end_time = time.time()
@@ -298,7 +305,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     if collect_data_for_ml:
         scenario_name = os.path.splitext(file)[0]
         drawer = ScenarioDrawer(scenario_name, input_dir, output_dir)
-        collect_data(drawer, scenario_name, final_time_step, sampling_params_cross_all_scenarios, state_list, output_dir)
+        collect_data(drawer, scenario_name, final_time_step, sampling_params_cross_all_scenarios, frenet_state_list, global_coordination_state_list, output_dir)
 
     # create the planned trajectory starting at time step 0
     if state_list:
@@ -556,7 +563,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
 
     return measurment
 
-def save_data(scenario_name: str, state_list: list, sampling_params: list, output_dir: str):
+def save_data(scenario_name: str, frenet_state_list: list, global_coordination_state_list: list, sampling_params: list, output_dir: str):
     os.makedirs(output_dir, exist_ok=True)
     
     samples_path = os.path.join(output_dir, 'sampled_vars.parquet')
@@ -594,10 +601,18 @@ def save_data(scenario_name: str, state_list: list, sampling_params: list, outpu
         "theta": [],
         "velocity": [],
         "acceleration": [],
-        "yaw_rate": []
+        "yaw_rate": [],
+        "s": [],
+        "s_d": [],
+        "s_dd": [],
+        "s_ddd": [],
+        "d": [],
+        "d_d": [],
+        "d_dd": [],
+        "d_ddd": []
     }
     
-    for time_step, (state, sampling_param) in enumerate(zip(state_list, sampling_params)):
+    for time_step, (frenet_state, global_state, sampling_param) in enumerate(zip(frenet_state_list, global_coordination_state_list, sampling_params)):
         # Add sampling params
         sampled_vars["scenario"].append(scenario_name)
         sampled_vars["time_step"].append(time_step)
@@ -608,12 +623,20 @@ def save_data(scenario_name: str, state_list: list, sampling_params: list, outpu
         # Add conditions from state
         conditions["scenario"].append(scenario_name)
         conditions["time_step"].append(time_step)
-        conditions["x"].append(state.position[0])
-        conditions["y"].append(state.position[1])
-        conditions["theta"].append(state.orientation)
-        conditions["velocity"].append(state.velocity)
-        conditions["acceleration"].append(state.acceleration)
-        conditions["yaw_rate"].append(state.yaw_rate)
+        conditions["x"].append(global_state.position[0])
+        conditions["y"].append(global_state.position[1])
+        conditions["theta"].append(global_state.orientation)
+        conditions["velocity"].append(global_state.velocity)
+        conditions["acceleration"].append(global_state.acceleration)
+        conditions["yaw_rate"].append(global_state.yaw_rate)
+        conditions["s"].append(frenet_state.s)
+        conditions["s_d"].append(frenet_state.s_d)
+        conditions["s_dd"].append(frenet_state.s_dd)
+        conditions["s_ddd"].append(frenet_state.s_ddd)
+        conditions["d"].append(frenet_state.d)
+        conditions["d_d"].append(frenet_state.d_d)
+        conditions["d_dd"].append(frenet_state.d_dd)
+        conditions["d_ddd"].append(frenet_state.d_ddd)
     
     df_samples_new = pd.DataFrame(sampled_vars)
     df_conditions_new = pd.DataFrame(conditions)
@@ -632,13 +655,14 @@ def save_data(scenario_name: str, state_list: list, sampling_params: list, outpu
     df_samples.to_parquet(samples_path, index=False)
     df_conditions.to_parquet(conditions_path, index=False)
     
-    print(f"Saved {len(state_list)} time steps for scenario {scenario_name}")
+    print(f"Saved {len(global_coordination_state_list)} time steps for scenario {scenario_name}")
 
 
-def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list, state_list: list, output_dir: str):
-    save_data(scenario_name, state_list, sampling_params_cross_all_scenarios, str(output_dir))
+def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list, 
+                 frenet_state_list: list, global_coordination_state_list: list, output_dir: str):
+    save_data(scenario_name, frenet_state_list, global_coordination_state_list, sampling_params_cross_all_scenarios, str(output_dir))
     
     # Save images for all time steps
     if drawer.save_dir is not None:
-        drawer.save_images_all_timesteps(state_list, scenario_name)
+        drawer.save_images_all_timesteps(global_coordination_state_list, scenario_name)
         print(f"Saved images for scenario {scenario_name}")
