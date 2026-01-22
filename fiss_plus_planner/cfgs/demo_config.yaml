@@ -5,13 +5,13 @@ OUTPUT_DIR: "data/output/"
 MEASUREMENTS_DIR: "data/measurements/"
 INPUT_DIR: "data/demo/FOP_CPP_Survived_Until_FinalTimeStep"
 # INPUT_DIR: "data/demo"
-FILES: ["AUT_Haag-1_1_T-7.xml"] # empty by default if you want to run all the scenario files under the input directory
+FILES: [] # empty by default if you want to run all the scenario files under the input directory
 
-PLANNER: "FISS+_CPP" # the name of the planner to be used, can be: FOP, FOP+, FISS, FISS+, Sparse, FOP_CPP， FISS+_CPP
+PLANNER: "FOP_CPP" # the name of the planner to be used, can be: FOP, FOP+, FISS, FISS+, Sparse, FOP_CPP， FISS+_CPP
 N_W_SAMPLE: 5 # number of lateral offset samples
 N_S_SAMPLE: 5 # number of longitudinal speed samples
 N_T_SAMPLE: 5 # number of time horizon samples
-SAVE_GIF: True # save the animation as a .gif file
+SAVE_GIF: False # save the animation as a .gif file
 SAVE_MEASUREMENTS: True # save the measurement data as .csv file
 Num_Threads_For_CollisionChecker: 16 # number of threads to be used in the numba parallel collision checker
 Runtime_Measurement: True # For runtime measurements, the data copy from c++ to python for all successful trajectories should not be included, check code in fiss_plus_planner/planners/frenet_optimal_planner.py
