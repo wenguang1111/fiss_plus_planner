@@ -32,6 +32,10 @@ class ScenarioDrawer:
     VIEW_SIZE_DEFAULT = 140.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
     COLOR_BLACK = "#000000"
     COLOR_GRAY = "#808080"
+    COLOR_LightGray = "#D3D3D3"
+    GENERATE_GIF = True
+    GIF_DURATION_MS = 100
+    GIF_LOOP = 0
 
     def __init__(
         self,
@@ -48,7 +52,7 @@ class ScenarioDrawer:
         self.scenario_name = scenario_name
         self.ego_params = DynamicObstacleParams()
         self.ego_params.draw_icon = True
-        self.ego_params.vehicle_shape.occupancy.shape.facecolor = "#ff0000"
+        self.ego_params.vehicle_shape.occupancy.shape.facecolor = self.COLOR_BLACK
         self.ego_params.draw_icon = True
         self.ego_id = None
         self.ego_type = ObstacleType.CAR
@@ -95,6 +99,7 @@ class ScenarioDrawer:
         output_dir = self.save_dir / self.scenario_name
         os.makedirs(output_dir, exist_ok=True)
 
+        images = [] if self.GENERATE_GIF else None
         for time_step, ego_state in enumerate(ego_state_list):
             img = self._render_frame(
                 ego_state=ego_state,
@@ -102,6 +107,19 @@ class ScenarioDrawer:
                 highest_speed=highest_speed,
             )
             img.save(output_dir / f"{time_step}.{image_format}")
+            if images is not None:
+                images.append(img)
+
+        if images:
+            gif_path = output_dir / f"{self.scenario_name}.gif"
+            images[0].save(
+                gif_path,
+                save_all=True,
+                append_images=images[1:],
+                optimize=True,
+                duration=self.GIF_DURATION_MS,
+                loop=self.GIF_LOOP,
+            )
 
     def generate_image_at_time_step(
         self,
@@ -152,14 +170,17 @@ class ScenarioDrawer:
         ax.axis("off")
 
         ego_x, ego_y = ego_state.position
-        ax.set_xlim(ego_x - view_size / 2.0, ego_x + view_size / 2.0)
-        ax.set_ylim(ego_y - view_size / 2.0, ego_y + view_size / 2.0)
+        yaw = 0.0 if ego_state.orientation is None else float(ego_state.orientation)
+        transform = self._build_ego_transform(np.array([ego_x, ego_y]), yaw)
 
-        self._draw_lanelet_boundaries(ax)
-        self._draw_lane_ahead(ax, ego_state)
-        self._draw_obstacles(ax, time_step)
-        self._draw_ego(ax, ego_state)
-        self._draw_speed_arrow(ax, ego_state, highest_speed)
+        ax.set_xlim(-view_size / 2.0, view_size / 2.0)
+        ax.set_ylim(-view_size / 2.0, view_size / 2.0)
+
+        self._draw_lanelet_boundaries(ax, transform)
+        self._draw_lane_ahead(ax, ego_state, transform)
+        self._draw_obstacles(ax, time_step, transform)
+        self._draw_ego(ax)
+        # self._draw_speed_arrow(ax, ego_state, highest_speed)
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=300, bbox_inches=None, pad_inches=0)
@@ -167,7 +188,7 @@ class ScenarioDrawer:
         buf.seek(0)
         return Image.open(buf).convert("RGB")
 
-    def _draw_lane_ahead(self, ax, ego_state: State):
+    def _draw_lane_ahead(self, ax, ego_state: State, transform: np.ndarray):
         if self.ref_ego_lane_pts is None:
             return
         lane_xy = self.ref_ego_lane_pts[:, :2]
@@ -176,7 +197,7 @@ class ScenarioDrawer:
         ego_pos = np.array(ego_state.position, dtype=float)
         distances = np.linalg.norm(lane_xy - ego_pos, axis=1)
         start_idx = int(np.argmin(distances))
-        lane_ahead = lane_xy[start_idx:]
+        lane_ahead = self._apply_transform(lane_xy[start_idx:], transform)
         if len(lane_ahead) < 2:
             return
         ax.plot(
@@ -188,18 +209,18 @@ class ScenarioDrawer:
             zorder=10,
         )
 
-    def _draw_lanelet_boundaries(self, ax):
+    def _draw_lanelet_boundaries(self, ax, transform: np.ndarray):
         lanelet_network = getattr(self.scenario, "lanelet_network", None)
         if lanelet_network is None:
             return
         for lanelet in lanelet_network.lanelets:
-            left = np.asarray(lanelet.left_vertices, dtype=float)
-            right = np.asarray(lanelet.right_vertices, dtype=float)
+            left = self._apply_transform(np.asarray(lanelet.left_vertices, dtype=float), transform)
+            right = self._apply_transform(np.asarray(lanelet.right_vertices, dtype=float), transform)
             if left.shape[0] >= 2:
                 ax.plot(
                     left[:, 0],
                     left[:, 1],
-                    color=self.COLOR_GRAY,
+                    color=self.COLOR_LightGray,
                     linewidth=self.LINE_WIDTH,
                     zorder=5,
                 )
@@ -207,30 +228,33 @@ class ScenarioDrawer:
                 ax.plot(
                     right[:, 0],
                     right[:, 1],
-                    color=self.COLOR_GRAY,
+                    color=self.COLOR_LightGray,
                     linewidth=self.LINE_WIDTH,
                     zorder=5,
                 )
 
-    def _draw_obstacles(self, ax, time_step: int):
+    def _draw_obstacles(self, ax, time_step: int, transform: np.ndarray):
         num_vertices_row = self.obstacles_num_vertices[time_step]
         for obs_idx, num_vertices in enumerate(num_vertices_row):
             if num_vertices < 3:
                 continue
-            coords = self.obstacles_array[time_step, obs_idx, :num_vertices, :]
+            coords = self._apply_transform(
+                self.obstacles_array[time_step, obs_idx, :num_vertices, :],
+                transform,
+            )
             patch = Polygon(
                 coords,
                 closed=True,
-                fill=False,
+                facecolor=self.COLOR_GRAY,
                 edgecolor=self.COLOR_GRAY,
                 linewidth=self.LINE_WIDTH,
-                zorder=20,
+                zorder=30,
             )
             ax.add_patch(patch)
 
-    def _draw_ego(self, ax, ego_state: State):
-        ego_x, ego_y = ego_state.position
-        yaw = 0.0 if ego_state.orientation is None else float(ego_state.orientation)
+    def _draw_ego(self, ax):
+        ego_x, ego_y = 0.0, 0.0
+        yaw = 0.0
         half_l = self.vehicle_length / 2.0
         half_w = self.vehicle_width / 2.0
         corners = np.array([
@@ -263,13 +287,10 @@ class ScenarioDrawer:
 
         if length <= 0.0:
             return
-        yaw = 0.0 if ego_state.orientation is None else float(ego_state.orientation)
-        cos_yaw = np.cos(yaw)
-        sin_yaw = np.sin(yaw)
-        dx = length * cos_yaw
-        dy = length * sin_yaw
-        start_x = ego_state.position[0] + cos_yaw * (self.vehicle_length / 2.0)
-        start_y = ego_state.position[1] + sin_yaw * (self.vehicle_length / 2.0)
+        dx = length
+        dy = 0.0
+        start_x = self.vehicle_length / 2.0
+        start_y = 0.0
         ax.quiver(
             start_x,
             start_y,
@@ -282,3 +303,21 @@ class ScenarioDrawer:
             color=self.COLOR_GRAY,
             zorder=35,
         )
+
+    def _build_ego_transform(self, ego_pos: np.ndarray, ego_yaw: float) -> np.ndarray:
+        cos_yaw = np.cos(-ego_yaw)
+        sin_yaw = np.sin(-ego_yaw)
+        rot = np.array([[cos_yaw, -sin_yaw], [sin_yaw, cos_yaw]])
+        transform = np.eye(3, dtype=float)
+        transform[:2, :2] = rot
+        transform[:2, 2] = -rot @ ego_pos
+        return transform
+
+    def _apply_transform(self, points: np.ndarray, transform: np.ndarray) -> np.ndarray:
+        if points.size == 0:
+            return points
+        pts = np.asarray(points, dtype=float)
+        ones = np.ones((pts.shape[0], 1), dtype=float)
+        hom = np.hstack((pts, ones))
+        transformed = hom @ transform.T
+        return transformed[:, :2]
