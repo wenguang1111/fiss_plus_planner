@@ -58,7 +58,12 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.cvae_model = self.cvae_model.to(self.settings.device)
         self.cvae_model.eval()
         
-        self.scenario_drawer = ScenarioDrawer(self.settings.scenario_file, self.settings.scenario_dir)
+        self.scenario_drawer = ScenarioDrawer(
+            self.settings.scenario_file,
+            self.settings.scenario_dir,
+            obstacles_array=self.obstacles_array,
+            obstacles_num_vertices=self.obstacles_num_vertices,
+        )
         
     
     def get_samples(self, current_state: InitialState = None, current_time_step: int = 0):
@@ -73,7 +78,11 @@ class SparsePlanner(FrenetOptimalPlanner):
             current_state.yaw_rate
         ], dtype=np.float32)
         
-        img = self.scenario_drawer.generate_image_at_time_step(current_time_step, current_state, None)
+        img = self.scenario_drawer.generate_image_at_time_step(
+            current_time_step,
+            current_state,
+            self.settings.highest_speed,
+        )
         
         with torch.inference_mode():
             # time_s = time.time()

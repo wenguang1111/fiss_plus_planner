@@ -225,15 +225,24 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     stats = Stats()
     sampling_params_cross_all_scenarios = []
     goal_reached = False
+    next_state = initial_state
     
     for i in range(final_time_step):
         num_cycles += 1
         
         frenet_state_list.append(current_frenet_state)
-        global_coordination_state_list.append(initial_state)
+        inital_state = InitialState(
+            time_step=i,
+            position=next_state.position,
+            orientation=next_state.orientation,
+            velocity=next_state.velocity,
+            acceleration=next_state.acceleration,
+            yaw_rate=next_state.yaw_rate
+        )
+        global_coordination_state_list.append(inital_state)
 
         start_time = time.time()
-        best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, initial_state)
+        best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
@@ -257,7 +266,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         yaw = best_traj_ego.yaw
         buf_yaw_rate = np.diff(yaw, prepend=yaw[0]) / dt
 
-        initial_state = InitialState(
+        next_state = InitialState(
             time_step=i,
             position=np.array([current_state.x, current_state.y]),
             orientation=current_state.yaw,
@@ -267,7 +276,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         )
         
         
-        state_list.append(initial_state)
+        state_list.append(next_state)
         time_list.append(end_time - start_time)
         sampling_params_cross_all_scenarios.append(best_traj_ego.sampling_param)
 
@@ -302,17 +311,34 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     stats.step_number = num_cycles
     stats.average(num_cycles)
 
-    if collect_data_for_ml:
-        scenario_name = os.path.splitext(file)[0]
-        drawer = ScenarioDrawer(scenario_name, input_dir, output_dir)
-        collect_data(drawer, scenario_name, final_time_step, sampling_params_cross_all_scenarios, frenet_state_list, global_coordination_state_list, output_dir)
-
     # create the planned trajectory starting at time step 0
     if state_list:
         ego_vehicle_traj = Trajectory(
             initial_time_step=0, state_list=state_list)
     else:
         ego_vehicle_traj = None
+
+    if collect_data_for_ml and method == 'FOP_CPP' and goal_reached:
+        scenario_name = os.path.splitext(file)[0]
+        drawer = ScenarioDrawer(
+            scenario_name=scenario_name,
+            scenario_dir=input_dir,
+            save_dir=output_dir,
+            ref_ego_lane_pts=ref_ego_lane_pts,
+            vehicle_params=vehicle_params,
+            obstacles_array=obstacles_array,
+            obstacles_num_vertices=obstacles_num_vertices,
+        )
+        collect_data(
+            drawer,
+            scenario_name,
+            final_time_step,
+            sampling_params_cross_all_scenarios,
+            frenet_state_list,
+            global_coordination_state_list,
+            output_dir,
+            planner.settings.highest_speed,
+        )
 
     return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, planner.all_trajs
 
@@ -658,11 +684,15 @@ def save_data(scenario_name: str, frenet_state_list: list, global_coordination_s
     print(f"Saved {len(global_coordination_state_list)} time steps for scenario {scenario_name}")
 
 
-def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list, 
-                 frenet_state_list: list, global_coordination_state_list: list, output_dir: str):
+def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list,
+                 frenet_state_list: list, global_coordination_state_list: list, output_dir: str,
+                 highest_speed: float):
     save_data(scenario_name, frenet_state_list, global_coordination_state_list, sampling_params_cross_all_scenarios, str(output_dir))
     
     # Save images for all time steps
     if drawer.save_dir is not None:
-        drawer.save_images_all_timesteps(global_coordination_state_list, scenario_name)
+        drawer.save_scenario_imgs(
+            ego_state_list=global_coordination_state_list,
+            highest_speed=highest_speed,
+        )
         print(f"Saved images for scenario {scenario_name}")
