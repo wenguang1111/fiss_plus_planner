@@ -35,7 +35,7 @@ struct SettingParameters {
         : tick_t(0.1),
           max_road_width(3.5),
           num_width(num_width_param),
-          highest_speed(13.4112),
+          highest_speed(14.0),
           lowest_speed(0.0),
           num_speed(num_speed_param),
           min_t(3.0),

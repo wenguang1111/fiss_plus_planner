@@ -57,7 +57,7 @@ class FrenetOptimalPlannerSettings(object):
         self.max_road_width = 3.5           # maximum road width [m]
         self.num_width = num_width          # road width sampling number
 
-        self.highest_speed = 13.4112        # highest sampling speed [m/s]
+        self.highest_speed = 14        # highest sampling speed [m/s]
         self.lowest_speed = 0.0             # lowest sampling speed [m/s]
         self.num_speed = num_speed          # speed sampling number
         

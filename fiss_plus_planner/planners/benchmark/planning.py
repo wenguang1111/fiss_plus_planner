@@ -452,7 +452,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 scenario, planning_problem, vehicle_params)
         else:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
-                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, number_threads, runtime_measurement, collect_data_for_ml)
+                scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
+                number_threads, runtime_measurement, collect_data_for_ml)
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
