@@ -30,13 +30,12 @@ from fiss_plus_planner.planners.sparse_planning.model import CVAE
 class SparsePlannerSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
-        print(scenario_file, scenario_dir)
         # heuristic cost weight
         self.w_heuristic = 10.0
         self.vis_all_candidates = False
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
-        self.z_dim: int = 32  #latent dimension
+        self.z_dim: int = 32 
         self.num_samples: int = 50
         self.device = "cpu"
         self.c_dim: int = 6 + 64

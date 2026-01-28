@@ -118,7 +118,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         print(f"    Speed interval {min_speed}, {max_speed} m/s")
     else:
         min_speed = 0.0
-        max_speed = 13.5
+        max_speed = 14
         print(
             f"    Scenario has no speed interval, using {min_speed}, {max_speed} m/s")
 
@@ -244,6 +244,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         start_time = time.time()
         best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
+
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
             break
