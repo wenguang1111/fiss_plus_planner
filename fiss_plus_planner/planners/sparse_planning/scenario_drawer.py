@@ -104,7 +104,7 @@ class ScenarioDrawer:
             img = self._render_frame(
                 ego_state=ego_state,
                 time_step=time_step,
-                highest_speed=highest_speed,
+                # highest_speed=highest_speed,
             )
             img.save(output_dir / f"{time_step}.{image_format}")
             if images is not None:
@@ -121,6 +121,19 @@ class ScenarioDrawer:
                 loop=self.GIF_LOOP,
             )
 
+    def create_scenario_img_at_time_step(
+        self,
+        time_step: int,
+        ego_state: State,
+    ) -> Image.Image:
+
+        img = self._render_frame(
+                ego_state=ego_state,
+                time_step=time_step,
+                # highest_speed=highest_speed,
+        )
+        return img
+
     def generate_image_at_time_step(
         self,
         time_step: int,
@@ -130,7 +143,7 @@ class ScenarioDrawer:
         img = self._render_frame(
             ego_state=ego_state,
             time_step=time_step,
-            highest_speed=highest_speed,
+            # highest_speed=highest_speed,
         )
         return self._transform(img).unsqueeze(0)
 
@@ -160,7 +173,7 @@ class ScenarioDrawer:
         self,
         ego_state: State,
         time_step: int,
-        highest_speed: Optional[float],
+        # highest_speed: Optional[float],
     ) -> Image.Image:
         view_size = self.VIEW_SIZE_DEFAULT
         fig, ax = plt.subplots(figsize=(4, 4), dpi=300, facecolor="white")
