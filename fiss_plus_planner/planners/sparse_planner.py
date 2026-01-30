@@ -99,6 +99,16 @@ class SparsePlanner(FrenetOptimalPlanner):
     #         samples = self.cvae_model.decode(z, c, img_features).cpu().numpy()
             
     #     return samples
+
+    def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
+        """Record generated sampling parameters to a file."""
+        output_dir = Path("output/sampling_parameters")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / f"{self.settings.scenario_file}.csv"
+        with open(output_file, "a") as f:
+            for sample in samples:
+                t, d, s_d = sample
+                f.write(f"{time_step_now}, {d}, {s_d}, {t}\n")
     
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
         """Plan using CVAE sampled trajectories."""
@@ -116,6 +126,11 @@ class SparsePlanner(FrenetOptimalPlanner):
             current_state
         )
         self.image_history.append((time_step_now, img))
+
+
+        output_dir = Path("output/generated_images") / Path(self.settings.scenario_file)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        img.save(output_dir / f"{time_step_now}.png")
 
         images_last_3_frame: List[Image.Image] = []
         if time_step_now >= 2:
@@ -138,7 +153,13 @@ class SparsePlanner(FrenetOptimalPlanner):
             ]
         
         # cvae_samples = self.get_samples(current_state=current_state, current_time_step=time_step_now)
+
+        # Output is t, d, s_d -> reorder to  d, s_d, t.
         cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
+        cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
+        
+
+        self.record_generated_sampling_parameters(cvae_samples, time_step_now)
 
         fplist = self.calc_frenet_paths(frenet_state, cvae_samples)
         fplist = self.calc_global_paths(fplist)
