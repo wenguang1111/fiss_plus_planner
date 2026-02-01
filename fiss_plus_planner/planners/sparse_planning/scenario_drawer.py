@@ -1,4 +1,3 @@
-import io
 import os
 from pathlib import Path
 from typing import Iterable, Optional
@@ -7,6 +6,8 @@ import numpy as np
 from PIL import Image
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.collections import LineCollection
 from matplotlib.patches import Polygon
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.visualization.draw_params import DynamicObstacleParams
@@ -176,7 +177,7 @@ class ScenarioDrawer:
         # highest_speed: Optional[float],
     ) -> Image.Image:
         view_size = self.VIEW_SIZE_DEFAULT
-        fig, ax = plt.subplots(figsize=(4, 4), dpi=300, facecolor="white")
+        fig, ax = plt.subplots(figsize=(4, 4), dpi=32, facecolor="white")
         fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
         ax.set_facecolor("white")
         ax.set_aspect("equal", adjustable="box")
@@ -195,11 +196,12 @@ class ScenarioDrawer:
         self._draw_ego(ax)
         # self._draw_speed_arrow(ax, ego_state, highest_speed)
 
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=300, bbox_inches=None, pad_inches=0)
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        width, height = canvas.get_width_height()
+        buf = np.frombuffer(canvas.tostring_rgb(), dtype=np.uint8).reshape(height, width, 3)
         plt.close(fig)
-        buf.seek(0)
-        return Image.open(buf).convert("RGB")
+        return Image.fromarray(buf)
 
     def _draw_lane_ahead(self, ax, ego_state: State, transform: np.ndarray):
         if self.ref_ego_lane_pts is None:
@@ -226,25 +228,22 @@ class ScenarioDrawer:
         lanelet_network = getattr(self.scenario, "lanelet_network", None)
         if lanelet_network is None:
             return
+        segments = []
         for lanelet in lanelet_network.lanelets:
             left = self._apply_transform(np.asarray(lanelet.left_vertices, dtype=float), transform)
             right = self._apply_transform(np.asarray(lanelet.right_vertices, dtype=float), transform)
             if left.shape[0] >= 2:
-                ax.plot(
-                    left[:, 0],
-                    left[:, 1],
-                    color=self.COLOR_LightGray,
-                    linewidth=self.LINE_WIDTH,
-                    zorder=5,
-                )
+                segments.append(left)
             if right.shape[0] >= 2:
-                ax.plot(
-                    right[:, 0],
-                    right[:, 1],
-                    color=self.COLOR_LightGray,
-                    linewidth=self.LINE_WIDTH,
-                    zorder=5,
-                )
+                segments.append(right)
+        if segments:
+            collection = LineCollection(
+                segments,
+                colors=self.COLOR_LightGray,
+                linewidths=self.LINE_WIDTH,
+                zorder=5,
+            )
+            ax.add_collection(collection)
 
     def _draw_obstacles(self, ax, time_step: int, transform: np.ndarray):
         num_vertices_row = self.obstacles_num_vertices[time_step]
