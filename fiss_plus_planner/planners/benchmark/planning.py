@@ -39,6 +39,7 @@ from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, M
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
 from fiss_plus_planner.planners.common.utils import configure_numba_threads
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
+from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 
 
 
@@ -186,6 +187,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'Sparse':
         planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
         planner = SparsePlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method == 'Sparse_Optimized':
+        planner_settings = SparsePlannerOptimizedSettings(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlannerOptimized(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11

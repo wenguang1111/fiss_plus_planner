@@ -1,4 +1,5 @@
 import copy
+from collections import deque
 from queue import PriorityQueue
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,7 +8,8 @@ import numpy as np
 from commonroad.scenario.scenario import Scenario
 from commonroad.planning.planning_problem import PlanningProblem, PlanningProblemSet
 from commonroad.scenario.state import InitialState
-from typing import List
+from typing import List, Tuple
+from PIL import Image
 import torch
 torch.manual_seed(0)
 import time
@@ -18,45 +20,28 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planning.model import CVAE
+from CVAE_efficient_sampling.CVAE import CVAE_Efficient
 
-# @dataclass
-# class ParameterSample:
-#     """Represents a trajectory sample with lateral, longitudinal, and temporal parameters."""
-#     d: float       # lateral position
-#     s_d: float     # longitudinal velocity
-#     t: float       # time horizon
-
-
-class SparsePlannerSettings(FrenetOptimalPlannerSettings):
+class SparsePlannerOptimizedSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
         # heuristic cost weight
-        self.w_heuristic = 10.0
+        # self.w_heuristic = 10.0
         self.vis_all_candidates = False
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
-        self.z_dim: int = 32 
-        self.num_samples: int = 50
-        self.device = "cpu"
-        self.c_dim: int = 6 + 64
-        current_dir = Path(__file__).parent
-        self.cvae_model_path = current_dir / Path("sparse_planning/cvae_weights/cvae_model_lr_0.0001_batch_1024_epochs_10_zdim_32_cos_0.05_stall_end.pth")
+        self.num_samples: int = 5
+        self.max_refine_iters = 3
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        current_dir = Path(__file__).parent.parent.parent
+        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/hcvae_opt_batch_64_epochs_20_zdim_32_sigmoid_0.1_stall_end.pth")
         self.decaying_factor = 0.5
 
-class SparsePlanner(FrenetOptimalPlanner):
+class SparsePlannerOptimized(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
-    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle,
+    def __init__(self, planner_settings: SparsePlannerOptimizedSettings, ego_vehicle: Vehicle,
                  obstacles_array=None, obstacles_num_vertices=None):
         super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
-        self.cvae_model = CVAE(X_dim=3, 
-                                   c_dim=planner_settings.c_dim, 
-                                   z_dim=planner_settings.z_dim,
-                                   h_Q_dim=512,
-                                   h_P_dim=512)
-        self.cvae_model.load_state_dict(torch.load(
-            planner_settings.cvae_model_path, map_location=torch.device(self.settings.device)))
-        self.cvae_model = self.cvae_model.to(self.settings.device)
-        self.cvae_model.eval()
         
         self.scenario_drawer = ScenarioDrawer(
             self.settings.scenario_file,
@@ -65,41 +50,26 @@ class SparsePlanner(FrenetOptimalPlanner):
             obstacles_num_vertices=self.obstacles_num_vertices,
         )
         self.sampling_res = np.empty(3)
+        self.sampling_min = np.empty(3)
+        self.sampling_max = np.empty(3)
         sampling_width = self.settings.max_road_width - self.vehicle.w + 0.3
         _, self.sampling_res[0] = np.linspace(-sampling_width/2, sampling_width/2, self.settings.num_width, retstep=True)
         _, self.sampling_res[1] = np.linspace(self.settings.lowest_speed, self.settings.highest_speed, self.settings.num_speed, retstep=True)
         _, self.sampling_res[2] = np.linspace(self.settings.min_t, self.settings.max_t, self.settings.num_t, retstep=True)
+        self.sampling_min[0] = -sampling_width/2
+        self.sampling_max[0] = sampling_width/2
+        self.sampling_min[1] = self.settings.lowest_speed
+        self.sampling_max[1] = self.settings.highest_speed
+        self.sampling_min[2] = self.settings.min_t
+        self.sampling_max[2] = self.settings.max_t
 
         self.refined_trajs = PriorityQueue()
+        self.image_history = deque(maxlen=3)
+        self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
 
-    def get_samples(self, current_state: InitialState = None, current_time_step: int = 0):
-        """Get CVAE samples conditioned on the current state and scenario image."""
-        
-        condition = np.array([
-            current_state.position[0],
-            current_state.position[1],
-            current_state.orientation,
-            current_state.velocity,
-            current_state.acceleration,
-            current_state.yaw_rate
-        ], dtype=np.float32)
-        
-        img = self.scenario_drawer.generate_image_at_time_step(
-            current_time_step,
-            current_state,
-            self.settings.highest_speed,
-        )
-        
-        with torch.inference_mode():
-            # time_s = time.time()
-            z = torch.randn(self.settings.num_samples, self.settings.z_dim)
-            z = z.to(torch.float32).to(self.settings.device)
-            c = torch.tensor(condition, dtype=torch.float32).repeat(self.settings.num_samples, 1).to(self.settings.device)
-            img_features = self.cvae_model.cnn_extractor(img)
-            img_features = img_features.repeat(self.settings.num_samples, 1)
-            samples = self.cvae_model.decode(z, c, img_features).cpu().numpy()
-            
-        return samples
+        self.start_state = None
+        self.time_inference = 0.0
+        self.time_image_generation = 0.0
     
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
         """Plan using CVAE sampled trajectories."""
@@ -107,19 +77,77 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.stats = Stats()
         self.refined_trajs = PriorityQueue()
         self.settings.highest_speed = max_target_speed
+        images_last_3_frame: List[Image.Image] = []
+        self.start_state = frenet_state
         
-        cvae_samples = self.get_samples(current_state=current_state, current_time_step=time_step_now)
+        time_image_start = time.time()
+        img = self.scenario_drawer.create_scenario_img_at_time_step(
+            time_step_now,
+            current_state
+        )
+        time_image_end = time.time()
+        self.time_image_generation += (time_image_end - time_image_start)
+        self.image_history.append((time_step_now, img))
+
+        if time_step_now >= 2:
+            images_last_3_frame = [
+                self.image_history[-3][1],
+                self.image_history[-2][1],
+                self.image_history[-1][1],
+            ]
+        elif time_step_now == 1:
+            images_last_3_frame = [
+                self.image_history[-2][1],
+                self.image_history[-1][1],
+                self.image_history[-1][1],
+            ]
+        else:
+            images_last_3_frame = [
+                self.image_history[-1][1],
+                self.image_history[-1][1],
+                self.image_history[-1][1],
+            ]
         
-        cvae_sampled_state = FrenetState(t=cvae_samples[2], s=0.0, s_d=cvae_samples[1], s_dd=0.0, s_ddd=0.0, d=cvae_samples[0], d_d=0.0, d_dd=0.0, d_ddd=0.0)
-        cvae_traj = self.generate_trajectory_by_end_state(cvae_sampled_state)
-        refined_traj = self.refine_solution(cvae_traj, obstacles, time_step_now)
+        # Output is t, d, s_d -> reorder to  d, s_d, t.
+        time_inference_start = time.time()
+        cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
+        time_inference_end = time.time()
+        self.time_inference += (time_inference_end - time_inference_start)
+        cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
+
+
+        # cvae_sampled_end_state = FrenetState(t=cvae_samples[2], s=0.0, s_d=cvae_samples[1], s_dd=0.0, s_ddd=0.0, d=cvae_samples[0], d_d=0.0, d_dd=0.0, d_ddd=0.0)
+        # cvae_traj = self.generate_trajectory_by_end_state(cvae_sampled_end_state)
+        sampled_best = self.getBestFromCVAE(frenet_state, cvae_samples, time_step_now)
+        
+        refined_traj = self.refine_solution(sampled_best, obstacles, time_step_now)
         if refined_traj is not None:
             self.best_traj = refined_traj
 
         return self.best_traj
+    
+    def getBestFromCVAE(self, frenet_state: FrenetState, cvae_samples: list, time_step_now:int) -> FrenetTrajectory:
+        fplist = self.calc_frenet_paths(frenet_state, cvae_samples)
+        fplist = self.calc_global_paths(fplist)
+        for fp, sample in zip(fplist, cvae_samples):
+            fp.end_state = FrenetState(t=sample[2], s=0.0, s_d=sample[1], s_dd=0.0, s_ddd=0.0, d=sample[0], d_d=0.0, d_dd=0.0, d_ddd=0.0)
+        
+        fplist = self.check_constraints(fplist)
+        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        fplist = self.check_collision_multithread(fplist, time_step_now)
+
+        # find minimum cost path
+        min_cost = float("inf")
+        best_trajectory = FrenetTrajectory()
+        for fp in fplist:
+            if min_cost >= fp.cost_final:
+                min_cost = fp.cost_final
+                best_trajectory = fp
+        return best_trajectory
 
     def refine_solution(self, traj: FrenetTrajectory, obstacles: list, time_step_now: int) -> FrenetTrajectory:
-        resolutions = self.sampling_res
+        #FIXME: The FISS_PLUS does not have the copy()
+        resolutions = self.sampling_res.copy()
         alpha = self.settings.decaying_factor
         
         J_new = traj.cost_final
