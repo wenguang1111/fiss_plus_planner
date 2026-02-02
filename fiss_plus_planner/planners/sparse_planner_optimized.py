@@ -30,7 +30,7 @@ class SparsePlannerOptimizedSettings(FrenetOptimalPlannerSettings):
         self.vis_all_candidates = False
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
-        self.num_samples: int = 5
+        self.num_samples: int = 1
         self.max_refine_iters = 3
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
@@ -132,9 +132,9 @@ class SparsePlannerOptimized(FrenetOptimalPlanner):
         for fp, sample in zip(fplist, cvae_samples):
             fp.end_state = FrenetState(t=sample[2], s=0.0, s_d=sample[1], s_dd=0.0, s_ddd=0.0, d=sample[0], d_d=0.0, d_dd=0.0, d_ddd=0.0)
         
-        fplist = self.check_constraints(fplist)
-        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
-        fplist = self.check_collision_multithread(fplist, time_step_now)
+        # fplist = self.check_constraints(fplist)
+        # # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        # fplist = self.check_collision_multithread(fplist, time_step_now)
 
         # find minimum cost path
         min_cost = float("inf")

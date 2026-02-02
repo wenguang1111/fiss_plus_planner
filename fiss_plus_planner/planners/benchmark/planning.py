@@ -316,7 +316,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)
-
+    # print("average inferecence time:", planner.time_inference / num_cycles)
+    # print("average image generation time:", planner.time_image_generation / num_cycles)
+    
     # create the planned trajectory starting at time step 0
     if state_list:
         ego_vehicle_traj = Trajectory(

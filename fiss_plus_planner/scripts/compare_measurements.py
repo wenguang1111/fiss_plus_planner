@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 
 # Set default planner names here for easy modification.
 PLANNER_A_NAME = "Sparse"
-PLANNER_B_NAME = "FOP"
+PLANNER_B_NAME = "FISS+"
 
 
 @dataclass

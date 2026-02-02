@@ -9,10 +9,10 @@ if __name__ == '__main__':
     
     # New parameters for two CSV files
     parser.add_argument('--csv_file_1', type=str, 
-                       default=os.path.join(repo_dir, 'data/measurements/summarize/measurement_FOP_20.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/1_Sample/measurement_Sparse_Optimized.csv'),
                        help='Path to first measurement CSV file (e.g., FOP)')
     parser.add_argument('--csv_file_2', type=str,
-                       default=os.path.join(repo_dir, 'data/measurements/summarize/measurement_FISS+_5.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/1_Sample/measurement_FISS+.csv'),
                        help='Path to second measurement CSV file (e.g., FISS+)')
     parser.add_argument('--output_file', type=str,
                        default=os.path.join(repo_dir, 'data/measurements/summarize/comparison_result.csv'),

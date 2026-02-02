@@ -87,6 +87,9 @@ class ScenarioDrawer:
 
         self.obstacles_array = obstacles_array
         self.obstacles_num_vertices = obstacles_num_vertices
+        self._fig = None
+        self._ax = None
+        self._canvas = None
 
     def save_scenario_imgs(
         self,
@@ -177,8 +180,12 @@ class ScenarioDrawer:
         # highest_speed: Optional[float],
     ) -> Image.Image:
         view_size = self.VIEW_SIZE_DEFAULT
-        fig, ax = plt.subplots(figsize=(4, 4), dpi=32, facecolor="white")
-        fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        if self._fig is None:
+            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=32, facecolor="white")
+            self._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+            self._canvas = FigureCanvas(self._fig)
+        ax = self._ax
+        ax.clear()
         ax.set_facecolor("white")
         ax.set_aspect("equal", adjustable="box")
         ax.axis("off")
@@ -196,11 +203,9 @@ class ScenarioDrawer:
         self._draw_ego(ax)
         # self._draw_speed_arrow(ax, ego_state, highest_speed)
 
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-        width, height = canvas.get_width_height()
-        buf = np.frombuffer(canvas.tostring_rgb(), dtype=np.uint8).reshape(height, width, 3)
-        plt.close(fig)
+        self._canvas.draw()
+        width, height = self._canvas.get_width_height()
+        buf = np.frombuffer(self._canvas.tostring_rgb(), dtype=np.uint8).reshape(height, width, 3)
         return Image.fromarray(buf)
 
     def _draw_lane_ahead(self, ax, ego_state: State, transform: np.ndarray):
