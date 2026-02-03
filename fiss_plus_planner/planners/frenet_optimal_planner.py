@@ -286,6 +286,10 @@ class FrenetOptimalPlanner(object):
 
         # find minimum cost path
         min_cost = float("inf")
+        
+        if(len(fplist) == 0):
+            return None
+        
         for fp in fplist:
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final

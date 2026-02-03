@@ -103,7 +103,6 @@ class SparsePlanner(FrenetOptimalPlanner):
         # Output is t, d, s_d -> reorder to  d, s_d, t.
         cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
         cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
-        
 
         # self.record_generated_sampling_parameters(cvae_samples, time_step_now)
 
@@ -120,6 +119,9 @@ class SparsePlanner(FrenetOptimalPlanner):
 
         # find minimum cost path
         min_cost = float("inf")
+        if(len(fplist) == 0):
+            return None
+        
         for fp in fplist:
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final
