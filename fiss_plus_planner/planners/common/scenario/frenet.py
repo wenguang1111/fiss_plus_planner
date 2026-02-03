@@ -148,6 +148,9 @@ class FrenetTrajectory(object):
         self.x = []
         self.y = []
         self.yaw = []
+        self.v = [] # velocity in cartesian coordinates
+        self.a = [] # acceleration in cartesian coordinates
+        self.c_yaw = [] # orientation in frenet frame
         self.ds = []
         self.c = []
         self.c_d = []
