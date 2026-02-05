@@ -6,6 +6,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#measurement files
+/fiss_plus_planner/data/measurements/*
+/fiss_plus_planner/data/output/*
+/fiss_plus_planner/data/fop_data/*
+/fiss_plus_planner/output/*
+
 # C extensions
 *.so
 
