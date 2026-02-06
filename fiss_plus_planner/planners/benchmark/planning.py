@@ -127,12 +127,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         speed_interval = goal_region.state_list[0].velocity
         min_speed = speed_interval.start
         max_speed = speed_interval.end
-        print(f"    Speed interval {min_speed}, {max_speed} m/s")
     else:
         min_speed = 0.0
         max_speed = 14
-        print(
-            f"    Scenario has no speed interval, using {min_speed}, {max_speed} m/s")
     
     # Get goal lanelet and center position
     if goal_region.lanelets_of_goal_position is not None and len(goal_region.lanelets_of_goal_position) > 0:
@@ -148,7 +145,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         else:
             # Use the end of the reference path as goal
             goal_center = ego_lane_pts[-1]
-        print(f"    Lanelets_of_goal_position not given, using fallback goal center: {goal_center}")
 
     # Obstacle lists
     obstacles_static = scenario.static_obstacles
@@ -313,6 +309,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         time_list.append(end_time - start_time)
         sampling_params_cross_all_scenarios.append(best_traj_ego.sampling_param)
 
+        # break when goal is reached
         if goal_position_available:
             if goal_region.is_reached(next_state):
                 print("Goal Reached")
@@ -330,6 +327,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 goal_reached = True
                 stats.success = True
                 break
+        
+        #break when the speed is close to zero, this is a simple model with out standstill feature.
+        if abs(next_state.velocity) < 0.01:
+            goal_reached = True
+            stats.success = False
+            break
 
         if show_animation:  # pragma: no cover
             plt.cla()
