@@ -436,6 +436,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
     num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
     save_gif = cfg['SAVE_GIF']
+    show_sampled_trajs = cfg.get('SHOW_SAMPLED_TRAJECTORIES', True)
     #set number of threads for numba parallel collision checker
     number_threads = cfg['Num_Threads_For_CollisionChecker']
     runtime_measurement = cfg.get('Runtime_Measurement')
@@ -483,6 +484,15 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
 
     ##################################################### Visualization #########################################################
     if save_gif and fplist:
+        best_traj_lines = None
+        if not show_sampled_trajs:
+            best_traj_lines = []
+            for step_trajs in fplist:
+                if not step_trajs:
+                    continue
+                best_fp = min(step_trajs, key=lambda fp: fp.cost_final)
+                if len(best_fp.x) > 1:
+                    best_traj_lines.append((best_fp.x[1:], best_fp.y[1:]))
         images = []
         # For each
         for i in range(len(fplist)):
@@ -495,16 +505,28 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             ego_vehicle.draw(rnd)
             planning_problem_set.draw(rnd)
             rnd.render()
-            costs = []
-            xs = []
-            ys = []
-            for fp in fplist[i]:
-                costs.append(fp.cost_final)
-                xs.append(fp.x[1:])
-                ys.append(fp.y[1:])
-            lc = multiline(xs, ys, costs, ax=rnd.ax,
-                           cmap='RdYlGn_r', lw=2, zorder=20)
-            plt.colorbar(lc)
+            if show_sampled_trajs:
+                costs = []
+                xs = []
+                ys = []
+                for fp in fplist[i]:
+                    costs.append(fp.cost_final)
+                    xs.append(fp.x[1:])
+                    ys.append(fp.y[1:])
+                lc = multiline(xs, ys, costs, ax=rnd.ax,
+                               cmap='RdYlGn_r', lw=2, zorder=20)
+                plt.colorbar(lc)
+            else:
+                if best_traj_lines:
+                    for x_line, y_line in best_traj_lines:
+                        rnd.ax.plot(
+                            x_line,
+                            y_line,
+                            color="#808080",
+                            alpha=0.35,
+                            zorder=18,
+                            lw=1,
+                        )
 
             x_coords = [state.position[0]
                         for state in ego_vehicle_trajectory.state_list]

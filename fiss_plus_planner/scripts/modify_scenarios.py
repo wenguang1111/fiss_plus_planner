@@ -1,3 +1,7 @@
+# This file is used to modify the scenarios for the demo.
+# It will transform the scenarios in the {path} by translating the initial position of the ego vehicle to the origin (0,0) and rotating the scenario accordingly.
+# The transported files will be saved in the {save_dir} with the same file name.
+
 import os
 import numpy as np
 import traceback

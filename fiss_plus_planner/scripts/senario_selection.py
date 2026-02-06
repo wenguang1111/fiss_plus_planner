@@ -1,3 +1,8 @@
+# This file is used to select the scenarios for the demo. 
+# It will run the planner on the specified scenario files and save the measurements. 
+# The files to read are defined in the config file.
+# If a scenario is successful, it will copy the scenario file into a separate folder {FOP_Scenario_Folder} for successful scenarios. 
+
 import argparse
 import os
 import json
