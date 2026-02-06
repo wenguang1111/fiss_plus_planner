@@ -106,11 +106,22 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                             ) -> Tuple[bool, Trajectory, float, list, Stats, list]:
     # Plan a global route
     global_planner = GlobalPlanner()
-    global_plan = global_planner.plan_global_route(scenario, planning_problem)
+    try:
+        global_plan = global_planner.plan_global_route(scenario, planning_problem)
+    except ValueError as e:
+        print(f"    Failed to plan global route: {e}")
+        return None, None, None, None, None, None
+    
     ego_lane_pts = global_plan.concat_centerline
 
     # Goal
     goal_region = planning_problem.goal
+    
+    # Check if goal position info is available
+    goal_position_available = (
+        goal_region.lanelets_of_goal_position is not None and 
+        len(goal_region.lanelets_of_goal_position) > 0
+    ) or goal_region.state_list[0].has_value("position")
 
     if goal_region.state_list[0].has_value("velocity"):
         speed_interval = goal_region.state_list[0].velocity
@@ -122,6 +133,22 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         max_speed = 14
         print(
             f"    Scenario has no speed interval, using {min_speed}, {max_speed} m/s")
+    
+    # Get goal lanelet and center position
+    if goal_region.lanelets_of_goal_position is not None and len(goal_region.lanelets_of_goal_position) > 0:
+        goal_lanelet_idx = goal_region.lanelets_of_goal_position[0][0]
+        goal_lanelet = scenario.lanelet_network.find_lanelet_by_id(goal_lanelet_idx)
+        center_vertices = goal_lanelet.center_vertices
+        mid_idx = int((center_vertices.shape[0] - 1) / 2)
+        goal_center = center_vertices[mid_idx]
+    else:
+        # Fallback: use goal position from goal state if available
+        if goal_region.state_list[0].has_value("position"):
+            goal_center = goal_region.state_list[0].position.center
+        else:
+            # Use the end of the reference path as goal
+            goal_center = ego_lane_pts[-1]
+        print(f"    Lanelets_of_goal_position not given, using fallback goal center: {goal_center}")
 
     # Obstacle lists
     obstacles_static = scenario.static_obstacles
@@ -286,6 +313,24 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         time_list.append(end_time - start_time)
         sampling_params_cross_all_scenarios.append(best_traj_ego.sampling_param)
 
+        if goal_position_available:
+            if goal_region.is_reached(next_state):
+                print("Goal Reached")
+                goal_reached = True
+                stats.success = True
+                break
+            # if goal_polygon.contains_properly()
+            elif np.hypot(next_state.position[0] - goal_center[0], next_state.position[1] - goal_center[1]) <= vehicle.l/2:
+                print("Goal Reached")
+                stats.success = True
+                goal_reached = True
+                break
+            elif np.hypot(next_state.position[0] - ref_ego_lane_pts[-1, 0], next_state.position[1] - ref_ego_lane_pts[-1, 1]) <= 3.0:
+                print("Reaching End of the Map, Stopping, Goal Not Reached")
+                goal_reached = True
+                stats.success = True
+                break
+
         if show_animation:  # pragma: no cover
             plt.cla()
             # for stopping simulation with the esc key.
@@ -340,7 +385,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         collect_data(
             drawer,
             scenario_name,
-            final_time_step,
             sampling_params_cross_all_scenarios,
             frenet_state_list,
             global_coordination_state_list,
@@ -715,7 +759,7 @@ def save_data(scenario_name: str, frenet_state_list: list, global_coordination_s
     print(f"Saved {len(global_coordination_state_list)} time steps for scenario {scenario_name}")
 
 
-def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list,
+def collect_data(drawer: ScenarioDrawer, scenario_name: str, sampling_params_cross_all_scenarios: list,
                  frenet_state_list: list, global_coordination_state_list: list, output_dir: str,
                  highest_speed: float):
     save_data(scenario_name, frenet_state_list, global_coordination_state_list, sampling_params_cross_all_scenarios, str(output_dir))
