@@ -21,3 +21,11 @@ DEU_Lohmar-32_1_T-1.xml (it need accelerate because the car infront)
 
 Set for Scenarios:
 ![alt text](image.png)
+
+
+# The result of our dataset for collecting scenarios:
+Total scenarios with |d_mean| < 0.1: 22683
+Total scenarios with |d_mean| >= 0.1: 2027
+Selected from |d_mean| < 0.1: 1500
+Selected from |d_mean| >= 0.1: 2027
+Total selected scenarios: 3527
