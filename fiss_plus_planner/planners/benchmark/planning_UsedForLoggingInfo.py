@@ -41,6 +41,9 @@ from fiss_plus_planner.planners.common.utils import configure_numba_threads
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 
+
+
+
 def prepare_obstacles_polygons_time_series(
     obstacles: list,
     num_time_steps: int,
@@ -103,30 +106,69 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                             ) -> Tuple[bool, Trajectory, float, list, Stats, list]:
     # Plan a global route
     global_planner = GlobalPlanner()
-    global_plan = global_planner.plan_global_route(scenario, planning_problem)
+    try:
+        global_plan = global_planner.plan_global_route(scenario, planning_problem)
+    except ValueError as e:
+        print(f"    Failed to plan global route: {e}")
+        return None, None, None, None, None, None
+    
     ego_lane_pts = global_plan.concat_centerline
 
     # Goal
     goal_region = planning_problem.goal
+    
+    # Check if goal state list is available
+    has_goal_state = goal_region.state_list is not None and len(goal_region.state_list) > 0
+    
+    # Check if goal position info is available
+    goal_position_available = (
+        goal_region.lanelets_of_goal_position is not None and 
+        len(goal_region.lanelets_of_goal_position) > 0
+    ) or (has_goal_state and goal_region.state_list[0].has_value("position"))
 
-    if goal_region.state_list[0].has_value("velocity"):
+    if has_goal_state and goal_region.state_list[0].has_value("velocity"):
         speed_interval = goal_region.state_list[0].velocity
         min_speed = speed_interval.start
         max_speed = speed_interval.end
-        print(f"    Speed interval {min_speed}, {max_speed} m/s")
     else:
         min_speed = 0.0
         max_speed = 14
-        print(
-            f"    Scenario has no speed interval, using {min_speed}, {max_speed} m/s")
+    
+    # Get goal lanelet and center position
+    if goal_region.lanelets_of_goal_position is not None and len(goal_region.lanelets_of_goal_position) > 0:
+        goal_lanelet_idx = goal_region.lanelets_of_goal_position[0][0]
+        goal_lanelet = scenario.lanelet_network.find_lanelet_by_id(goal_lanelet_idx)
+        center_vertices = goal_lanelet.center_vertices
+        mid_idx = int((center_vertices.shape[0] - 1) / 2)
+        goal_center = center_vertices[mid_idx]
+    else:
+        # Fallback: use goal position from goal state if available
+        if has_goal_state and goal_region.state_list[0].has_value("position"):
+            goal_center = goal_region.state_list[0].position.center
+        else:
+            # Use the end of the reference path as goal
+            goal_center = ego_lane_pts[-1]
 
+    stats = Stats()
     # Obstacle lists
     obstacles_static = scenario.static_obstacles
     obstacles_dynamic = scenario.dynamic_obstacles
     obstacles_all = obstacles_static + obstacles_dynamic
 
     obstacle_positions = []
-    obstacles_final_time_step = [obs.prediction.final_time_step for obs in scenario.dynamic_obstacles]
+    obstacles_final_time_step = []
+    # obstacles_final_time_step = [obs.prediction.final_time_step for obs in scenario.dynamic_obstacles]
+    for obs in scenario.dynamic_obstacles:
+        if obs.prediction is not None:
+            obstacles_final_time_step.append(obs.prediction.final_time_step)
+        else:
+            stats.success = False
+            goal_reached = False
+            return goal_reached, None, None, None, stats, None
+    if len(obstacles_final_time_step) == 0:
+        stats.success = False
+        goal_reached = False
+        return goal_reached, None, None, None, stats, None
     final_time_step = max(obstacles_final_time_step)
 
     for t_step in range(final_time_step):
@@ -224,7 +266,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     global_coordination_state_list = []
 
     time_list = []
-    stats = Stats()
+    
     sampling_params_cross_all_scenarios = []
     goal_reached = False
     next_state = initial_state
@@ -293,6 +335,31 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         time_list.append(end_time - start_time)
         sampling_params_cross_all_scenarios.append(best_traj_ego.sampling_param)
 
+        # break when goal is reached
+        if goal_position_available:
+            if goal_region.is_reached(next_state):
+                print("Goal Reached")
+                goal_reached = True
+                stats.success = True
+                break
+            # if goal_polygon.contains_properly()
+            elif np.hypot(next_state.position[0] - goal_center[0], next_state.position[1] - goal_center[1]) <= vehicle.l/2:
+                print("Goal Reached")
+                stats.success = True
+                goal_reached = True
+                break
+            elif np.hypot(next_state.position[0] - ref_ego_lane_pts[-1, 0], next_state.position[1] - ref_ego_lane_pts[-1, 1]) <= 3.0:
+                print("Reaching End of the Map, Stopping, Goal Not Reached")
+                goal_reached = True
+                stats.success = True
+                break
+        
+        #break when the speed is close to zero, this is a simple model with out standstill feature.
+        if abs(next_state.velocity) < 0.01:
+            goal_reached = True
+            stats.success = False
+            break
+
         if show_animation:  # pragma: no cover
             plt.cla()
             # for stopping simulation with the esc key.
@@ -348,17 +415,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         collect_data(
             drawer,
             scenario_name,
-            final_time_step,
             sampling_params_cross_all_scenarios,
             frenet_state_list,
             global_coordination_state_list,
             output_dir,
             planner.settings.highest_speed,
         )
-
+        
     if traj_log_lines:
-        with open(traj_log_path, "w", encoding="utf-8") as traj_log_file:
-            traj_log_file.writelines(traj_log_lines)
+            with open(traj_log_path, "w", encoding="utf-8") as traj_log_file:
+                traj_log_file.writelines(traj_log_lines)
 
     return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, planner.all_trajs
 
@@ -448,6 +514,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
     num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
     save_gif = cfg['SAVE_GIF']
+    show_sampled_trajs = cfg.get('SHOW_SAMPLED_TRAJECTORIES', True)
     #set number of threads for numba parallel collision checker
     number_threads = cfg['Num_Threads_For_CollisionChecker']
     runtime_measurement = cfg.get('Runtime_Measurement')
@@ -495,6 +562,15 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
 
     ##################################################### Visualization #########################################################
     if save_gif and fplist:
+        best_traj_lines = None
+        if not show_sampled_trajs:
+            best_traj_lines = []
+            for step_trajs in fplist:
+                if not step_trajs:
+                    continue
+                best_fp = min(step_trajs, key=lambda fp: fp.cost_final)
+                if len(best_fp.x) > 1:
+                    best_traj_lines.append((best_fp.x[1:], best_fp.y[1:]))
         images = []
         # For each
         for i in range(len(fplist)):
@@ -507,16 +583,28 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             ego_vehicle.draw(rnd)
             planning_problem_set.draw(rnd)
             rnd.render()
-            costs = []
-            xs = []
-            ys = []
-            for fp in fplist[i]:
-                costs.append(fp.cost_final)
-                xs.append(fp.x[1:])
-                ys.append(fp.y[1:])
-            lc = multiline(xs, ys, costs, ax=rnd.ax,
-                           cmap='RdYlGn_r', lw=2, zorder=20)
-            plt.colorbar(lc)
+            if show_sampled_trajs:
+                costs = []
+                xs = []
+                ys = []
+                for fp in fplist[i]:
+                    costs.append(fp.cost_final)
+                    xs.append(fp.x[1:])
+                    ys.append(fp.y[1:])
+                lc = multiline(xs, ys, costs, ax=rnd.ax,
+                               cmap='RdYlGn_r', lw=2, zorder=20)
+                plt.colorbar(lc)
+            else:
+                if best_traj_lines:
+                    for x_line, y_line in best_traj_lines:
+                        rnd.ax.plot(
+                            x_line,
+                            y_line,
+                            color="#808080",
+                            alpha=0.35,
+                            zorder=18,
+                            lw=1,
+                        )
 
             x_coords = [state.position[0]
                         for state in ego_vehicle_trajectory.state_list]
@@ -705,7 +793,7 @@ def save_data(scenario_name: str, frenet_state_list: list, global_coordination_s
     print(f"Saved {len(global_coordination_state_list)} time steps for scenario {scenario_name}")
 
 
-def collect_data(drawer: ScenarioDrawer, scenario_name: str, final_time_step: int, sampling_params_cross_all_scenarios: list,
+def collect_data(drawer: ScenarioDrawer, scenario_name: str, sampling_params_cross_all_scenarios: list,
                  frenet_state_list: list, global_coordination_state_list: list, output_dir: str,
                  highest_speed: float):
     save_data(scenario_name, frenet_state_list, global_coordination_state_list, sampling_params_cross_all_scenarios, str(output_dir))

@@ -117,13 +117,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     # Goal
     goal_region = planning_problem.goal
     
+    # Check if goal state list is available
+    has_goal_state = goal_region.state_list is not None and len(goal_region.state_list) > 0
+    
     # Check if goal position info is available
     goal_position_available = (
         goal_region.lanelets_of_goal_position is not None and 
         len(goal_region.lanelets_of_goal_position) > 0
-    ) or goal_region.state_list[0].has_value("position")
+    ) or (has_goal_state and goal_region.state_list[0].has_value("position"))
 
-    if goal_region.state_list[0].has_value("velocity"):
+    if has_goal_state and goal_region.state_list[0].has_value("velocity"):
         speed_interval = goal_region.state_list[0].velocity
         min_speed = speed_interval.start
         max_speed = speed_interval.end
@@ -140,19 +143,32 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         goal_center = center_vertices[mid_idx]
     else:
         # Fallback: use goal position from goal state if available
-        if goal_region.state_list[0].has_value("position"):
+        if has_goal_state and goal_region.state_list[0].has_value("position"):
             goal_center = goal_region.state_list[0].position.center
         else:
             # Use the end of the reference path as goal
             goal_center = ego_lane_pts[-1]
 
+    stats = Stats()
     # Obstacle lists
     obstacles_static = scenario.static_obstacles
     obstacles_dynamic = scenario.dynamic_obstacles
     obstacles_all = obstacles_static + obstacles_dynamic
 
     obstacle_positions = []
-    obstacles_final_time_step = [obs.prediction.final_time_step for obs in scenario.dynamic_obstacles]
+    obstacles_final_time_step = []
+    # obstacles_final_time_step = [obs.prediction.final_time_step for obs in scenario.dynamic_obstacles]
+    for obs in scenario.dynamic_obstacles:
+        if obs.prediction is not None:
+            obstacles_final_time_step.append(obs.prediction.final_time_step)
+        else:
+            stats.success = False
+            goal_reached = False
+            return goal_reached, None, None, None, stats, None
+    if len(obstacles_final_time_step) == 0:
+        stats.success = False
+        goal_reached = False
+        return goal_reached, None, None, None, stats, None
     final_time_step = max(obstacles_final_time_step)
 
     for t_step in range(final_time_step):
@@ -250,7 +266,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     global_coordination_state_list = []
 
     time_list = []
-    stats = Stats()
+    
     sampling_params_cross_all_scenarios = []
     goal_reached = False
     next_state = initial_state
