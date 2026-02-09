@@ -47,6 +47,7 @@ class SparsePlanner(FrenetOptimalPlanner):
 
         self.image_history: List[Tuple[int, Image.Image]] = []
         self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
+        self.all_trajs = []
 
     def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
         """Record generated sampling parameters to a file."""
@@ -65,11 +66,6 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.settings.highest_speed = max_target_speed
         images_last_3_frame: List[Image.Image] = []
 
-        # img = self.scenario_drawer.generate_image_at_time_step(
-        #     time_step_now,
-        #     current_state,
-        #     self.settings.highest_speed,
-        # )
         img = self.scenario_drawer.create_scenario_img_at_time_step(
             time_step_now,
             current_state
@@ -107,6 +103,7 @@ class SparsePlanner(FrenetOptimalPlanner):
         # self.record_generated_sampling_parameters(cvae_samples, time_step_now)
 
         fplist = self.calc_frenet_paths(frenet_state, cvae_samples)
+        self.all_trajs.append(fplist)
         fplist = self.calc_global_paths(fplist)
         self.stats.num_trajs_generated = len(fplist)
         self.stats.num_trajs_validated = len(fplist)
