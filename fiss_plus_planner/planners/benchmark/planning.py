@@ -1,6 +1,7 @@
 import os
 import signal
 import time
+import csv
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -540,6 +541,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
         ego_vehicle = DynamicObstacle(obstacle_id=100, obstacle_type=ego_vehicle_type,
                                       obstacle_shape=ego_vehicle_shape, initial_state=initial_state,
                                       prediction=ego_vehicle_prediction)
+        
+        # record_sampling_parameters_to_csv(fplist)
 
     except RuntimeError:
         print("   ", f"{file} not feasible!")
@@ -563,7 +566,13 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             mpl.rcParams['font.size'] = 20
             rnd = MPRenderer()
             rnd.draw_params.time_begin = i
+            # Disable drawing of dynamic obstacle trajectories (the black dots)
+            rnd.draw_params.dynamic_obstacle.trajectory.draw_trajectory = False
+            rnd.draw_params.dynamic_obstacle.occupancy.draw_occupancies = False
+            # Disable drawing of initial state arrow (green direction marker)
+            rnd.draw_params.planning_problem.initial_state.state.draw_arrow = False
             scenario.draw(rnd)
+            # ...existing code...
             rnd.draw_params.dynamic_obstacle.vehicle_shape.occupancy.shape.facecolor = "g"
             ego_vehicle.draw(rnd)
             planning_problem_set.draw(rnd)
@@ -605,12 +614,12 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                           for state in ego_vehicle_trajectory.state_list[i:]]
             dx_ego_f = np.diff(x_coords_f)
             dy_ego_f = np.diff(y_coords_f)
-            rnd.ax.plot(x_coords_p, y_coords_p, color='#9400D3',
-                        alpha=1,  zorder=25, lw=1)
-            rnd.ax.plot(x_coords_f, y_coords_f, color='#AFEEEE',
-                        alpha=1,  zorder=25, lw=1)
-            rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
-                          scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
+            # rnd.ax.plot(x_coords_p, y_coords_p, color='#9400D3',
+            #             alpha=1,  zorder=25, lw=1)
+            # rnd.ax.plot(x_coords_f, y_coords_f, color='#AFEEEE',
+            #             alpha=1,  zorder=25, lw=1)
+            # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
+            #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
 
             x_min = min(x_coords)-8
             x_max = max(x_coords)+8
@@ -639,14 +648,14 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 dy = np.diff(obs_traj_y)
                 obs_traj_x = obs_traj_x[:-1]
                 obs_traj_y = obs_traj_y[:-1]
-                rnd.ax.quiver(obs_traj_x[:i:5], obs_traj_y[:i:5], dx[:i:5], dy[:i:5],
-                              scale_units='xy', angles='xy', scale=1, width=0.006, color='#BA55D3', zorder=25)
-                rnd.ax.quiver(obs_traj_x[i::5], obs_traj_y[i::5], dx[i::5], dy[i::5],
-                              scale_units='xy', angles='xy', scale=1, width=0.006, color='#1d7eea', zorder=25)
-                rnd.ax.plot(obs_traj_x[0:i], obs_traj_y[0:i],
-                            color='#BA55D3', alpha=0.8,  zorder=25, lw=0.6)
-                rnd.ax.plot(obs_traj_x[i:], obs_traj_y[i:],
-                            color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
+                # rnd.ax.quiver(obs_traj_x[:i:5], obs_traj_y[:i:5], dx[:i:5], dy[:i:5],
+                #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#BA55D3', zorder=25)
+                # rnd.ax.quiver(obs_traj_x[i::5], obs_traj_y[i::5], dx[i::5], dy[i::5],
+                #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#1d7eea', zorder=25)
+                # rnd.ax.plot(obs_traj_x[0:i], obs_traj_y[0:i],
+                #             color='#BA55D3', alpha=0.8,  zorder=25, lw=0.6)
+                # rnd.ax.plot(obs_traj_x[i:], obs_traj_y[i:],
+                #             color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
             time_list.append(0)
 
             plt.title("{method}: {time}s".format(
@@ -790,3 +799,37 @@ def collect_data(drawer: ScenarioDrawer, scenario_name: str, sampling_params_cro
             highest_speed=highest_speed,
         )
         print(f"Saved images for scenario {scenario_name}")
+
+def record_sampling_parameters_to_csv(fplist: list, output_path: str = "samplingParameterWithCost.csv"):
+        """
+        Record sampling parameters (d, s_d, t) and their costs to a CSV file.
+        
+        Args:
+            fplist: List of lists containing FrenetTrajectory objects for each time step
+            output_path: Path to the output CSV file
+        """
+        print(f"DEBUG: fplist length = {len(fplist) if fplist else 0}")
+        
+        total_trajs = 0
+        with open(output_path, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            # Write header
+            writer.writerow(['time_step', 'd', 's_d', 't', 'cost'])
+            # Write data - fplist is a list of lists (one per time step)
+            for step_idx, step_trajs in enumerate(fplist):
+                if step_trajs is None:
+                    print(f"DEBUG: step {step_idx} is None")
+                    continue
+                print(f"DEBUG: step {step_idx} has {len(step_trajs)} trajectories")
+                for fp in step_trajs:
+                    if hasattr(fp, 'sampling_param') and hasattr(fp, 'cost_final'):
+                        total_trajs += 1
+                        writer.writerow([
+                            step_idx,
+                            fp.sampling_param.d,
+                            fp.sampling_param.s_d,
+                            fp.sampling_param.t,
+                            fp.cost_final
+                        ])
+        
+        print(f"Saved {total_trajs} sampling parameters to {output_path}")
