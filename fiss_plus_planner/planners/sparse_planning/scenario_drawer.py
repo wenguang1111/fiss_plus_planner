@@ -181,7 +181,7 @@ class ScenarioDrawer:
     ) -> Image.Image:
         view_size = self.VIEW_SIZE_DEFAULT
         if self._fig is None:
-            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=64, facecolor="white")
+            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=300, facecolor="white")
             self._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
             self._canvas = FigureCanvas(self._fig)
         ax = self._ax
