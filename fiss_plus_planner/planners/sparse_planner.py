@@ -121,7 +121,7 @@ class SparsePlanner(FrenetOptimalPlanner):
         cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
 
         # self.record_generated_sampling_parameters(cvae_samples, time_step_now)
-        # print(f"Timestep {time_step_now}, CVAE sampling")
+        print(f"Timestep {time_step_now}, CVAE sampling")
         fplist = self.generate_trajectories(
                     frenet_state=frenet_state,
                     samples=cvae_samples,
@@ -130,7 +130,7 @@ class SparsePlanner(FrenetOptimalPlanner):
 
         # if cvae returned 0 paths try dense sampling
         if(len(fplist) == 0):
-            # print(f"Timestep {time_step_now}, CVAE failed, running dense sampling")
+            print(f"Timestep {time_step_now}, CVAE failed, running dense sampling")
             # this gets dense samples from parent FOP class
             dense_samples = self.get_samples()
             fplist = self.generate_trajectories(

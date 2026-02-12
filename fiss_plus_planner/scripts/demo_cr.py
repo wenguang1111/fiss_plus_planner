@@ -34,6 +34,7 @@ if __name__ == '__main__':
             measurements.append((file, measurement))
     
     if save_measurments:
+        t_cvae_timesteps, t_dense_timesteps, t_total_timesteps = 0, 0, 0
         os.makedirs(measurement_dir, exist_ok=True)
         csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + '.csv')
         with open(csv_path, 'w', newline='') as csv_file:
@@ -50,5 +51,15 @@ if __name__ == '__main__':
                     f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
                     f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
                     f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},' 
-                    f'{measurement.cvae_samples}, {measurement.dense_samples}, {measurement.total_samples}, {measurement.success}\n'
+                    f'{measurement.cvae_timesteps}, {measurement.dense_timesteps}, {measurement.total_timesteps}, {measurement.success}\n'
                 )
+                t_cvae_timesteps += measurement.cvae_timesteps
+                t_dense_timesteps += measurement.dense_timesteps
+                t_total_timesteps += measurement.total_timesteps
+                
+        print(f"Total timesteps planned: {t_total_timesteps}")
+        print(f"Timesteps planned with CVAE: {t_cvae_timesteps}")
+        print(f"Timesteps planned with dense sampling: {t_dense_timesteps}")
+        print(f"Percentage of CVAE sampling: {t_cvae_timesteps/t_total_timesteps*100:.2f}")
+        print(f"Percentage of dense sampling: {t_dense_timesteps/t_total_timesteps*100:.2f}")
+                
