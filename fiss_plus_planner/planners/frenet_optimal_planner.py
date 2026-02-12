@@ -31,6 +31,10 @@ class Stats(object):
         self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
         self.success = False
         
+        self.cvae_samples = 0
+        self.dense_samples = 0
+        self.total_samples = 0
+        
     def __add__(self, other):
         self.num_iter += other.num_iter
         self.num_trajs_generated += other.num_trajs_generated

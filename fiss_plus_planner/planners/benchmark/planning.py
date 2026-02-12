@@ -381,6 +381,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)
+    # record the number of samples from CVAE sampling and dense sampling
+    stats.cvae_samples = planner.samples_cntr["cvae_samples"]
+    stats.dense_samples = planner.samples_cntr["dense_samples"]
+    stats.total_samples = stats.cvae_samples + stats.dense_samples
     # print("average inferecence time:", planner.time_inference / num_cycles)
     # print("average image generation time:", planner.time_image_generation / num_cycles)
     
