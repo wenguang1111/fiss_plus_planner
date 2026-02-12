@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from commonroad.scenario.scenario import Scenario
 from commonroad.planning.planning_problem import PlanningProblem, PlanningProblemSet
 from commonroad.scenario.state import InitialState
@@ -28,9 +29,9 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
         self.num_samples: int = 64
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
-        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/hcvae_opt_batch_64_epochs_20_zdim_32_sigmoid_0.1_stall_end.pth")
+        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zdim_64_sigmoid_1.0_stall_end.pth")
         
 class SparsePlanner(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
@@ -48,6 +49,11 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.image_history: List[Tuple[int, Image.Image]] = []
         self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
         self.all_trajs = []
+        
+        self.samples_cntr = {
+            "cvae_samples": 0,
+            "dense_samples": 0,
+        }
 
     def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
         """Record generated sampling parameters to a file."""
@@ -58,6 +64,20 @@ class SparsePlanner(FrenetOptimalPlanner):
             for sample in samples:
                 t, d, s_d = sample
                 f.write(f"{time_step_now}, {d}, {s_d}, {t}\n")
+                
+    def generate_trajectories(self, frenet_state: FrenetState, samples: List[List[float]], time_step_now) -> List[FrenetTrajectory]:
+        fplist = self.calc_frenet_paths(frenet_state, samples)
+        self.all_trajs.append(fplist)
+        fplist = self.calc_global_paths(fplist)
+        self.stats.num_trajs_generated = len(fplist)
+        self.stats.num_trajs_validated = len(fplist)
+        self.stats.num_collison_checks = len(fplist)
+        fplist = self.check_constraints(fplist)
+        # print(len(fplist), "trajectories passed constraint check")
+        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
+        fplist = self.check_collision_multithread(fplist, time_step_now)
+        
+        return fplist
     
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
         """Plan using CVAE sampled trajectories."""
@@ -101,23 +121,29 @@ class SparsePlanner(FrenetOptimalPlanner):
         cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
 
         # self.record_generated_sampling_parameters(cvae_samples, time_step_now)
+        # print(f"Timestep {time_step_now}, CVAE sampling")
+        fplist = self.generate_trajectories(
+                    frenet_state=frenet_state,
+                    samples=cvae_samples,
+                    time_step_now=time_step_now
+                )
 
-        fplist = self.calc_frenet_paths(frenet_state, cvae_samples)
-        self.all_trajs.append(fplist)
-        fplist = self.calc_global_paths(fplist)
-        self.stats.num_trajs_generated = len(fplist)
-        self.stats.num_trajs_validated = len(fplist)
-        self.stats.num_collison_checks = len(fplist)
-        fplist = self.check_constraints(fplist)
-        # print(len(fplist), "trajectories passed constraint check")
-        # fplist = self.check_collisions(fplist, obstacles, time_step_now)
-        fplist = self.check_collision_multithread(fplist, time_step_now)
-        # print(len(fplist), "trajectories passed collision check")
-
-        # find minimum cost path
-        min_cost = float("inf")
+        # if cvae returned 0 paths try dense sampling
         if(len(fplist) == 0):
-            return None
+            # print(f"Timestep {time_step_now}, CVAE failed, running dense sampling")
+            # this gets dense samples from parent FOP class
+            dense_samples = self.get_samples()
+            fplist = self.generate_trajectories(
+                frenet_state=frenet_state,
+                samples=dense_samples,
+                time_step_now=time_step_now
+            )
+            self.samples_cntr["dense_samples"] += 1
+        else:
+            self.samples_cntr["cvae_samples"] += 1
+            
+        # find minimum cost path    
+        min_cost = float("inf")
         
         for fp in fplist:
             if min_cost >= fp.cost_final:
