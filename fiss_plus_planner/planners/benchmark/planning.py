@@ -10,7 +10,10 @@ from typing import Tuple
 from PIL import Image
 from omegaconf import DictConfig
 from matplotlib.collections import LineCollection
+from matplotlib.patches import Polygon as MplPolygon
 import pandas as pd
+from matplotlib import font_manager
+from shapely import affinity
 
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.common.solution import VehicleType
@@ -42,8 +45,55 @@ from fiss_plus_planner.planners.common.utils import configure_numba_threads
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 
+# === IEEE-like font family and sizes (10pt doc) ===
+S = {
+    "normalsize": 18,      # body text
+    "small": 16,            # axis labels / lane labels
+    "footnotesize": 14,     # tick labels / legend
+    "large": 22,           # figure title
+}
+mpl.rcParams.update({
+    "text.usetex": False,
+    "mathtext.fontset": "stix",                   # Times-like math
+    "axes.titlesize": S["large"],
+    "axes.labelsize": S["large"],
+    "xtick.labelsize": S["large"],
+    "ytick.labelsize": S["large"],
+    "legend.fontsize": S["large"],
+    "pdf.fonttype": 42, "ps.fonttype": 42,        # keep text searchable
+    "svg.fonttype": "none",                       # keep text as text in SVG
+})
+
+# Pick an available Times-like font so figures stay consistent on systems
+# without proprietary Times faces.
+_FONT_CANDIDATES = [
+    "Times New Roman",
+    "Times",
+    "Nimbus Roman",
+    "DejaVu Serif",
+    "STIXGeneral",
+]
 
 
+def _select_font_property():
+    for family in _FONT_CANDIDATES:
+        prop = font_manager.FontProperties(family=family)
+        try:
+            font_manager.findfont(prop, fallback_to_default=False)
+        except ValueError:
+            continue
+        return prop
+    return font_manager.FontProperties(family="serif")
+
+
+_BASE_FONT = _select_font_property()
+
+
+def font_prop(size_key: str) -> font_manager.FontProperties:
+    prop = _BASE_FONT.copy()
+    prop.set_size(S[size_key])
+    return prop
+##-------------------------------------------------------------------------------------------------
 
 def prepare_obstacles_polygons_time_series(
     obstacles: list,
@@ -104,7 +154,7 @@ def prepare_obstacles_polygons_time_series(
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool
-                            ) -> Tuple[bool, Trajectory, float, list, Stats, list]:
+                            ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
     # Plan a global route
     global_planner = GlobalPlanner()
     try:
@@ -271,6 +321,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     sampling_params_cross_all_scenarios = []
     goal_reached = False
     next_state = initial_state
+    best_trajs_all_time_steps = []
     
     for i in range(final_time_step):
         num_cycles += 1
@@ -289,6 +340,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         start_time = time.time()
         best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
+
+        best_trajs_all_time_steps.append(best_traj_ego)
 
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             stats.time_step_have_to_break = i
@@ -412,7 +465,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             planner.settings.highest_speed,
         )
 
-    return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, planner.all_trajs
+    return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, planner.all_trajs, best_trajs_all_time_steps
 
 
 def timeout_handler(signum, frame):
@@ -500,7 +553,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
     num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
     save_gif = cfg['SAVE_GIF']
-    show_sampled_trajs = cfg.get('SHOW_SAMPLED_TRAJECTORIES', True)
+    show_sampled_trajs = cfg['SHOW_SAMPLED_TRAJECTORIES']
     #set number of threads for numba parallel collision checker
     number_threads = cfg['Num_Threads_For_CollisionChecker']
     runtime_measurement = cfg.get('Runtime_Measurement')
@@ -524,7 +577,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             _, ego_vehicle_trajectory, _, time_list = informed_planning(
                 scenario, planning_problem, vehicle_params)
         else:
-            _, ego_vehicle_trajectory, _, time_list, measurment, fplist = frenet_optimal_planning(
+            _, ego_vehicle_trajectory, _, time_list, measurment, fplist, best_trajs = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
                 number_threads, runtime_measurement, collect_data_for_ml)
 
@@ -551,14 +604,6 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     ##################################################### Visualization #########################################################
     if save_gif and fplist:
         best_traj_lines = None
-        if not show_sampled_trajs:
-            best_traj_lines = []
-            for step_trajs in fplist:
-                if not step_trajs:
-                    continue
-                best_fp = min(step_trajs, key=lambda fp: fp.cost_final)
-                if len(best_fp.x) > 1:
-                    best_traj_lines.append((best_fp.x[1:], best_fp.y[1:]))
         images = []
         # For each
         for i in range(len(fplist)):
@@ -589,16 +634,15 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                                cmap='RdYlGn_r', lw=2, zorder=20)
                 plt.colorbar(lc)
             else:
-                if best_traj_lines:
-                    for x_line, y_line in best_traj_lines:
-                        rnd.ax.plot(
-                            x_line,
-                            y_line,
-                            color="#808080",
-                            alpha=0.35,
-                            zorder=18,
-                            lw=1,
-                        )
+                if i < len(best_trajs):
+                    best_fp = best_trajs[i]
+                    if best_fp is not None and len(best_fp.x) > 1 and len(best_fp.y) > 1:
+                        costs = [best_fp.cost_final]
+                        xs = [best_fp.x[1:]]
+                        ys = [best_fp.y[1:]]
+                        lc = multiline(xs, ys, costs, ax=rnd.ax,
+                                       cmap='RdYlGn_r', lw=2, zorder=20)
+                        plt.colorbar(lc)
 
             x_coords = [state.position[0]
                         for state in ego_vehicle_trajectory.state_list]
@@ -621,10 +665,10 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
             #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
 
-            x_min = min(x_coords)-8
-            x_max = max(x_coords)+8
-            y_min = min(y_coords)-8
-            y_max = max(y_coords)+8
+            x_min = min(x_coords)-30
+            x_max = max(x_coords)+30
+            y_min = min(y_coords)-30
+            y_max = max(y_coords)+30
             l = max(x_max-x_min, y_max-y_min)
 
             if l == x_max - x_min:
