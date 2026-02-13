@@ -162,7 +162,7 @@ std::vector<FrenetTrajectory> check_collision(
                 vehicle_width
             );
             
-            int time_step = step_idx + time_step_now;
+            int time_step = time_step_now;
             
             // Check against all obstacles at this time step
             for (int obs_idx = 0; obs_idx < num_obstacles && !has_collision; obs_idx++) {
