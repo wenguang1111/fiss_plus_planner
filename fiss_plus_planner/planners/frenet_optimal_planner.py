@@ -130,9 +130,6 @@ class FrenetOptimalPlanner(object):
             tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
             tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
-            
-            # Compute the final cost
-            tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
 
             tfp.sampling_param = SamplingParam(di, tv, Ti)
             frenet_paths.append(tfp)
@@ -283,6 +280,7 @@ class FrenetOptimalPlanner(object):
         self.stats.num_collison_checks = len(fplist)
         # fplist = self.check_collisions(fplist, obstacles, time_step_now)
         fplist = self.check_collision_multithread(fplist, time_step_now)
+        fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
 
         # find minimum cost path
         min_cost = float("inf")

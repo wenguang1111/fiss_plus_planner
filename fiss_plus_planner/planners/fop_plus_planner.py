@@ -23,6 +23,7 @@ class FopPlusPlanner(FrenetOptimalPlanner):
         fplist = self.calc_frenet_paths(frenet_state)
         fplist = self.calc_global_paths(fplist)
         self.stats.num_trajs_generated = len(fplist)
+        fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
         
         self.candidate_trajs = PriorityQueue()
         for traj in fplist:
