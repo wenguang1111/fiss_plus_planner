@@ -113,6 +113,27 @@ class CostFunction:
         cost_total = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk + cost_offset)/len(traj.t)
         return cost_total
     
+    def final_trajectory_cost(self,
+                              traj: FrenetTrajectory,
+                              target_speed: float,
+                              obstacles_array: np.ndarray,
+                              obstacles_num_vertices: np.ndarray) -> float:
+        """
+        calculate the cost of the final executed trajectory
+        """
+        
+        cost_obstacle = 0.0
+        
+        cost_time = self.cost_terminal_time(10.0 - traj.t[-1])
+        for i in range(len(traj.t)):
+            cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, i)
+        cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
+        cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
+        cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
+        cost_offset = self.cost_lane_center_offset(traj.d)
+        cost_total = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk + cost_offset)/len(traj.t)
+        return cost_total
+    
     def calc_cost(self, fplist:list, target_speed: float, obstacles_array: np.ndarray,
         obstacles_num_vertices: np.ndarray, time_step_now: int) -> list:
         for traj in fplist:

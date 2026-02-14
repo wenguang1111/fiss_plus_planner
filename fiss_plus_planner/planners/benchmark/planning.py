@@ -344,6 +344,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         best_trajs_all_time_steps.append(best_traj_ego)
 
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
+            print(f"Planning failed at time step {i}")
             stats.time_step_have_to_break = i
             break
         processing_time = (end_time - start_time)
@@ -431,6 +432,17 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if i == final_time_step-1:
             stats.success = True
             goal_reached = True
+            
+    # construct the final frenet trajectory and calculate the final cost
+    final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list)
+    final_trajectory.cost_final = planner.cost_function.final_trajectory_cost(
+        traj=final_trajectory,
+        target_speed=max_speed,
+        obstacles_array=obstacles_array,
+        obstacles_num_vertices=obstacles_num_vertices,
+    )
+    stats.final_traj_cost = final_trajectory.cost_final
+    # print(f"Final trajectory cost: {final_trajectory.cost_final}")
     avg_processing_time = processing_time / num_cycles
     stats.step_number = num_cycles
     stats.average(num_cycles)
