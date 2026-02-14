@@ -86,7 +86,7 @@ class CostFunction:
         return self.w_LC * sum(np.power(offsets, 2))
     
     def cost_total(self, traj: FrenetTrajectory, target_speed: float) -> float:
-        cost_time = 10.0 - traj.t[-1] # self.cost_time()
+        cost_time = self.cost_terminal_time(10.0 - traj.t[-1])  # self.cost_time()
         cost_obstacle = 0.0 # self.cost_dist_obstacle()
         cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
