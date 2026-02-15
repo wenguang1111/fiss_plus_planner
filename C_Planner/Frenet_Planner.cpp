@@ -499,7 +499,7 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
     PlanResult plan_result = plan_multithread(samples_per_thread_vec, frenet_state, time_step_now);
 
     // Store all frenet_paths to all_trajs (thread-safe here, single thread context)
-    all_trajs.push_back(plan_result.frenet_paths);
+    // all_trajs.push_back(plan_result.frenet_paths);
 
     last_fplist = plan_result.collision_free_paths;
 

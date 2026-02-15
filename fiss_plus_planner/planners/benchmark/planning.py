@@ -563,7 +563,7 @@ def multiline(xs, ys, c, ax=None, **kwargs):
 def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     # Global benchmark settings
     method = cfg['PLANNER']  # 'informed', 'FOP', 'FOP+', 'FISS', 'FISS+'
-    num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_W_SAMPLE'])
+    num_samples = (cfg['N_W_SAMPLE'], cfg['N_S_SAMPLE'], cfg['N_T_SAMPLE'])
     save_gif = cfg['SAVE_GIF']
     show_sampled_trajs = cfg['SHOW_SAMPLED_TRAJECTORIES']
     #set number of threads for numba parallel collision checker
