@@ -161,7 +161,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         global_plan = global_planner.plan_global_route(scenario, planning_problem)
     except ValueError as e:
         print(f"    Failed to plan global route: {e}")
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
     
     ego_lane_pts = global_plan.concat_centerline
 
@@ -215,11 +215,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         else:
             stats.success = False
             goal_reached = False
-            return goal_reached, None, None, None, stats, None
+            return goal_reached, None, None, None, stats, None, None
     if len(obstacles_final_time_step) == 0:
         stats.success = False
         goal_reached = False
-        return goal_reached, None, None, None, stats, None
+        return goal_reached, None, None, None, stats, None, None
     final_time_step = max(obstacles_final_time_step)
 
     for t_step in range(final_time_step):
