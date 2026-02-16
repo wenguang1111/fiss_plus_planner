@@ -30,7 +30,7 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
         self.num_samples: int = 64
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
-        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/hcvae_opt_batch_64_epochs_20_zdim_32_sigmoid_0.1_stall_end.pth")
+        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zdim_64_sigmoid_1.0_stall_end.pth")
         
 class SparsePlanner(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
