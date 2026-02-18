@@ -44,6 +44,7 @@ from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_
 from fiss_plus_planner.planners.common.utils import configure_numba_threads
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
+from fiss_plus_planner.planners.fop_backup_planner import SP_FOP_Planner
 
 # === IEEE-like font family and sizes (10pt doc) ===
 S = {
@@ -255,6 +256,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         time_step_now=0,
         max_vertices=max_vertices
     )
+    
+    # initialize to none and if SP_FOP it will be assigned with FOP as backup planner
+    backup_planner = None
 
     if method == 'FOP':
         planner_settings = FrenetOptimalPlannerSettings(
@@ -276,7 +280,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         use_cpp_planner = False
     elif method == 'Sparse':
         planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
-        planner = SparsePlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        # there is no backup planner here, so do the internal backup
+        planner = SparsePlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, use_internal_backup=True)
         use_cpp_planner = False
     elif method == 'Sparse_Optimized':
         planner_settings = SparsePlannerOptimizedSettings(num_width, num_speed, num_t, input_dir, file)
@@ -293,11 +298,22 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusCppWrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True
+    # SP_FOP means Sparse with full FOP planner as backup, the internal backup in SparsePlanner is not used here
+    elif method == 'SP_FOP':
+        planner_settings = SparsePlannerSettings(num_width, num_speed, num_t, input_dir, file)
+        # since use_internal_backup is set to false in the SparsePlanner, then the external backup will be used not the one inside the SparsePlanner
+        planner = SparsePlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, use_internal_backup=False)
+        backup_planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        backup_planner = SP_FOP_Planner(backup_planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
 
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
+    # just to make sure the backup planner has the cubic spline object
+    if backup_planner is not None:
+        _, _ = backup_planner.generate_frenet_frame(ego_lane_pts)
 
     # Initial state
     initial_state = planning_problem.initial_state
@@ -337,8 +353,13 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         )
         global_coordination_state_list.append(inital_state)
 
+        # if there is a backup planner, then try it if the main planner fails
         start_time = time.time()
         best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
+        if best_traj_ego is None and backup_planner is not None:
+            print(f"planner failed at time step {i}, trying backup planner...")
+            best_traj_ego = backup_planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
+            planner.samples_cntr["dense_samples"] += 1
         end_time = time.time()
 
         best_trajs_all_time_steps.append(best_traj_ego)
@@ -447,9 +468,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     stats.step_number = num_cycles
     stats.average(num_cycles)
     # record the number of samples from CVAE sampling and dense sampling
-    stats.cvae_timesteps = planner.samples_cntr["cvae_samples"]
-    stats.dense_timesteps = planner.samples_cntr["dense_samples"]
-    stats.total_timesteps = stats.cvae_timesteps + stats.dense_timesteps
+    if isinstance(planner, SparsePlanner):
+        stats.cvae_timesteps = planner.samples_cntr["cvae_samples"]
+        stats.dense_timesteps = planner.samples_cntr["dense_samples"]
+        stats.total_timesteps = stats.cvae_timesteps + stats.dense_timesteps
     # print("average inferecence time:", planner.time_inference / num_cycles)
     # print("average image generation time:", planner.time_image_generation / num_cycles)
     

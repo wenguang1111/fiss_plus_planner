@@ -20,6 +20,7 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from CVAE_efficient_sampling.CVAE import CVAE_Efficient
+
 class SparsePlannerSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
@@ -36,8 +37,10 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
 class SparsePlanner(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
     def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle,
-                 obstacles_array=None, obstacles_num_vertices=None):
+                 obstacles_array=None, obstacles_num_vertices=None, use_internal_backup=False):
         super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
+        
+        self.use_internal_backup = use_internal_backup
         
         self.scenario_drawer = ScenarioDrawer(
             self.settings.scenario_file,
@@ -130,17 +133,25 @@ class SparsePlanner(FrenetOptimalPlanner):
 
         # if cvae returned 0 paths try dense sampling
         if(len(fplist) == 0):
-            print(f"Timestep {time_step_now}, CVAE failed, running dense sampling")
-            # this gets dense samples from parent FOP class
-            dense_samples = self.get_samples()
-            fplist = self.generate_trajectories(
-                frenet_state=frenet_state,
-                samples=dense_samples,
-                time_step_now=time_step_now
-            )
-            self.samples_cntr["dense_samples"] += 1
+            if self.use_internal_backup:
+                print(f"Timestep {time_step_now}, CVAE failed, running dense sampling")
+                # this gets dense samples from parent FOP class
+                dense_samples = self.get_samples()
+                fplist = self.generate_trajectories(
+                    frenet_state=frenet_state,
+                    samples=dense_samples,
+                    time_step_now=time_step_now
+                )
+                self.samples_cntr["dense_samples"] += 1
         else:
             self.samples_cntr["cvae_samples"] += 1
+            
+        # calculate trajectories costs
+        fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
+        
+        # then both cvae and dense samples failed, return None
+        if(len(fplist) == 0):
+            return None
             
         # find minimum cost path    
         min_cost = float("inf")
