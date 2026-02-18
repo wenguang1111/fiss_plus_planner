@@ -230,3 +230,25 @@ class FrenetTrajectory(object):
         new_traj.c = new_traj.c[steps:]
         
         return new_traj
+    
+    @staticmethod
+    def from_frenet_states_list(frenet_states_list):
+        """
+        construct the final trajectory from the executed frenet states
+        
+        :param frenet_states_list: list of frenet states
+        """
+        
+        trajectory = FrenetTrajectory()
+        trajectory.t = [state.t for state in frenet_states_list]
+        trajectory.s = [state.s for state in frenet_states_list]
+        trajectory.s_d = [state.s_d for state in frenet_states_list]
+        trajectory.s_dd = [state.s_dd for state in frenet_states_list]
+        trajectory.s_ddd = [state.s_ddd for state in frenet_states_list]
+        trajectory.d = [state.d for state in frenet_states_list]
+        trajectory.d_d = [state.d_d for state in frenet_states_list]
+        trajectory.d_dd = [state.d_dd for state in frenet_states_list]
+        trajectory.d_ddd = [state.d_ddd for state in frenet_states_list]
+        
+        return trajectory
+            

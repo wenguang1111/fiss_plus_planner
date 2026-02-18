@@ -268,6 +268,7 @@ class FissPlanner(FrenetOptimalPlanner):
             self.trajs_per_timestep = self.calc_global_paths(self.trajs_per_timestep)
         self.all_trajs.append(self.trajs_per_timestep)
         self.trajs_per_timestep = []
-            
-        
+
+        if self.best_traj is not None:    
+            self.best_traj.cost_final = self.cost_function.cost_singleTrajectory(self.best_traj, self.settings.highest_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
         return self.best_traj

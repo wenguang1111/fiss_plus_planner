@@ -30,13 +30,14 @@ class ScenarioDrawer:
     LANE_DASH_LENGTH = 2.0
     LANE_DASH_GAP = 2.0
     ARROW_WIDTH = 0.006
-    VIEW_SIZE_DEFAULT = 140.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
+    VIEW_SIZE_DEFAULT = 60.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
     COLOR_BLACK = "#000000"
     COLOR_GRAY = "#808080"
     COLOR_LightGray = "#D3D3D3"
     GENERATE_GIF = True
     GIF_DURATION_MS = 100
     GIF_LOOP = 0
+    img_dim = 256
 
     def __init__(
         self,
@@ -70,7 +71,7 @@ class ScenarioDrawer:
             os.makedirs(self.save_dir / self.scenario_name, exist_ok=True)
 
         self._transform = transforms.Compose([
-            transforms.Resize((128, 128)),
+            transforms.Resize((self.img_dim, self.img_dim)),
             transforms.ToTensor(),
         ])
 

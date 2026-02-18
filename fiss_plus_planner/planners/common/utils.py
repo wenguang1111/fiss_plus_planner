@@ -163,7 +163,7 @@ def check_trajectories_collision_parallel_static(
             )
 
             for obs_idx in range(num_obstacles):
-                time_step = state_idx+time_step_now
+                time_step = time_step_now
                 actual_verts = num_vertices[time_step, obs_idx]
                 if actual_verts > 0:
                     obstacle_poly = obstacles_array[time_step, obs_idx, :actual_verts, :]

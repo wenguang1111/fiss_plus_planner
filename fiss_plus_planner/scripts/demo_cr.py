@@ -40,7 +40,7 @@ if __name__ == '__main__':
         with open(csv_path, 'w', newline='') as csv_file:
             csv_file.write(
                 'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                'num_collision_checks,average_cost,max_cost, step_number_for_break, cvae_samples, dense_samples, total_samples, success\n'
+                'num_collision_checks,average_cost,max_cost,final_trajector_cost, step_number_for_break, cvae_samples, dense_samples, total_samples, success\n'
             )
             for file, measurement in measurements:
                 if measurement is None:
@@ -50,7 +50,7 @@ if __name__ == '__main__':
                 csv_file.write(
                     f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
                     f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-                    f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},' 
+                    f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},' 
                     f'{measurement.cvae_timesteps}, {measurement.dense_timesteps}, {measurement.total_timesteps}, {measurement.success}\n'
                 )
                 t_cvae_timesteps += measurement.cvae_timesteps
