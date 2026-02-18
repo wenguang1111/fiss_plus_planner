@@ -56,10 +56,12 @@ if __name__ == '__main__':
                 t_cvae_timesteps += measurement.cvae_timesteps
                 t_dense_timesteps += measurement.dense_timesteps
                 t_total_timesteps += measurement.total_timesteps
-                
-        print(f"Total timesteps planned: {t_total_timesteps}")
-        print(f"Timesteps planned with CVAE: {t_cvae_timesteps}")
-        print(f"Timesteps planned with dense sampling: {t_dense_timesteps}")
-        print(f"Percentage of CVAE sampling: {t_cvae_timesteps/t_total_timesteps*100:.2f}")
-        print(f"Percentage of dense sampling: {t_dense_timesteps/t_total_timesteps*100:.2f}")
+        
+        # if the planner is different than Sparse or SP_FOP, then we don't have the cvae samples and the prints are useless
+        if name_planner in ["Sparse", "SP_FOP"]:
+            print(f"Total timesteps planned: {t_total_timesteps}")
+            print(f"Timesteps planned with CVAE: {t_cvae_timesteps}")
+            print(f"Timesteps planned with dense sampling: {t_dense_timesteps}")
+            print(f"Percentage of CVAE sampling: {t_cvae_timesteps/t_total_timesteps*100:.2f}")
+            print(f"Percentage of dense sampling: {t_dense_timesteps/t_total_timesteps*100:.2f}")
                 
