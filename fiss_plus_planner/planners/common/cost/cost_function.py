@@ -104,8 +104,9 @@ class CostFunction:
         obstacles_num_vertices: np.ndarray,
         time_step_now: int
     ) -> float:
-        cost_time = self.cost_terminal_time(10.0 - traj.t[-1]) 
-        cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
+        cost_time = self.cost_terminal_time(10.0 - traj.t[-1])
+        cost_obstacle = 0.0  # no obstacle cost for the intermediate cost fn
+        # cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
         cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
