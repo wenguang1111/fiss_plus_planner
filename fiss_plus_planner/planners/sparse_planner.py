@@ -13,7 +13,6 @@ from PIL import Image
 import torch
 torch.manual_seed(0)
 import time
-
 from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
@@ -57,6 +56,8 @@ class SparsePlanner(FrenetOptimalPlanner):
             "cvae_samples": 0,
             "dense_samples": 0,
         }
+        
+        self.img_render_time = 0.0
 
     def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
         """Record generated sampling parameters to a file."""
@@ -89,10 +90,13 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.settings.highest_speed = max_target_speed
         images_last_3_frame: List[Image.Image] = []
 
+        # render the scenario image at current time step and record the image rendering time
+        start_time = time.time()
         img = self.scenario_drawer.create_scenario_img_at_time_step(
             time_step_now,
             current_state
         )
+        self.img_render_time = time.time() - start_time
         self.image_history.append((time_step_now, img))
 
         # #Useful for debugging, make sure if you want to delete it

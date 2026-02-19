@@ -369,6 +369,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.time_step_have_to_break = i
             break
         processing_time = (end_time - start_time)
+        # if the planner is sparse planner, then subtract the image rendering time from planning time
+        if isinstance(planner, (SparsePlanner, SP_FOP_Planner)):
+            print(f"subtracting image rendering time {planner.img_render_time:.4f} seconds from total processing time {processing_time:.4f} seconds")
+            processing_time -= planner.img_render_time
         stats.runtime_history.append(processing_time)
         stats.average_runtime += processing_time
         stats.best_traj_costs.append(best_traj_ego.cost_final)
