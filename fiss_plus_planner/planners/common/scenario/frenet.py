@@ -232,15 +232,22 @@ class FrenetTrajectory(object):
         return new_traj
     
     @staticmethod
-    def from_frenet_states_list(frenet_states_list):
+    def from_states_lists(state_list, frenet_states_list):
         """
-        construct the final trajectory from the executed frenet states
+        construct the final trajectory from the executed cartesian and frenet states
         
+        :param state_list: list of cartesian states
         :param frenet_states_list: list of frenet states
         """
         
+        assert len(state_list) == len(frenet_states_list), "The length of the cartesian state list and the frenet state list must be the same"
+        
         trajectory = FrenetTrajectory()
         trajectory.t = [state.t for state in frenet_states_list]
+        # get x, y, theta from the cartesian state list
+        trajectory.x = [state.position[0] for state in state_list]
+        trajectory.y = [state.position[1] for state in state_list]
+        trajectory.yaw = [state.orientation for state in state_list]
         trajectory.s = [state.s for state in frenet_states_list]
         trajectory.s_d = [state.s_d for state in frenet_states_list]
         trajectory.s_dd = [state.s_dd for state in frenet_states_list]
