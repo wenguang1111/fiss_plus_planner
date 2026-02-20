@@ -22,12 +22,24 @@ class CostFunction:
             return np.array([np.inf, np.inf])
         return vertices[:num_verts].mean(axis=0)
     
+    def is_obstacle_front(self, ego_pose: np.ndarray, obs_center: np.ndarray) -> bool:
+        # returns whether the obstacle is in front of the ego vehicle
+        # based on the dot product between the relative vector between ego and obstacle and the ego direction vector
+        # if > 0, then the obstacle is in front, otherwise it's behind
+        
+        ego_direction = np.array([np.cos(ego_pose[2]), np.sin(ego_pose[2])])
+        relative_vector = obs_center - ego_pose[:2]
+        dot_product = np.dot(relative_vector, ego_direction)
+        # print(dot_product)
+        return dot_product > 0
+    
+    
     def cost_dist_obstacle(
         self, 
         obstacles_array: np.ndarray, 
         obstacles_num_vertices: np.ndarray,
         traj: FrenetTrajectory, 
-        time_step_now: int = 0
+        # time_step_now: int = 0
     ) -> float:
         num_traj_points = len(traj.x)
         num_time_steps = obstacles_array.shape[0]
@@ -38,15 +50,15 @@ class CostFunction:
         
         min_dists = []
         
-        for i in range(num_traj_points):
-            # t_idx = time_step_now + i
-            t_idx = time_step_now
+        for t_idx in range(num_traj_points):
             
             if t_idx >= num_time_steps:
                 break
                 
-            traj_x = traj.x[i]
-            traj_y = traj.y[i]
+            traj_x = traj.x[t_idx]
+            traj_y = traj.y[t_idx]
+            
+            ego_pose = np.array([traj_x, traj_y, traj.yaw[t_idx]])
             
             min_dist = np.inf
             
@@ -58,6 +70,12 @@ class CostFunction:
                 
                 vertices = obstacles_array[t_idx, obs_idx]
                 center = self._compute_polygon_center(vertices, num_verts)
+                
+                # if the obstacle is not in front of the ego vehicle, we don't consider it for the cost calculation
+                if not self.is_obstacle_front(ego_pose, center):
+                #     # print("obstacle ", obs_idx, " at time step ", t_idx, " is behind the ego vehicle. Skipping it for cost calculation.")
+                #     # print("ego pose: ", ego_pose[:2], " obstacle center: ", center)
+                    continue
                 
                 dist = np.sqrt((traj_x - center[0])**2 + (traj_y - center[1])**2)
                 
@@ -124,10 +142,9 @@ class CostFunction:
         """
         
         cost_obstacle = 0.0
-        
         cost_time = self.cost_terminal_time(10.0 - traj.t[-1])
-        for i in range(len(traj.t)):
-            cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, i)
+        cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
+        # print("Obstacle cost: ", cost_obstacle)
         cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
