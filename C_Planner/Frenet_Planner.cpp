@@ -463,21 +463,27 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
                                       double max_target_speed,
                                       int time_step_now,
                                       int num_threads) {
-    // Main planning function
+    std::vector<std::tuple<double, double, double>> samples = get_samples();
+    return best_traj_generation(frenet_state, samples, max_target_speed, time_step_now, num_threads);
+}
+
+FrenetTrajectory Frenet_Planner::best_traj_generation(
+    const FrenetState& frenet_state,
+    const std::vector<std::tuple<double, double, double>>& samples,
+    double max_target_speed,
+    int time_step_now,
+    int num_threads) {
     settings.highest_speed = max_target_speed;
 
     // Ensure num_threads is at least 1
     if (num_threads <= 0) {
         num_threads = std::thread::hardware_concurrency();
-        std::cerr<<"Thread number was 0"<<std::endl;
-        if (num_threads <= 0) num_threads = 1;  // fallback default
+        if (num_threads <= 0) num_threads = 1;
     }
-
-    std::vector<std::tuple<double, double, double>> samples = get_samples();
 
     // Handle edge case: no samples
     if (samples.empty()) {
-        std::cerr<<"empty samples"<<std::endl;
+        std::cerr << "empty samples" << std::endl;
         return FrenetTrajectory();
     }
 
@@ -497,16 +503,11 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
 
     // Get collision-free paths from multithreaded planning
     PlanResult plan_result = plan_multithread(samples_per_thread_vec, frenet_state, time_step_now);
-
-    // Store all frenet_paths to all_trajs (thread-safe here, single thread context)
-    // all_trajs.push_back(plan_result.frenet_paths);
-
     last_fplist = plan_result.collision_free_paths;
 
     // Find minimum cost path
     best_traj = FrenetTrajectory();
     best_traj.cost_final = std::numeric_limits<double>::infinity();
-
     for (const auto& fp : plan_result.collision_free_paths) {
         if (fp.cost_final < best_traj.cost_final) {
             best_traj = fp;

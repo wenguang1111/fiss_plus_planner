@@ -257,6 +257,11 @@ class FrenetTrajectory(object):
         trajectory.d_d = [state.d_d for state in frenet_states_list]
         trajectory.d_dd = [state.d_dd for state in frenet_states_list]
         trajectory.d_ddd = [state.d_ddd for state in frenet_states_list]
+        trajectory.x = [state.position[0] for state in global_state_list]
+        trajectory.y = [state.position[1] for state in global_state_list]
+        trajectory.yaw = [state.orientation for state in global_state_list]
+        trajectory.v = [state.velocity for state in global_state_list]
+        trajectory.a = [state.acceleration for state in global_state_list]
         
         return trajectory
             

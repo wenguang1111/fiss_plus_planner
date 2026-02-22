@@ -32,7 +32,7 @@ def load_measurements(csv_path: str) -> Dict[str, ScenarioMetrics]:
             if not scenario:
                 continue
             data[scenario] = ScenarioMetrics(
-                avg_cost=_to_float(row.get("average_cost")),
+                avg_cost=_to_float(row.get("final_trajector_cost")),
                 max_cost=_to_float(row.get("max_cost")),
                 avg_runtime=_to_float(row.get("average runtime_plan [s]")),
             )

@@ -3,9 +3,9 @@
 #   self.max_t = 5.0  
 OUTPUT_DIR: "data/output/"
 MEASUREMENTS_DIR: "data/measurements/"
-INPUT_DIR: "data/demo/Test"
+INPUT_DIR: "data/demo/JustForTest"
 # INPUT_DIR: "data/demo"
-FILES: ["ARG_Carcarana-5_2_T-1.xml"] # empty by default if you want to run all the scenario files under the input directory
+FILES: ["AUT_Haag-42_1_T-17.xml"] # empty by default if you want to run all the scenario files under the input directory
 
 PLANNER: "SP_FOP" # the name of the planner to be used, can be: FOP, FOP+, FISS, FISS+, Sparse, Sparse_Optimized, FOP_CPP, FISS+_CPP, SP_FOP
 N_W_SAMPLE: 5 #34 # number of lateral offset samples
@@ -14,6 +14,6 @@ N_T_SAMPLE: 5 #20 # number of time horizon samples
 SAVE_GIF: False # save the animation as a .gif file
 SAVE_MEASUREMENTS: True # save the measurement data as .csv file
 Num_Threads_For_CollisionChecker: 16 # number of threads to be used in the numba parallel collision checker
-Runtime_Measurement: True # keep it False if you need Save GIF
+Runtime_Measurement: False # keep it False if you need Save GIF
 Collect_Data_For_ML: False # Collect data for ML training, check code in fiss_plus_planner/planners/frenet_optimal_planner.py
-SHOW_SAMPLED_TRAJECTORIES: True # visualize the sampled trajectories in the animation, set it to False, it show only the selected best trajectory of each time step
+SHOW_SAMPLED_TRAJECTORIES: False # visualize the sampled trajectories in the animation, set it to False, it show only the selected best trajectory of each time step

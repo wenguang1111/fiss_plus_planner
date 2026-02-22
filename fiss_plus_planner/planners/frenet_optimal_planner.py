@@ -137,6 +137,7 @@ class FrenetOptimalPlanner(object):
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
 
             tfp.sampling_param = SamplingParam(di, tv, Ti)
+            tfp.cost_final = self.cost_function.cost_total(tfp, self.settings.highest_speed)
             frenet_paths.append(tfp)
             traj_per_timestep.append(tfp)
             

@@ -36,6 +36,7 @@ from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPl
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
+from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
 from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
@@ -306,6 +307,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         backup_planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
         backup_planner = SP_FOP_Planner(backup_planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
+    elif method == 'Sparse_CPP':
+        # Use C++ Sparse Planner with pybind11
+        planner_settings = SparsePlannerSettings_CPP(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlanner_CPP(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = True
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
@@ -330,6 +336,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     num_cycles = 0
     state_list = []
     frenet_state_list = []
+    global_state_list = []
     global_coordination_state_list = []
 
     time_list = []
@@ -342,7 +349,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     for i in range(final_time_step):
         num_cycles += 1
         
-        frenet_state_list.append(current_frenet_state)
         inital_state = InitialState(
             time_step=i,
             position=next_state.position,
@@ -352,6 +358,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             yaw_rate=next_state.yaw_rate
         )
         global_coordination_state_list.append(inital_state)
+        global_state_list.append(inital_state)
+        frenet_state_list.append(current_frenet_state)
 
         # if there is a backup planner, then try it if the main planner fails
         start_time = time.time()
@@ -386,6 +394,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         current_state = best_traj_ego.state_at_time_step(next_step_idx)
         current_frenet_state = best_traj_ego.frenet_state_at_time_step(
             next_step_idx)
+        
         #TODO: update initial_state for low speed scenarios
         dt = planner.settings.tick_t
         yaw = best_traj_ego.yaw

@@ -136,6 +136,14 @@ public:
                          int time_step_now = 0,
                          int num_threads=1);
 
+    // Main planning function using externally provided sampling parameters (d, s_d, t)
+    FrenetTrajectory best_traj_generation(
+        const FrenetState& frenet_state,
+        const std::vector<std::tuple<double, double, double>>& samples,
+        double max_target_speed,
+        int time_step_now = 0,
+        int num_threads = 1);
+
     // Multithreaded planning function
     PlanResult plan_multithread(
         const std::vector<std::vector<std::tuple<double, double, double>>>& samples_per_thread_vec,

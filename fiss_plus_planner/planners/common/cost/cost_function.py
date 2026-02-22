@@ -5,11 +5,11 @@ class CostFunction:
     def __init__(self, cost_type: str):
         if cost_type is "WX1":
             self.w_T = 10
-            self.w_V = 1
+            self.w_V = 0.1
             self.w_A = 0.1
             self.w_J = 0.1
-            self.w_D = 0.1
-            self.w_LC = 10
+            self.w_D = 10
+            self.w_LC = 1
     
     def cost_time(self) -> float:
         pass
@@ -150,6 +150,14 @@ class CostFunction:
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
         cost_offset = self.cost_lane_center_offset(traj.d)
         cost_total = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk + cost_offset)/len(traj.t)
+        # print("Cost Distance To Obstacles:", cost_obstacle)
+        # print("Cost Time:", cost_time)
+        # print("Cost Speed:", cost_speed)
+        # print("Cost Acceleration:", cost_accel)
+        # print("Cost Jerk:", cost_jerk)
+        # print("Cost Lane Center Offset:", cost_offset)
+        # print("len(traj.t):", len(traj.t))
+        # print("Total Cost:", cost_total)
         return cost_total
     
     def calc_cost(self, fplist:list, target_speed: float, obstacles_array: np.ndarray,
