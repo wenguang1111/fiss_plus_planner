@@ -459,7 +459,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             goal_reached = True
     
     # construct the final frenet trajectory and calculate the final cost
-    final_trajectory = FrenetTrajectory.from_states_lists(state_list, frenet_state_list)
+    final_trajectory = FrenetTrajectory.from_states_lists(global_coordination_state_list, frenet_state_list)
     final_trajectory.cost_final = planner.cost_function.final_trajectory_cost(
         traj=final_trajectory,
         target_speed=max_speed,

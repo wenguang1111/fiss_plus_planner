@@ -240,7 +240,8 @@ class FrenetTrajectory(object):
         :param frenet_states_list: list of frenet states
         """
         
-        assert len(state_list) == len(frenet_states_list), "The length of the cartesian state list and the frenet state list must be the same"
+        assert len(state_list) == len(frenet_states_list), "The length of the cartesian state list and the frenet state list must be \
+            the same but got {} and {}".format(len(state_list), len(frenet_states_list))
         
         trajectory = FrenetTrajectory()
         trajectory.t = [state.t for state in frenet_states_list]
