@@ -148,6 +148,26 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("max_target_speed"),
              py::arg("time_step_now") = 0,
              py::arg("num_threads") =1)
+        .def("best_traj_generation",
+             [](Frenet_Planner& self,
+                const FrenetState& frenet_state,
+                const std::vector<std::tuple<double, double, double>>& samples,
+                double max_target_speed,
+                int time_step_now,
+                int num_threads) {
+                return self.best_traj_generation(
+                    frenet_state,
+                    samples,
+                    max_target_speed,
+                    time_step_now,
+                    num_threads
+                );
+             },
+             py::arg("frenet_state"),
+             py::arg("samples"),
+             py::arg("max_target_speed"),
+             py::arg("time_step_now") = 0,
+             py::arg("num_threads") = 1)
         .def("get_samples", &Frenet_Planner::get_samples)
      //    .def("calc_frenet_paths",
      //         [](Frenet_Planner& self, const FrenetState& frenet_state) {

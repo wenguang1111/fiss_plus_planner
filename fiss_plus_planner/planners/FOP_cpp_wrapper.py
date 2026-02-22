@@ -384,6 +384,93 @@ class FOP_CPP_Wrapper(object):
             except Exception as e:
                 print(f"Warning: C++ plan failed: {e}, falling back to Python")
 
+    def best_traj_generation(self, frenet_state: FrenetState, sampling_parameters: list,
+                             max_target_speed: float, time_step_now: int = 0) -> FrenetTrajectory:
+        """Use externally provided samples (d, s_d, t) to generate best trajectory in C++."""
+        if self.cpp_planner is not None:
+            try:
+                cpp_state = frenet_planner_cpp.FrenetState()
+                cpp_state.t = frenet_state.t
+                cpp_state.s = frenet_state.s
+                cpp_state.s_d = frenet_state.s_d
+                cpp_state.s_dd = frenet_state.s_dd
+                cpp_state.s_ddd = frenet_state.s_ddd
+                cpp_state.d = frenet_state.d
+                cpp_state.d_d = frenet_state.d_d
+                cpp_state.d_dd = frenet_state.d_dd
+                cpp_state.d_ddd = frenet_state.d_ddd
+
+                cpp_samples = []
+                for sample in sampling_parameters:
+                    cpp_samples.append((float(sample[0]), float(sample[1]), float(sample[2])))
+
+                cpp_traj = self.cpp_planner.best_traj_generation(
+                    cpp_state,
+                    cpp_samples,
+                    max_target_speed,
+                    time_step_now,
+                    self.number_threads
+                )
+
+                if cpp_traj.is_generated:
+                    py_traj = FrenetTrajectory()
+                    py_traj.t = list(cpp_traj.t)
+                    py_traj.s = list(cpp_traj.s)
+                    py_traj.s_d = list(cpp_traj.s_d)
+                    py_traj.s_dd = list(cpp_traj.s_dd)
+                    py_traj.s_ddd = list(cpp_traj.s_ddd)
+                    py_traj.d = list(cpp_traj.d)
+                    py_traj.d_d = list(cpp_traj.d_d)
+                    py_traj.d_dd = list(cpp_traj.d_dd)
+                    py_traj.d_ddd = list(cpp_traj.d_ddd)
+                    py_traj.x = list(cpp_traj.x)
+                    py_traj.y = list(cpp_traj.y)
+                    py_traj.yaw = list(cpp_traj.yaw)
+                    py_traj.ds = list(cpp_traj.ds)
+                    py_traj.c = list(cpp_traj.c)
+                    py_traj.c_d = list(cpp_traj.c_d)
+                    py_traj.c_dd = list(cpp_traj.c_dd)
+                    py_traj.cost_final = cpp_traj.cost_final
+                    py_traj.sampling_param.d = cpp_traj.sampling_param.d
+                    py_traj.sampling_param.s_d = cpp_traj.sampling_param.s_d
+                    py_traj.sampling_param.t = cpp_traj.sampling_param.t
+                    self.best_traj = py_traj
+
+                    if self.doing_runtime_measurement==False:
+                        py_fplist = []
+                        cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
+                        for cpp_fp in cpp_fplist:
+                            fp = FrenetTrajectory()
+                            fp.t = list(cpp_fp.t)
+                            fp.s = list(cpp_fp.s)
+                            fp.s_d = list(cpp_fp.s_d)
+                            fp.s_dd = list(cpp_fp.s_dd)
+                            fp.s_ddd = list(cpp_fp.s_ddd)
+                            fp.d = list(cpp_fp.d)
+                            fp.d_d = list(cpp_fp.d_d)
+                            fp.d_dd = list(cpp_fp.d_dd)
+                            fp.d_ddd = list(cpp_fp.d_ddd)
+                            fp.x = list(cpp_fp.x)
+                            fp.y = list(cpp_fp.y)
+                            fp.yaw = list(cpp_fp.yaw)
+                            fp.ds = list(cpp_fp.ds)
+                            fp.c = list(cpp_fp.c)
+                            fp.c_d = list(cpp_fp.c_d)
+                            fp.c_dd = list(cpp_fp.c_dd)
+                            fp.cost_final = cpp_fp.cost_final
+                            fp.sampling_param.d = cpp_fp.sampling_param.d
+                            fp.sampling_param.s_d = cpp_fp.sampling_param.s_d
+                            fp.sampling_param.t = cpp_fp.sampling_param.t
+                            py_fplist.append(fp)
+                        self.all_trajs.append(py_fplist)
+
+                    return py_traj
+                else:
+                    return None
+            except Exception as e:
+                print(f"Warning: C++ best_traj_generation failed: {e}, falling back to Python")
+        return None
+
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         # Python implementation
         self.cubic_spline = CubicSpline2D(centerline_pts[:, 0], centerline_pts[:, 1])

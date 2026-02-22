@@ -9,10 +9,10 @@ if __name__ == '__main__':
     
     # New parameters for two CSV files
     parser.add_argument('--csv_file_1', type=str, 
-                       default=os.path.join(repo_dir, 'data/measurements/1_Sample/measurement_Sparse_Optimized.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/measurement_Sparse.csv'),
                        help='Path to first measurement CSV file (e.g., FOP)')
     parser.add_argument('--csv_file_2', type=str,
-                       default=os.path.join(repo_dir, 'data/measurements/1_Sample/measurement_FISS+.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/measurement_FISS+.csv'),
                        help='Path to second measurement CSV file (e.g., FISS+)')
     parser.add_argument('--output_file', type=str,
                        default=os.path.join(repo_dir, 'data/measurements/summarize/comparison_result.csv'),
@@ -80,8 +80,8 @@ if __name__ == '__main__':
         
         runtime_FOP = row_FOP['average runtime_plan [s]']
         runtime_FISS = row_FISS['average runtime_plan [s]']
-        cost_FOP = row_FOP['average_cost']
-        cost_FISS = row_FISS['average_cost']
+        cost_FOP = row_FOP['final_trajector_cost']
+        cost_FISS = row_FISS['final_trajector_cost']
         
         # Check if planner_1 has better runtime
         runtime_better = runtime_FOP < runtime_FISS
