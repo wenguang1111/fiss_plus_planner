@@ -136,8 +136,7 @@ class CostFunction:
         cost_obstacle = 0.0
         
         cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t))  # assuming each time step is 0.1s, and the total time is 10s
-        for i in range(len(traj.t)):
-            cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
+        cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
         cost_speed = self.cost_velocity_offset(traj.v, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
