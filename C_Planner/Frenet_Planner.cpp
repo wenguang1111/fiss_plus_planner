@@ -133,7 +133,7 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_frenet_paths(const FrenetStat
         }
         
         // Compute final cost
-        fp.cost_final = cost_function.cost_total(fp, settings.highest_speed);
+        // fp.cost_final = cost_function.cost_total(fp, settings.highest_speed);
         fp.is_generated = true;
         fp.sampling_param = SamplingParam(di, tv, Ti);
         frenet_paths.push_back(fp);
@@ -571,6 +571,18 @@ PlanResult Frenet_Planner::plan_multithread(
                 vehicle_params.w,
                 time_step_now,
                 1  // check_resolution
+            );
+
+            // Recompute final cost with obstacle-distance term, matching Python calc_cost flow.
+            cost_function.calc_cost(
+                collision_free_paths,
+                settings.highest_speed,
+                obstacles_array,
+                num_vertices_array,
+                num_time_steps,
+                num_obstacles,
+                max_vertices,
+                time_step_now
             );
 
             // Store collision_free_paths for this thread
