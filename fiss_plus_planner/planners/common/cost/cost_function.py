@@ -9,7 +9,7 @@ class CostFunction:
             self.w_A = 0.1
             self.w_J = 0.1
             self.w_D = 0.1
-            self.w_LC = 1.0
+            self.w_LC = 10.0
     
     def cost_time(self) -> float:
         pass
@@ -21,6 +21,17 @@ class CostFunction:
         if num_verts <= 0:
             return np.array([np.inf, np.inf])
         return vertices[:num_verts].mean(axis=0)
+
+    def is_obstacle_front(self, ego_pose: np.ndarray, obs_center: np.ndarray) -> bool:
+        # returns whether the obstacle is in front of the ego vehicle
+        # based on the dot product between the relative vector between ego and obstacle and the ego direction vector
+        # if > 0, then the obstacle is in front, otherwise it's behind
+        
+        ego_direction = np.array([np.cos(ego_pose[2]), np.sin(ego_pose[2])])
+        relative_vector = obs_center - ego_pose[:2]
+        dot_product = np.dot(relative_vector, ego_direction)
+        # print(dot_product)
+        return dot_product > 0
     
     def cost_dist_obstacle(
         self, 
@@ -86,7 +97,7 @@ class CostFunction:
         return self.w_LC * sum(np.power(offsets, 2))
     
     def cost_total(self, traj: FrenetTrajectory, target_speed: float) -> float:
-        cost_time = self.cost_terminal_time(10.0 - traj.t[-1])  # self.cost_time()
+        cost_time = self.cost_terminal_time(15.0 - traj.t[-1])  # self.cost_time()
         cost_obstacle = 0.0 # self.cost_dist_obstacle()
         cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
@@ -104,7 +115,7 @@ class CostFunction:
         obstacles_num_vertices: np.ndarray,
         time_step_now: int
     ) -> float:
-        cost_time = self.cost_terminal_time(10.0 - traj.t[-1]) 
+        cost_time = self.cost_terminal_time(15.0 - traj.t[-1]) 
         cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
         cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
@@ -124,14 +135,15 @@ class CostFunction:
         
         cost_obstacle = 0.0
         
-        cost_time = self.cost_terminal_time(10.0 - traj.t[-1])
+        cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t))  # assuming each time step is 0.1s, and the total time is 10s
         for i in range(len(traj.t)):
-            cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, i)
-        cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
+            cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
+        cost_speed = self.cost_velocity_offset(traj.v, target_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
         cost_offset = self.cost_lane_center_offset(traj.d)
-        cost_total = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk + cost_offset)/len(traj.t)
+        cost_total = ( cost_obstacle + cost_speed + cost_accel + cost_jerk + cost_offset)/len(traj.t) + cost_time
+        # print("velocity:", traj.v)
         # print("Cost Distance To Obstacles:", cost_obstacle)
         # print("Cost Time:", cost_time)
         # print("Cost Speed:", cost_speed)

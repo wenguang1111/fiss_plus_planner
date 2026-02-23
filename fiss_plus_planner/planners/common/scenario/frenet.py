@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import math
 from fiss_plus_planner.planners.common.scenario.lane import LaneType
 from fiss_plus_planner.planners.common.geometry.math_utils import unifyAngleRange
 
@@ -190,7 +191,7 @@ class FrenetTrajectory(object):
         """
         assert t < len(self.s) and t >= 0
 
-        return State(self.t[t], self.x[t], self.y[t], self.yaw[t], self.s_d[t], self.s_dd[t])
+        return State(self.t[t], self.x[t], self.y[t], self.yaw[t], math.sqrt(self.s_d[t]*self.s_d[t] + self.d_d[t]*self.d_d[t]), math.sqrt(self.s_dd[t]*self.s_dd[t] + self.d_dd[t]*self.d_dd[t]))
         
     def frenet_state_at_time_step(self, t: int) -> FrenetState:
         """
