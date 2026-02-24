@@ -19,7 +19,7 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from CVAE_efficient_sampling.CVAE import CVAE_Efficient
-class SparsePlannerSettings(FrenetOptimalPlannerSettings):
+class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
         # heuristic cost weight
@@ -32,9 +32,9 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
         current_dir = Path(__file__).parent.parent.parent
         self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
         
-class SparsePlanner(FrenetOptimalPlanner):
+class SparsePlannerFOP(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
-    def __init__(self, planner_settings: SparsePlannerSettings, ego_vehicle: Vehicle,
+    def __init__(self, planner_settings: SparsePlannerFOPSettings, ego_vehicle: Vehicle,
                  obstacles_array=None, obstacles_num_vertices=None):
         super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         
@@ -49,6 +49,7 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
         self.all_trajs = []
         self.time_image_generation = 0.0
+        self.num_FOP_intervention = 0
 
     def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
         """Record generated sampling parameters to a file."""
@@ -97,8 +98,8 @@ class SparsePlanner(FrenetOptimalPlanner):
                 self.image_history[-1][1],
                 self.image_history[-1][1],
             ]
-        self.time_image_generation = time.time() - time_start
 
+        self.time_image_generation = time.time() - time_start
         # Output is t, d, s_d -> reorder to  d, s_d, t.
         cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
         cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
@@ -111,17 +112,21 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.stats.num_trajs_validated = len(fplist)
         self.stats.num_collison_checks = len(fplist)
         fplist = self.check_constraints(fplist)
-        # print(len(fplist), "trajectories passed constraint check")
         # fplist = self.check_collisions(fplist, obstacles, time_step_now)
         fplist = self.check_collision_multithread(fplist, time_step_now)
-        # print(len(fplist), "trajectories passed collision check")
-        # fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
 
+        if(len(fplist) == 0):
+            self.num_FOP_intervention  = 1
+            return super().plan(
+                frenet_state,
+                max_target_speed,
+                obstacles,
+                time_step_now,
+                current_state,
+            )
+        
         # find minimum cost path
         min_cost = float("inf")
-        if(len(fplist) == 0):
-            return None
-        
         for fp in fplist:
             if min_cost >= fp.cost_final:
                 min_cost = fp.cost_final

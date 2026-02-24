@@ -31,12 +31,14 @@ class Stats(object):
         self.runtime_history = []
         self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
         self.success = False
+        self.num_FOP_intervention = 0 # only for sparse_planner_fop
         
     def __add__(self, other):
         self.num_iter += other.num_iter
         self.num_trajs_generated += other.num_trajs_generated
         self.num_trajs_validated += other.num_trajs_validated
         self.num_collison_checks += other.num_collison_checks
+        self.num_FOP_intervention += other.num_FOP_intervention
         return self
     
     def average(self, value: int):
@@ -78,6 +80,7 @@ class FrenetOptimalPlanner(object):
         self.cubic_spline = None
         self.best_traj = None
         self.all_trajs = []
+        self.numof_fop_calls = 0 # only for sparse_planner_fop
         
         # Pre-processed obstacles data (optional)
         self.obstacles_array = obstacles_array

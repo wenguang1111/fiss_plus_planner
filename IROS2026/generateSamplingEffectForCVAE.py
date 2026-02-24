@@ -56,7 +56,7 @@ def font_prop(size_key: str) -> font_manager.FontProperties:
 
 def plot_cvae_vs_fop_3d(
     d_cvae, sv_cvae, t_cvae,
-    d_range=(-4.0, 4.0), sv_range=(0.0, 15.0), t_range=(0.5, 5.0),
+    d_range=(-4, 4), sv_range=(0, 15), t_range=(3, 5),
     d_bins=9, sv_bins=8, t_bins=6,
     fop_subsample=1,            # >1 时对网格做稀释，避免太密看不清
     elev=18, azim=45,
@@ -194,7 +194,7 @@ def plot_fop_3d(
 if __name__ == "__main__":
     # Plot FOP sampling space only
     plot_fop_3d(
-        d_range=(-1, 1),      # lateral offset: [-1, 1] m
+        d_range=(-1.8, 1.8),      # lateral offset: [-1, 1] m
         sv_range=(0, 14),     # longitudinal velocity: [0, 14] m/s
         t_range=(3, 5),       # time horizon: [3, 5] s
         d_bins=10,             # number of d samples

@@ -70,14 +70,16 @@ struct PlanStats {
     int num_trajs_generated;    // Number of frenet paths generated
     int num_trajs_validated;    // Number of trajectories that passed constraint check
     int num_collision_checks;   // Number of collision checks performed
+    int num_FOP_intervention; // Number of times FOP was used for intervention (if applicable)
     
-    PlanStats() : num_trajs_generated(0), num_trajs_validated(0), num_collision_checks(0) {}
+    PlanStats() : num_trajs_generated(0), num_trajs_validated(0), num_collision_checks(0), num_FOP_intervention(0) {}
     
     // Accumulate stats from another PlanStats
     PlanStats& operator+=(const PlanStats& other) {
         num_trajs_generated += other.num_trajs_generated;
         num_trajs_validated += other.num_trajs_validated;
         num_collision_checks += other.num_collision_checks;
+        num_FOP_intervention += other.num_FOP_intervention;
         return *this;
     }
 };

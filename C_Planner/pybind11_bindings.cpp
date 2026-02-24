@@ -97,7 +97,8 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def(py::init<>())
         .def_readwrite("num_trajs_generated", &PlanStats::num_trajs_generated)
         .def_readwrite("num_trajs_validated", &PlanStats::num_trajs_validated)
-        .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks);
+        .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks)
+        .def_readwrite("num_FOP_intervention", &PlanStats::num_FOP_intervention);
 
     // Bind Frenet_Planner class
     py::class_<Frenet_Planner>(m, "FrenetPlanner")

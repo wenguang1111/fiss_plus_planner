@@ -174,6 +174,7 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 d["num_trajs_generated"] = stats.num_trajs_generated;
                 d["num_trajs_validated"] = stats.num_trajs_validated;
                 d["num_collision_checks"] = stats.num_collision_checks;
+                d["num_FOP_intervention"] = stats.num_FOP_intervention;
                 return d;
              })
         .def_readwrite("fiss_settings", &Fiss_Plus_Planner::fiss_settings);

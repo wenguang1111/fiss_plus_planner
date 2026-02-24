@@ -45,6 +45,7 @@ from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_
 from fiss_plus_planner.planners.common.utils import configure_numba_threads
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
+from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
 
 # === IEEE-like font family and sizes (10pt doc) ===
 S = {
@@ -283,6 +284,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = SparsePlannerOptimizedSettings(num_width, num_speed, num_t, input_dir, file)
         planner = SparsePlannerOptimized(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
+    elif method == 'Sparse_FOP':
+        planner_settings = SparsePlannerFOPSettings(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlannerFOP(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
@@ -357,7 +362,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             break
         processing_time = (end_time - start_time)
         stats.runtime_history.append(processing_time)
-        stats.average_runtime += processing_time
+        if method == 'Sparse_FOP' or method == 'Sparse':
+            stats.average_runtime += processing_time - planner.time_image_generation
+            stats.num_FOP_intervention += planner.num_FOP_intervention
+        else:
+            stats.average_runtime += processing_time
         stats.best_traj_costs.append(best_traj_ego.cost_final)
         if not use_cpp_planner:
             stats += planner.stats
