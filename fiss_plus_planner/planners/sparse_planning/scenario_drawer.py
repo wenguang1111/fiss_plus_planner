@@ -30,7 +30,7 @@ class ScenarioDrawer:
     LANE_DASH_LENGTH = 2.0
     LANE_DASH_GAP = 2.0
     ARROW_WIDTH = 0.006
-    VIEW_SIZE_DEFAULT = 105.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
+    VIEW_SIZE_DEFAULT = 60.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
     COLOR_BLACK = "#000000"
     COLOR_GRAY = "#808080"
     COLOR_LightGray = "#D3D3D3"

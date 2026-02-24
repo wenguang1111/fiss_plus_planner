@@ -10,6 +10,7 @@ from typing import Tuple
 from PIL import Image
 from omegaconf import DictConfig
 from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
 from matplotlib.patches import Polygon as MplPolygon
 import pandas as pd
 from matplotlib import font_manager
@@ -652,6 +653,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             ego_vehicle.draw(rnd)
             # planning_problem_set.draw(rnd)
             rnd.render()
+            min_cm, max_cm = 20, 150
             if show_sampled_trajs:
                 costs = []
                 xs = []
@@ -660,8 +662,13 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                     costs.append(fp.cost_final)
                     xs.append(fp.x[1:])
                     ys.append(fp.y[1:])
-                lc = multiline(xs, ys, costs, ax=rnd.ax,
-                               cmap='RdYlGn_r', lw=2, zorder=20)
+                norm = Normalize(vmin=min_cm, vmax=max_cm)
+                lc = multiline(xs, ys, costs, 
+                               ax=rnd.ax,
+                               cmap='RdYlGn_r', 
+                               lw=2, 
+                               norm=norm,
+                               zorder=20)
                 plt.colorbar(lc)
             else:
                 if i < len(best_trajs):
@@ -670,8 +677,13 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                         costs = [best_fp.cost_final]
                         xs = [best_fp.x[1:]]
                         ys = [best_fp.y[1:]]
-                        lc = multiline(xs, ys, costs, ax=rnd.ax,
-                                       cmap='RdYlGn_r', lw=2, zorder=20)
+                        norm = Normalize(vmin=min_cm, vmax=max_cm)
+                        lc = multiline(xs, ys, costs, 
+                               ax=rnd.ax,
+                               cmap='RdYlGn_r', 
+                               lw=2, 
+                               norm=norm,
+                               zorder=20)
                         plt.colorbar(lc)
 
             x_coords = [state.position[0]
@@ -746,7 +758,10 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 print("Target directory: {} Created".format(result_path))
             fig_path = os.path.join(
                 result_path, "{time_step}.jpg".format(time_step=i))
+            pdf_fig_path = os.path.join(
+                result_path, "{time_step}.pdf".format(time_step=i))
             plt.savefig(fig_path, dpi=200, bbox_inches='tight')
+            plt.savefig(pdf_fig_path, dpi=300, bbox_inches='tight')
             print("Fig saved to:", fig_path)
 
             # plt.show()
