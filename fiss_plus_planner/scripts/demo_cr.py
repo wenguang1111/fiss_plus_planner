@@ -19,6 +19,8 @@ def readExsistedScenarios(existing_entries):
 
 
 def append_measurement_to_csv(csv_path, file, measurement):
+    if not hasattr(measurement, 'best_traj_costs'):
+        return 
     max_cost = max(measurement.best_traj_costs) if measurement.best_traj_costs else 0.0
     runtime_history_str = json.dumps(measurement.runtime_history)
     with open(csv_path, 'a', newline='') as csv_file:
