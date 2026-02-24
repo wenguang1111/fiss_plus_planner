@@ -28,7 +28,7 @@ class SparsePlannerSettings(FrenetOptimalPlannerSettings):
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
         self.num_samples: int = 1
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
         self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
         

@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<commonRoad timeStepSize="0.1" commonRoadVersion="2020a" author="Florian Finkeldei" affiliation="TUM - Cyber-Physical Systems" source="Scenario Factory 2.0 - SUMO" benchmarkID="GRC_ArchaioLimani-84_1_T-12" date="2026-02-07">
+<commonRoad timeStepSize="0.1" commonRoadVersion="2020a" author="Florian Finkeldei" affiliation="TUM - Cyber-Physical Systems" source="Scenario Factory 2.0 - SUMO" benchmarkID="GRC_ArchaioLimani-84_1_T-12" date="2026-02-14">
   <location>
     <geoNameId>259289</geoNameId>
     <gpsLatitude>37.93710474577561</gpsLatitude>
@@ -15,11 +15,11 @@
     </geoTransformation>
   </location>
   <scenarioTags>
-    <turn_left/>
-    <merging_lanes/>
     <simulated/>
+    <turn_left/>
     <single_lane/>
     <intersection/>
+    <merging_lanes/>
   </scenarioTags>
   <lanelet id="2080">
     <leftBound>

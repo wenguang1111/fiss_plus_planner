@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<commonRoad timeStepSize="0.1" commonRoadVersion="2020a" author="Florian Finkeldei" affiliation="TUM - Cyber-Physical Systems" source="Scenario Factory 2.0 - OTS" benchmarkID="POL_Srodmiescie-123_1_T-60" date="2026-02-07">
+<commonRoad timeStepSize="0.1" commonRoadVersion="2020a" author="Florian Finkeldei" affiliation="TUM - Cyber-Physical Systems" source="Scenario Factory 2.0 - OTS" benchmarkID="POL_Srodmiescie-123_1_T-60" date="2026-02-14">
   <location>
     <geoNameId>758470</geoNameId>
     <gpsLatitude>52.234385729928235</gpsLatitude>
@@ -15,11 +15,11 @@
     </geoTransformation>
   </location>
   <scenarioTags>
-    <merging_lanes/>
     <simulated/>
     <single_lane/>
     <intersection/>
     <multi_lane/>
+    <merging_lanes/>
   </scenarioTags>
   <lanelet id="128">
     <leftBound>

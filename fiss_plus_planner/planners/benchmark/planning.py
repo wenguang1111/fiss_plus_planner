@@ -650,7 +650,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             # ...existing code...
             rnd.draw_params.dynamic_obstacle.vehicle_shape.occupancy.shape.facecolor = "g"
             ego_vehicle.draw(rnd)
-            planning_problem_set.draw(rnd)
+            # planning_problem_set.draw(rnd)
             rnd.render()
             if show_sampled_trajs:
                 costs = []
