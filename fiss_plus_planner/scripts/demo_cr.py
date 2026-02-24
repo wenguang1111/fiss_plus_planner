@@ -5,6 +5,19 @@ import yaml
 
 from fiss_plus_planner.planners.benchmark.planning import planning
 
+
+def readExsistedScenarios(existing_entries):
+    """
+    Convert existing output entries to scenario file names (e.g. DEU_xxx.xml).
+    """
+    existing_scenarios = set()
+    for entry in existing_entries:
+        scenario_name = os.path.splitext(entry)[0]
+        if scenario_name:
+            existing_scenarios.add(f"{scenario_name}.xml")
+    return existing_scenarios
+
+
 if __name__ == '__main__':
     repo_dir = os.getcwd()
     parser = argparse.ArgumentParser(description='Demo')
@@ -22,17 +35,29 @@ if __name__ == '__main__':
     measurement_dir = os.path.join(os.getcwd(), cfg['MEASUREMENTS_DIR'])
     measurements = []
     name_planner = cfg['PLANNER']
+    data_collection = cfg['Collect_Data_For_ML']
+    reading_dir = '/home/wenguang/workplace/fiss_plus_planner/fiss_plus_planner/data/output/imgs'
+    if data_collection and os.path.isdir(reading_dir):
+        exsited_files = readExsistedScenarios(os.listdir(reading_dir))
+    else:
+        exsited_files = set()
+
     if cfg['FILES']:
         # Only run the specified scenario files under the input directory
+        print("!!!")
         for i, file in enumerate(cfg['FILES']):
             measurement = planning(cfg, output_dir, input_dir, file)
             measurements.append((file, measurement))
     else:
         # Read all scenario files under the input directory
         for i, file in enumerate(os.listdir(input_dir)):
-            measurement = planning(cfg, output_dir, input_dir, file)
-            measurements.append((file, measurement))
-    
+            if file in exsited_files:
+                print(f"Skipping {file} as it already exists in the reading_dir.")
+                continue
+            else:
+                print(f"Processing {file}...")
+                measurement = planning(cfg, output_dir, input_dir, file)
+                measurements.append((file, measurement))
     if save_measurments:
         os.makedirs(measurement_dir, exist_ok=True)
         csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + '.csv')
