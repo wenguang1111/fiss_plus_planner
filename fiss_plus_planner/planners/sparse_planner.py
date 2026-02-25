@@ -49,6 +49,7 @@ class SparsePlanner(FrenetOptimalPlanner):
         self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
         self.all_trajs = []
         self.time_image_generation = 0.0
+        self.num_FOP_intervention = 0
 
     def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
         """Record generated sampling parameters to a file."""

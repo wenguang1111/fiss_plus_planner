@@ -22,8 +22,6 @@ from CVAE_efficient_sampling.CVAE import CVAE_Efficient
 class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
-        # heuristic cost weight
-        # self.w_heuristic = 10.0
         self.vis_all_candidates = False
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
