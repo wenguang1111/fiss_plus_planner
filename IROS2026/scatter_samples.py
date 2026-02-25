@@ -54,8 +54,10 @@ def font_prop(size_key: str) -> font_manager.FontProperties:
     prop.set_size(S[size_key])
     return prop
 
-samples_file = "data/output/sampling_parameters/ESP_Barcelona-49_23_T-1.csv"
-time_step = 15
+method = "sparse" # "fop" or "sparse"
+time_step = 26
+samples_file = f"data/output/sampling_parameters/{method}/DEU_Schwetzingen-12_1_T-2.csv"
+save_path = f"data/output/sampling_parameters/{method}/DEU_Schwetzingen-12_1_T-2_{method}_time_{time_step}.pdf"
 
 file = pd.read_csv(samples_file)
 # reps = [5 if val == time_step else 1 for val in file["time_step"]]
@@ -87,6 +89,8 @@ def plot_3d_scatter(samples, elev=18, azim=45, save_path=None):
     # --- Plot ---
     fig = plt.figure(figsize=(7.0, 5.8))
     ax = fig.add_subplot(111, projection="3d")
+    
+    vmin, vmax = 0, 90
 
     # FOP grid (blue, structured)
     ax.scatter(
@@ -96,8 +100,8 @@ def plot_3d_scatter(samples, elev=18, azim=45, save_path=None):
         c=costs, 
         cmap="RdYlGn_r",
         # these should be the same as the scenario plot to have the same range for color bar
-        vmin=costs.min(), 
-        vmax=costs.max(),
+        vmin=vmin, 
+        vmax=vmax,
         marker="o"
     )
     ax.cbar = plt.colorbar(ax.collections[0], ax=ax, pad=0.1)
@@ -124,8 +128,8 @@ def plot_3d_scatter(samples, elev=18, azim=45, save_path=None):
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.savefig(save_path, dpi=300)
     plt.show()
 
 # run as: python ../IROS2026/scatter_samples.py
-plot_3d_scatter(samples_at_time_step.to_numpy(), elev=18, azim=45, save_path=None)
+plot_3d_scatter(samples_at_time_step.to_numpy(), elev=18, azim=45, save_path=save_path)

@@ -653,7 +653,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             ego_vehicle.draw(rnd)
             # planning_problem_set.draw(rnd)
             rnd.render()
-            min_cm, max_cm = 20, 150
+            min_cm, max_cm = 0, 90
             if show_sampled_trajs:
                 costs = []
                 xs = []
@@ -707,10 +707,10 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
             #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
 
-            x_min = min(x_coords)-30
-            x_max = max(x_coords)+30
-            y_min = min(y_coords)-30
-            y_max = max(y_coords)+30
+            x_min = min(x_coords)-10
+            x_max = max(x_coords)+10
+            y_min = min(y_coords)-10
+            y_max = max(y_coords)+10
             l = max(x_max-x_min, y_max-y_min)
 
             if l == x_max - x_min:

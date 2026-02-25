@@ -1,5 +1,6 @@
 import copy
 import csv
+import os
 from queue import PriorityQueue
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,7 +30,7 @@ class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
         self.num_samples: int = 1
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
         self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
         
@@ -64,9 +65,14 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
     
     def record_generated_sampling_parameters(self, fp_list: List[FrenetTrajectory], time_step_now: int):
         """Record generated sampling parameters to a file."""
-        output_dir = Path("data/output/sampling_parameters")
+        
+        output_dir = Path("data/output/sampling_parameters/sparse")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / f"{self.settings.scenario_file[:-4]}.csv"
+        
+        if output_file.exists() and time_step_now == 0:
+            os.remove(output_file)
+            
         with open(output_file, "a") as f:
             writer = csv.writer(f)
             # file_exists = output_file.exists()
@@ -80,6 +86,7 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
         """Plan using CVAE sampled trajectories."""
         # reset stats
+        print(f"Planning at time step {time_step_now}...")
         self.stats = Stats()
         self.settings.highest_speed = max_target_speed
         images_last_3_frame: List[Image.Image] = []
@@ -94,7 +101,7 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         # #Useful for debugging, make sure if you want to delete it
         output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
         output_dir.mkdir(parents=True, exist_ok=True)
-        img.save(output_dir / f"{time_step_now}.png")
+        img.save(output_dir / f"{time_step_now}.pdf", dpi=(300, 300))
 
         if time_step_now >= 2:
             images_last_3_frame = [
@@ -134,6 +141,7 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         self.record_generated_sampling_parameters(fplist, time_step_now)
 
         if(len(fplist) == 0):
+            print(f"No valid trajectory found at time step {time_step_now}, invoking FOP as fallback.")
             self.num_FOP_intervention  = 1
             return super().plan(
                 frenet_state,
@@ -142,6 +150,8 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
                 time_step_now,
                 current_state,
             )
+        else:
+            print(f"Found {len(fplist)} valid trajectories at time step {time_step_now}, selecting the one with minimum cost.")
         
         # find minimum cost path
         min_cost = float("inf")

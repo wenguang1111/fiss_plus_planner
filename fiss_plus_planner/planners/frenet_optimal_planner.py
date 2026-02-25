@@ -1,5 +1,6 @@
 import copy
 import math
+import os
 import time
 from itertools import product
 import numpy as np
@@ -14,7 +15,9 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
-from typing import Tuple
+from typing import Tuple, List
+from pathlib import Path
+import csv
 
 
 class Stats(object):
@@ -70,6 +73,8 @@ class FrenetOptimalPlannerSettings(object):
 
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries
+        
+        self.scenario_file = "DEU_Schwetzingen-12_1_T-2.xml"
 
 class FrenetOptimalPlanner(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
@@ -271,6 +276,26 @@ class FrenetOptimalPlanner(object):
 
         passed_indices = np.where(~collision_mask)[0]
         return [trajs[i] for i in passed_indices]
+    
+    def record_generated_sampling_parameters(self, fp_list: List[FrenetTrajectory], time_step_now: int):
+        """Record generated sampling parameters to a file."""
+        
+        output_dir = Path("data/output/sampling_parameters/fop")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / f"{self.settings.scenario_file[:-4]}.csv"
+        
+        if output_file.exists() and time_step_now == 0:
+            os.remove(output_file)
+            
+        with open(output_file, "a") as f:
+            writer = csv.writer(f)
+            # file_exists = output_file.exists()
+            if time_step_now == 0:
+                writer.writerow(["time_step", "t", "d", "s_d", "cost_final"])
+            for fp in fp_list:
+                params = fp.sampling_param
+                t, d, s_d = params.t, params.d, params.s_d
+                writer.writerow([time_step_now, t, d, s_d, fp.cost_final])
 
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
         # reset stats
@@ -286,6 +311,8 @@ class FrenetOptimalPlanner(object):
         # fplist = self.check_collisions(fplist, obstacles, time_step_now)
         fplist = self.check_collision_multithread(fplist, time_step_now)
         fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
+        
+        self.record_generated_sampling_parameters(fplist, time_step_now)
 
         # find minimum cost path
         min_cost = float("inf")
