@@ -1,4 +1,5 @@
 import copy
+import csv
 from queue import PriorityQueue
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,15 +52,30 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         self.time_image_generation = 0.0
         self.num_FOP_intervention = 0
 
-    def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
+    # def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
+    #     """Record generated sampling parameters to a file."""
+    #     output_dir = Path("output/sampling_parameters")
+    #     output_dir.mkdir(parents=True, exist_ok=True)
+    #     output_file = output_dir / f"{self.settings.scenario_file}.csv"
+    #     with open(output_file, "a") as f:
+    #         for sample in samples:
+    #             t, d, s_d = sample
+    #             f.write(f"{time_step_now}, {d}, {s_d}, {t}\n")
+    
+    def record_generated_sampling_parameters(self, fp_list: List[FrenetTrajectory], time_step_now: int):
         """Record generated sampling parameters to a file."""
-        output_dir = Path("output/sampling_parameters")
+        output_dir = Path("data/output/sampling_parameters")
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / f"{self.settings.scenario_file}.csv"
+        output_file = output_dir / f"{self.settings.scenario_file[:-4]}.csv"
         with open(output_file, "a") as f:
-            for sample in samples:
-                t, d, s_d = sample
-                f.write(f"{time_step_now}, {d}, {s_d}, {t}\n")
+            writer = csv.writer(f)
+            # file_exists = output_file.exists()
+            if time_step_now == 0:
+                writer.writerow(["time_step", "t", "d", "s_d", "cost_final"])
+            for fp in fp_list:
+                params = fp.sampling_param
+                t, d, s_d = params.t, params.d, params.s_d
+                writer.writerow([time_step_now, t, d, s_d, fp.cost_final])
     
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
         """Plan using CVAE sampled trajectories."""
@@ -76,9 +92,9 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         self.image_history.append((time_step_now, img))
 
         # #Useful for debugging, make sure if you want to delete it
-        # output_dir = Path("output/generated_images") / Path(self.settings.scenario_file)
-        # output_dir.mkdir(parents=True, exist_ok=True)
-        # img.save(output_dir / f"{time_step_now}.png")
+        output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        img.save(output_dir / f"{time_step_now}.png")
 
         if time_step_now >= 2:
             images_last_3_frame = [
@@ -114,6 +130,8 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         fplist = self.check_constraints(fplist)
         # fplist = self.check_collisions(fplist, obstacles, time_step_now)
         fplist = self.check_collision_multithread(fplist, time_step_now)
+        
+        self.record_generated_sampling_parameters(fplist, time_step_now)
 
         if(len(fplist) == 0):
             self.num_FOP_intervention  = 1
