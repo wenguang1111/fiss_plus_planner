@@ -9,13 +9,13 @@ if __name__ == '__main__':
     
     # New parameters for two CSV files
     parser.add_argument('--csv_file_1', type=str, 
-                       default=os.path.join(repo_dir, 'data/measurements/SparseFOP/measurement_Sparse_FOP.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/measurement_Sparse_FOP_Sample1.csv'),
                        help='Path to first measurement CSV file (e.g., FOP)')
     parser.add_argument('--csv_file_2', type=str,
-                       default=os.path.join(repo_dir, 'data/measurements/SparseFOP/measurement_FISS+.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/measurement_FOP.csv'),
                        help='Path to second measurement CSV file (e.g., FISS+)')
     parser.add_argument('--output_file', type=str,
-                       default=os.path.join(repo_dir, 'data/measurements/SparseFOP/summarize/comparison_result.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/SPFOP_VS_FOP.csv'),
                        help='Output CSV file with comparison results')
     
     args = parser.parse_args()
@@ -158,8 +158,8 @@ if __name__ == '__main__':
     print(f"  {planner_FISS} - Mean: {df_fiss['average runtime_plan [s]'].mean():.4f}, Std: {df_fiss['average runtime_plan [s]'].std():.4f}")
     
     print(f"\nCost Statistics:")
-    print(f"  {planner_FOP} - Mean: {df_FOP['average_cost'].mean():.4f}, Std: {df_FOP['average_cost'].std():.4f}")
-    print(f"  {planner_FISS} - Mean: {df_fiss['average_cost'].mean():.4f}, Std: {df_fiss['average_cost'].std():.4f}")
+    print(f"  {planner_FOP} - Mean: {df_FOP['final_trajector_cost'].mean():.4f}, Std: {df_FOP['final_trajector_cost'].std():.4f}")
+    print(f"  {planner_FISS} - Mean: {df_fiss['final_trajector_cost'].mean():.4f}, Std: {df_fiss['final_trajector_cost'].std():.4f}")
     
     if runtime_better_count > 0:
         print(f"\nScenarios where {planner_FOP} has better runtime:")

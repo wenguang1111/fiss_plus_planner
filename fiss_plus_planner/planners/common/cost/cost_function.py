@@ -5,11 +5,14 @@ class CostFunction:
     def __init__(self, cost_type: str):
         if cost_type is "WX1":
             self.w_T = 10.0
-            self.w_V = 1.0
-            self.w_A = 0.1
-            self.w_J = 0.1
-            self.w_D = 0.1
+            self.w_V = 0.1
+            self.w_A = 1.0
+            self.w_J = 1.0
+            self.w_D = 1.0
             self.w_LC = 10.0
+            self.w_dist = 0.1
+            self.max_speed = 14.0  # for normalization, can be adjusted based on
+
     
     def cost_time(self) -> float:
         pass
@@ -81,7 +84,7 @@ class CostFunction:
         if len(min_dists) == 0:
             return 0.0
         
-        Xis = np.exp(-np.array(min_dists))
+        Xis = np.exp(-np.array(min_dists)*self.w_dist)
         return self.w_D * np.sum(Xis)
     
     def cost_velocity_offset(self, vels: list, v_target: float) -> float:
@@ -97,9 +100,9 @@ class CostFunction:
         return self.w_LC * sum(np.power(offsets, 2))
     
     def cost_total(self, traj: FrenetTrajectory, target_speed: float) -> float:
-        cost_time = self.cost_terminal_time(15.0 - traj.t[-1])  # self.cost_time()
+        cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t))
         cost_obstacle = 0.0 # self.cost_dist_obstacle()
-        cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
+        cost_speed = self.cost_velocity_offset(np.abs(traj.s_d), self.max_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
         cost_offset = self.cost_lane_center_offset(traj.d)
@@ -115,9 +118,9 @@ class CostFunction:
         obstacles_num_vertices: np.ndarray,
         time_step_now: int
     ) -> float:
-        cost_time = self.cost_terminal_time(15.0 - traj.t[-1]) 
-        cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
-        cost_speed = self.cost_velocity_offset(traj.s_d, target_speed)
+        cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t)) 
+        cost_obstacle = 0.0 #self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
+        cost_speed = self.cost_velocity_offset(np.abs(traj.s_d), self.max_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
         cost_offset = self.cost_lane_center_offset(traj.d)
@@ -126,31 +129,28 @@ class CostFunction:
     
     def final_trajectory_cost(self,
                               traj: FrenetTrajectory,
-                              target_speed: float,
                               obstacles_array: np.ndarray,
                               obstacles_num_vertices: np.ndarray) -> float:
         """
         calculate the cost of the final executed trajectory
         """
         
-        cost_obstacle = 0.0
-        
         cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t))  # assuming each time step is 0.1s, and the total time is 10s
         cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
-        cost_speed = self.cost_velocity_offset(traj.v, target_speed)
+        cost_speed = self.cost_velocity_offset(np.abs(traj.v), self.max_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
         cost_offset = self.cost_lane_center_offset(traj.d)
         cost_total = ( cost_obstacle + cost_speed + cost_accel + cost_jerk + cost_offset)/len(traj.t) + cost_time
         # print("velocity:", traj.v)
-        # print("Cost Distance To Obstacles:", cost_obstacle)
-        # print("Cost Time:", cost_time)
-        # print("Cost Speed:", cost_speed)
-        # print("Cost Acceleration:", cost_accel)
-        # print("Cost Jerk:", cost_jerk)
-        # print("Cost Lane Center Offset:", cost_offset)
-        # print("len(traj.t):", len(traj.t))
-        # print("Total Cost:", cost_total)
+        print("Cost Distance To Obstacles:", cost_obstacle)
+        print("Cost Time:", cost_time)
+        print("Cost Speed:", cost_speed)
+        print("Cost Acceleration:", cost_accel)
+        print("Cost Jerk:", cost_jerk)
+        print("Cost Lane Center Offset:", cost_offset)
+        print("len(traj.t):", len(traj.t))
+        print("Total Cost:", cost_total)
         return cost_total
     
     def calc_cost(self, fplist:list, target_speed: float, obstacles_array: np.ndarray,
