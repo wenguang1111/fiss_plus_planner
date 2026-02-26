@@ -10,7 +10,7 @@ class CostFunction:
             self.w_J = 1.0
             self.w_D = 10.0
             self.w_LC = 10.0
-            self.w_dist = 0.1
+            self.w_dist = 0.01
             self.max_speed = 14.0  # for normalization, can be adjusted based on
 
     
