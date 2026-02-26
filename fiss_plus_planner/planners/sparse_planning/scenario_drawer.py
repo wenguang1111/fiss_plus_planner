@@ -31,6 +31,7 @@ class ScenarioDrawer:
     LANE_DASH_GAP = 2.0
     ARROW_WIDTH = 0.006
     VIEW_SIZE_DEFAULT = 105.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
+    DEFAULT_DPI = 64
     COLOR_BLACK = "#000000"
     COLOR_GRAY = "#808080"
     COLOR_LightGray = "#D3D3D3"
@@ -96,7 +97,7 @@ class ScenarioDrawer:
         self,
         ego_state_list: Iterable[State],
         highest_speed: float,
-        image_format: str = "png",
+        image_format: str = "pdf",
     ):
         if self.save_dir is None or ego_state_list is None:
             return
@@ -132,12 +133,14 @@ class ScenarioDrawer:
         time_step: int,
         ego_state: State,
         view_size: Optional[int] = None,
+        dpi: Optional[int] = None,
     ) -> Image.Image:
 
         img = self._render_frame(
                 ego_state=ego_state,
                 time_step=time_step,
                 view_size=view_size,
+                dpi=dpi,
                 # highest_speed=highest_speed,
         )
         return img
@@ -182,12 +185,15 @@ class ScenarioDrawer:
         ego_state: State,
         time_step: int,
         view_size: Optional[int] = None,
+        dpi: Optional[int] = None,
         # highest_speed: Optional[float],
     ) -> Image.Image:
         if view_size is None:
             view_size = self.VIEW_SIZE_DEFAULT
+        if dpi is None:
+            dpi = self.DEFAULT_DPI
         if self._fig is None:
-            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=300, facecolor="white")
+            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=dpi, facecolor="white")
             self._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
             self._canvas = FigureCanvas(self._fig)
         ax = self._ax

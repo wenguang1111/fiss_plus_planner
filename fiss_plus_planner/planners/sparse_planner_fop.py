@@ -101,20 +101,33 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         self.image_history.append((time_step_now, img))
 
         # #Useful for debugging, make sure if you want to delete it
-        output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        img.save(output_dir / f"{time_step_now}_{view_size_1}.pdf", dpi=(300, 300))
+        # output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
+        # output_dir.mkdir(parents=True, exist_ok=True)
+        # img.save(output_dir / f"{time_step_now}_{view_size_1}.pdf", dpi=(300, 300))
         
         img = self.scenario_drawer.create_scenario_img_at_time_step(
             time_step_now,
             current_state,
-            view_size=view_size_2
+            view_size=view_size_1,
+            dpi=300
         )
 
         # #Useful for debugging, make sure if you want to delete it
         output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
         output_dir.mkdir(parents=True, exist_ok=True)
-        img.save(output_dir / f"{time_step_now}_{view_size_2}.pdf", dpi=(300, 300))
+        img.save(output_dir / f"{time_step_now}_{view_size_1}.pdf")
+        
+        img = self.scenario_drawer.create_scenario_img_at_time_step(
+            time_step_now,
+            current_state,
+            view_size=view_size_2,
+            dpi=300
+        )
+
+        # #Useful for debugging, make sure if you want to delete it
+        output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        img.save(output_dir / f"{time_step_now}_{view_size_2}.pdf")
 
         if time_step_now >= 2:
             images_last_3_frame = [
