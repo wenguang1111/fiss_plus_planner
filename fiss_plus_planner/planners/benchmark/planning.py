@@ -362,7 +362,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             break
         processing_time = (end_time - start_time)
         stats.runtime_history.append(processing_time)
-        if method == 'Sparse_FOP' or method == 'Sparse':
+        if method == 'Sparse_FOP' or method == 'Sparse' or method == 'Sparse_CPP':
             stats.average_runtime += processing_time - planner.time_image_generation
             stats.num_FOP_intervention += planner.num_FOP_intervention
         else:

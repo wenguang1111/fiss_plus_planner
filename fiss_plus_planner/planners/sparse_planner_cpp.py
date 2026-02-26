@@ -27,10 +27,10 @@ class SparsePlannerSettings_CPP(FrenetOptimalPlannerSettings):
         self.vis_all_candidates = False
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
-        self.num_samples: int = 64
+        self.num_samples: int = 1
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
-        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_gen_zdim_64_sigmoid_1.0_stall_end.pth")
+        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
         
 class SparsePlanner_CPP(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #
@@ -48,6 +48,9 @@ class SparsePlanner_CPP(FrenetOptimalPlanner):
         self.image_history: List[Tuple[int, Image.Image]] = []
         self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
         self.all_trajs = []
+        self.time_image_generation = 0.0
+        self.num_FOP_intervention = 0
+
         self.cpp_wrapper = FOP_CPP_Wrapper(
             planner_settings,
             ego_vehicle,
@@ -77,6 +80,7 @@ class SparsePlanner_CPP(FrenetOptimalPlanner):
         self.settings.highest_speed = max_target_speed
         images_last_3_frame: List[Image.Image] = []
 
+        time_start = time.time()
         img = self.scenario_drawer.create_scenario_img_at_time_step(
             time_step_now,
             current_state
@@ -107,6 +111,7 @@ class SparsePlanner_CPP(FrenetOptimalPlanner):
                 self.image_history[-1][1],
             ]
         
+        self.time_image_generation = time.time() - time_start
         # Output is t, d, s_d -> reorder to  d, s_d, t.
         cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
         cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
@@ -118,6 +123,15 @@ class SparsePlanner_CPP(FrenetOptimalPlanner):
             max_target_speed,
             time_step_now
         )
+        if self.best_traj is None:
+            self.num_FOP_intervention  = 1
+            return super().plan(
+                frenet_state,
+                max_target_speed,
+                obstacles,
+                time_step_now,
+                current_state,
+            )
         self.stats = self.cpp_wrapper.get_stats()
         return self.best_traj
 

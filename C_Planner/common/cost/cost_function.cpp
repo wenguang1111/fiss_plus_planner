@@ -3,20 +3,24 @@
 
 CostFunction::CostFunction(const std::string& cost_type) {
     if (cost_type == "WX1") {
-        w_T = 10.0;
-        w_V = 1.0;
-        w_A = 0.1;
-        w_J = 0.1;
-        w_D = 0.1;
-        w_LC = 1.0;
+        w_T = 1.0;
+        w_V = 0.1;
+        w_A = 1.0;
+        w_J = 1.0;
+        w_D = 1.0;
+        w_LC = 10.0;
+        w_dist = 0.1;
+        max_speed = 14.0;
     } else {
         // Default values
-        w_T = 10.0;
-        w_V = 1.0;
-        w_A = 0.1;
-        w_J = 0.1;
-        w_D = 0.1;
-        w_LC = 1.0;
+        w_T = 1.0;
+        w_V = 0.1;
+        w_A = 1.0;
+        w_J = 1.0;
+        w_D = 1.0;
+        w_LC = 10.0;
+        w_dist = 0.1;
+        max_speed = 14.0;
     }
 }
 
@@ -107,7 +111,7 @@ double CostFunction::cost_dist_obstacle(const double* obstacles_array,
         }
 
         if (std::isfinite(min_dist)) {
-            exp_sum += std::exp(-min_dist);
+            exp_sum += std::exp(-min_dist * w_dist);
         }
     }
 
@@ -126,18 +130,9 @@ double CostFunction::cost_singleTrajectory(const FrenetTrajectory& traj,
         return std::numeric_limits<double>::infinity();
     }
 
-    // Keep base formulation aligned with existing C++ cost_total.
-    double cost_time = cost_terminal_time(10.0 - traj.t.back());
-    double cost_obstacle = cost_dist_obstacle(
-        obstacles_array,
-        num_vertices_array,
-        num_time_steps,
-        num_obstacles,
-        max_vertices,
-        traj,
-        time_step_now
-    );
-    double cost_speed = cost_velocity_offset(traj.s_d, target_speed);
+    double cost_time = cost_terminal_time(15.0 - 0.1 * static_cast<double>(traj.t.size()));
+    double cost_obstacle = 0.0;
+    double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
     double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
     double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
     double cost_offset = cost_lane_center_offset(traj.d);
@@ -169,27 +164,21 @@ void CostFunction::calc_cost(std::vector<FrenetTrajectory>& fplist,
 }
 
 double CostFunction::cost_total(const FrenetTrajectory& traj, double target_speed) {
+    (void)target_speed;
+
     if (traj.t.empty()) {
         return std::numeric_limits<double>::infinity();
     }
 
-    // Cost for time: prefer shorter trajectories
-    double cost_time = cost_terminal_time(10.0 - traj.t.back());
-    
-    // Cost for speed deviation
-    double cost_speed = cost_velocity_offset(traj.s_d, target_speed);
-    
-    // Cost for accelerations
+    double cost_time = cost_terminal_time(15.0 - 0.1 * static_cast<double>(traj.t.size()));
+    double cost_obstacle = 0.0;
+    double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
+
     double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
-    
-    // Cost for jerks
     double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
-    
-    // Cost for lane offset
     double cost_offset = cost_lane_center_offset(traj.d);
-    
-    // Normalize by trajectory length
-    double total_cost = (cost_time + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
+
+    double total_cost = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
                         static_cast<double>(traj.t.size());
     
     return total_cost;

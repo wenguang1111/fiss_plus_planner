@@ -4,7 +4,7 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 class CostFunction:
     def __init__(self, cost_type: str):
         if cost_type is "WX1":
-            self.w_T = 10.0
+            self.w_T = 1.0
             self.w_V = 0.1
             self.w_A = 1.0
             self.w_J = 1.0

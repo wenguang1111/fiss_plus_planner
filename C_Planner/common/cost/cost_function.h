@@ -15,6 +15,8 @@ public:
     double w_J;   // weight for jerk
     double w_D;   // weight for distance to obstacle
     double w_LC;  // weight for lane center offset
+    double w_dist; // weight for distance to obstacles
+    double max_speed; // maximum speed for normalization
     
     CostFunction(const std::string& cost_type = "WX1");
     

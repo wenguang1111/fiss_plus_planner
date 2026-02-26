@@ -63,19 +63,19 @@ std::vector<std::tuple<double, double, double>> Frenet_Planner::get_samples() {
     
     std::vector<double> d_samples;
     for (int i = 0; i < settings.num_width; i++) {
-        double d = -sampling_width / 2.0 + i * sampling_width / (settings.num_width - 1);
+        double d = -sampling_width / 2.0 + i * sampling_width / (settings.num_width-1);
         d_samples.push_back(d);
     }
     
     std::vector<double> s_d_samples;
     for (int i = 0; i < settings.num_speed; i++) {
-        double s_d = settings.lowest_speed + i * (settings.highest_speed - settings.lowest_speed) / (settings.num_speed - 1);
+        double s_d = settings.lowest_speed + i * (settings.highest_speed - settings.lowest_speed) / (settings.num_speed-1);
         s_d_samples.push_back(s_d);
     }
     
     std::vector<double> t_samples;
     for (int i = 0; i < settings.num_t; i++) {
-        double t = settings.min_t + i * (settings.max_t - settings.min_t) / (settings.num_t - 1);
+        double t = settings.min_t + i * (settings.max_t - settings.min_t) / (settings.num_t-1);
         t_samples.push_back(t);
     }
     

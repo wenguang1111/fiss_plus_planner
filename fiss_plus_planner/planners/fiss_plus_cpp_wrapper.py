@@ -143,6 +143,7 @@ class FissPlusCppWrapper(object):
                 stats.num_trajs_generated = cpp_stats["num_trajs_generated"]
                 stats.num_trajs_validated = cpp_stats["num_trajs_validated"]
                 stats.num_collison_checks = cpp_stats["num_collision_checks"]
+                stats.num_FOP_intervention = cpp_stats.get("num_FOP_intervention", 0)
             except Exception as e:
                 print(f"Warning: Failed to get stats from C++ planner: {e}")
         return stats
