@@ -91,17 +91,30 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         self.settings.highest_speed = max_target_speed
         images_last_3_frame: List[Image.Image] = []
 
+        view_size_1, view_size_2 = 60, 105
         time_start = time.time()
         img = self.scenario_drawer.create_scenario_img_at_time_step(
             time_step_now,
-            current_state
+            current_state,
+            view_size=view_size_1
         )
         self.image_history.append((time_step_now, img))
 
         # #Useful for debugging, make sure if you want to delete it
         output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
         output_dir.mkdir(parents=True, exist_ok=True)
-        img.save(output_dir / f"{time_step_now}.pdf", dpi=(300, 300))
+        img.save(output_dir / f"{time_step_now}_{view_size_1}.pdf", dpi=(300, 300))
+        
+        img = self.scenario_drawer.create_scenario_img_at_time_step(
+            time_step_now,
+            current_state,
+            view_size=view_size_2
+        )
+
+        # #Useful for debugging, make sure if you want to delete it
+        output_dir = Path("data/output/bw_imgs") / Path(self.settings.scenario_file)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        img.save(output_dir / f"{time_step_now}_{view_size_2}.pdf", dpi=(300, 300))
 
         if time_step_now >= 2:
             images_last_3_frame = [
