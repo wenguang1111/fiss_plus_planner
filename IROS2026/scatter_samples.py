@@ -17,10 +17,10 @@ mpl.rcParams.update({
     "text.usetex": False,
     "mathtext.fontset": "stix",                   # Times-like math
     "axes.titlesize": S["large"],
-    "axes.labelsize": S["small"],
-    "xtick.labelsize": S["footnotesize"],
-    "ytick.labelsize": S["footnotesize"],
-    "legend.fontsize": S["footnotesize"],
+    "axes.labelsize": S["normalsize"],
+    "xtick.labelsize": S["large"],
+    "ytick.labelsize": S["large"],
+    "legend.fontsize": S["large"],
     "pdf.fonttype": 42, "ps.fonttype": 42,        # keep text searchable
 })
 
@@ -54,10 +54,10 @@ def font_prop(size_key: str) -> font_manager.FontProperties:
     prop.set_size(S[size_key])
     return prop
 
-method = "sparse" # "fop" or "sparse"
+method = "fop" # "fop" or "sparse"
 time_step = 26
 samples_file = f"data/output/sampling_parameters/{method}/DEU_Schwetzingen-12_1_T-2.csv"
-save_path = f"data/output/sampling_parameters/{method}/DEU_Schwetzingen-12_1_T-2_{method}_time_{time_step}.pdf"
+save_path = f"/home/kareem/fiss_plus_planner/IROS2026/imgs/DEU_Schwetzingen-12_1_T-2_{method}_time_{time_step}.pdf"
 
 file = pd.read_csv(samples_file)
 # reps = [5 if val == time_step else 1 for val in file["time_step"]]
@@ -95,8 +95,8 @@ def plot_3d_scatter(samples, elev=18, azim=45, save_path=None):
     # FOP grid (blue, structured)
     ax.scatter(
         d, sv, t,
-        s=15,
-        alpha=0.7,
+        s=20,
+        alpha=1.0,
         c=costs, 
         cmap="RdYlGn_r",
         # these should be the same as the scenario plot to have the same range for color bar
@@ -104,27 +104,29 @@ def plot_3d_scatter(samples, elev=18, azim=45, save_path=None):
         vmax=vmax,
         marker="o"
     )
-    ax.cbar = plt.colorbar(ax.collections[0], ax=ax, pad=0.1)
-    ax.cbar.set_label("Cost", fontproperties=font_prop("small"))
+    # ax.cbar = plt.colorbar(ax.collections[0], ax=ax, pad=0.1)
+    # ax.cbar.set_label("Cost", fontproperties=font_prop("small"))
 
-    ax.set_xlabel(r"$d$ [m]", fontproperties=font_prop("small"))
-    ax.set_ylabel(r"$\dot{s}$ [m/s]", fontproperties=font_prop("small"))
-    ax.set_zlabel(r"$t$ [s]", fontproperties=font_prop("small"))
+    ax.set_xlabel(r"$d$ [m]", fontproperties=font_prop("large"), labelpad=15)
+    ax.set_ylabel(r"$\dot{s}$ [m/s]", fontproperties=font_prop("large"), labelpad=15)
+    ax.set_zlabel(r"$t$ [s]", fontproperties=font_prop("large"), labelpad=10)
 
-    ax.set_xticks(np.round(d_range, 1))
-    ax.set_yticks(np.round(sv_range, 1))
-    ax.set_zticks(np.round(t_range, 1))
+    # ax.set_xticks(np.round(d_range, 1))
+    # ax.set_yticks(np.round(sv_range, 1))
+    # ax.set_zticks(np.round(t_range, 1))
+    ax.set_xticks(np.linspace(-1.8, 1.8, 5))
+    ax.set_yticks(np.linspace(-1, 15, 5))
+    ax.set_zticks(np.linspace(2, 6, 5))
 
     ax.view_init(elev=elev, azim=azim)
 
     # Apply tick label fonts
     for tick in ax.get_xticklabels():
-        tick.set_fontproperties(font_prop("footnotesize"))
+        tick.set_fontproperties(font_prop("large"))
     for tick in ax.get_yticklabels():
-        tick.set_fontproperties(font_prop("footnotesize"))
+        tick.set_fontproperties(font_prop("large"))
     for tick in ax.get_zticklabels():
-        tick.set_fontproperties(font_prop("footnotesize"))
-
+        tick.set_fontproperties(font_prop("large"))
     plt.tight_layout()
 
     if save_path:

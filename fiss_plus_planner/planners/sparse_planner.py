@@ -63,7 +63,7 @@ class SparsePlanner(FrenetOptimalPlanner):
     
     def record_generated_sampling_parameters(self, fp_list: List[FrenetTrajectory], time_step_now: int):
         """Record generated sampling parameters to a file."""
-        output_dir = Path("data/output/sampling_parameters")
+        output_dir = Path("data/output/sampling_parameters/sparse")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / f"{self.settings.scenario_file[:-4]}.csv"
         with open(output_file, "a") as f:
@@ -122,6 +122,7 @@ class SparsePlanner(FrenetOptimalPlanner):
         # self.record_generated_sampling_parameters(cvae_samples, time_step_now)
 
         fplist = self.calc_frenet_paths(frenet_state, cvae_samples)
+        self.record_generated_sampling_parameters(fplist, time_step_now)
         fplist = self.calc_global_paths(fplist)
         self.stats.num_trajs_generated = len(fplist)
         self.stats.num_trajs_validated = len(fplist)
@@ -133,7 +134,6 @@ class SparsePlanner(FrenetOptimalPlanner):
         # print(len(fplist), "trajectories passed collision check")
         # fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
 
-        self.record_generated_sampling_parameters(fplist, time_step_now)
         
         # find minimum cost path
         min_cost = float("inf")

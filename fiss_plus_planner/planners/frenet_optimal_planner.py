@@ -303,6 +303,7 @@ class FrenetOptimalPlanner(object):
         self.settings.highest_speed = max_target_speed
         
         fplist = self.calc_frenet_paths(frenet_state)
+        self.record_generated_sampling_parameters(fplist, time_step_now)
         self.stats.num_trajs_generated = len(fplist)
         fplist = self.calc_global_paths(fplist)
         self.stats.num_trajs_validated = len(fplist)
@@ -312,7 +313,6 @@ class FrenetOptimalPlanner(object):
         fplist = self.check_collision_multithread(fplist, time_step_now)
         fplist = self.cost_function.calc_cost(fplist, max_target_speed, self.obstacles_array, self.obstacles_num_vertices, time_step_now)
         
-        self.record_generated_sampling_parameters(fplist, time_step_now)
 
         # find minimum cost path
         min_cost = float("inf")
