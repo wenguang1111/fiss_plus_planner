@@ -9,13 +9,13 @@ if __name__ == '__main__':
     
     # New parameters for two CSV files
     parser.add_argument('--csv_file_1', type=str, 
-                       default=os.path.join(repo_dir, 'data/measurements/measurement_Sparse_FOP_Sample1.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/measurement_Sparse_FOP.csv'),
                        help='Path to first measurement CSV file (e.g., FOP)')
     parser.add_argument('--csv_file_2', type=str,
-                       default=os.path.join(repo_dir, 'data/measurements/measurement_FOP.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/measurement_FISS+.csv'),
                        help='Path to second measurement CSV file (e.g., FISS+)')
     parser.add_argument('--output_file', type=str,
-                       default=os.path.join(repo_dir, 'data/measurements/SPFOP_VS_FOP.csv'),
+                       default=os.path.join(repo_dir, 'data/measurements/SP_VS_FISS+.csv'),
                        help='Output CSV file with comparison results')
     
     args = parser.parse_args()
@@ -72,6 +72,7 @@ if __name__ == '__main__':
     runtime_better_scenarios = []
     cost_better_scenarios = []
     better_in_both_scenarios = []
+    cost_diff_by_scenario = {}
     
     # Compare scenarios
     for scenario in sorted(common_scenarios):
@@ -107,11 +108,24 @@ if __name__ == '__main__':
         output_data[f'{planner_FISS}_Cost'].append(cost_FISS)
         output_data['Cost_Difference'].append(cost_FISS - cost_FOP)
         output_data[f'{planner_FOP}_Better_in_Both'].append('Yes' if better_in_both else 'No')
+        cost_diff_by_scenario[scenario] = cost_FISS - cost_FOP
     
     runtime_better_count = len(runtime_better_scenarios)
     cost_better_count = len(cost_better_scenarios)
     better_in_both_count = len(better_in_both_scenarios)
     common_scenario_count = len(common_scenarios)
+
+    # Sort scenario lists by cost difference (descending) for simple output.
+    runtime_better_scenarios = sorted(
+        runtime_better_scenarios,
+        key=lambda s: cost_diff_by_scenario.get(s, float('-inf')),
+        reverse=True
+    )
+    cost_better_scenarios = sorted(
+        cost_better_scenarios,
+        key=lambda s: cost_diff_by_scenario.get(s, float('-inf')),
+        reverse=True
+    )
     
     # Create a simplified output CSV with just the two comparison columns
     # Use copied lists so padding does not mutate the original comparison results.
