@@ -4,13 +4,13 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 class CostFunction:
     def __init__(self, cost_type: str):
         if cost_type is "WX1":
-            self.w_T = 10.0
+            self.w_T = 1.0
             self.w_V = 0.1
-            self.w_A = 1.0
-            self.w_J = 1.0
+            self.w_A = 10.0
+            self.w_J = 10.0
             self.w_D = 100.0
             self.w_LC = 10.0
-            self.w_dist = 1.0
+            self.w_dist = 0.1
             self.max_speed = 14.0  # for normalization, can be adjusted based on
 
     
