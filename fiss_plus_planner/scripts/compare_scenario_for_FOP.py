@@ -71,6 +71,7 @@ if __name__ == '__main__':
     
     runtime_better_scenarios = []
     cost_better_scenarios = []
+    cost_worse_scenarios = []
     better_in_both_scenarios = []
     cost_diff_by_scenario = {}
     
@@ -88,6 +89,8 @@ if __name__ == '__main__':
         runtime_better = runtime_FOP < runtime_FISS
         # Check if planner_1 has lower cost
         cost_better = cost_FOP < cost_FISS
+        # Check if planner_1 has higher cost
+        cost_worse = cost_FOP > cost_FISS
         # Check if better in both metrics
         better_in_both = runtime_better and cost_better
         
@@ -96,6 +99,8 @@ if __name__ == '__main__':
             runtime_better_scenarios.append(scenario)
         if cost_better:
             cost_better_scenarios.append(scenario)
+        if cost_worse:
+            cost_worse_scenarios.append(scenario)
         if better_in_both:
             better_in_both_scenarios.append(scenario)
         
@@ -112,6 +117,7 @@ if __name__ == '__main__':
     
     runtime_better_count = len(runtime_better_scenarios)
     cost_better_count = len(cost_better_scenarios)
+    cost_worse_count = len(cost_worse_scenarios)
     better_in_both_count = len(better_in_both_scenarios)
     common_scenario_count = len(common_scenarios)
 
@@ -126,13 +132,20 @@ if __name__ == '__main__':
         key=lambda s: cost_diff_by_scenario.get(s, float('-inf')),
         reverse=True
     )
+    # For worse-cost cases, larger (cost_FOP - cost_FISS) means larger gap.
+    cost_worse_scenarios = sorted(
+        cost_worse_scenarios,
+        key=lambda s: -cost_diff_by_scenario.get(s, float('inf')),
+        reverse=True
+    )
     
     # Create a simplified output CSV with just the two comparison columns
     # Use copied lists so padding does not mutate the original comparison results.
-    max_len = max(runtime_better_count, cost_better_count)
+    max_len = max(runtime_better_count, cost_better_count, cost_worse_count)
     simple_output_data = {
         f'Runtime_{planner_FOP}_Better': runtime_better_scenarios + [''] * (max_len - runtime_better_count),
-        f'Lower_Cost_{planner_FOP}': cost_better_scenarios + [''] * (max_len - cost_better_count)
+        f'Lower_Cost_{planner_FOP}': cost_better_scenarios + [''] * (max_len - cost_better_count),
+        f'Higher_Cost_{planner_FOP}': cost_worse_scenarios + [''] * (max_len - cost_worse_count)
     }
     
     # Create simple comparison dataframe
@@ -159,11 +172,13 @@ if __name__ == '__main__':
     print("="*80)
     runtime_better_pct = (runtime_better_count / common_scenario_count * 100) if common_scenario_count else 0.0
     cost_better_pct = (cost_better_count / common_scenario_count * 100) if common_scenario_count else 0.0
+    cost_worse_pct = (cost_worse_count / common_scenario_count * 100) if common_scenario_count else 0.0
     better_in_both_pct = (better_in_both_count / common_scenario_count * 100) if common_scenario_count else 0.0
     
     print(f"\nTotal common scenarios: {common_scenario_count}")
     print(f"\n{planner_FOP} has better runtime in: {runtime_better_count} scenarios ({runtime_better_pct:.1f}%)")
     print(f"{planner_FOP} has lower cost in: {cost_better_count} scenarios ({cost_better_pct:.1f}%)")
+    print(f"{planner_FOP} has higher cost in: {cost_worse_count} scenarios ({cost_worse_pct:.1f}%)")
     print(f"{planner_FOP} is better in BOTH metrics: {better_in_both_count} scenarios ({better_in_both_pct:.1f}%)")
     
     # Print statistics
@@ -188,3 +203,10 @@ if __name__ == '__main__':
             print(f"  - {scenario}")
         if cost_better_count > 10:
             print(f"  ... and {cost_better_count - 10} more")
+
+    if cost_worse_count > 0:
+        print(f"\nScenarios where {planner_FOP} has higher cost (largest gap to smallest):")
+        for scenario in cost_worse_scenarios[:10]:  # Show first 10
+            print(f"  - {scenario}")
+        if cost_worse_count > 10:
+            print(f"  ... and {cost_worse_count - 10} more")
