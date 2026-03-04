@@ -25,7 +25,7 @@ class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
         self.vis_all_candidates = False
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
-        self.num_samples: int = 1
+        self.num_samples: int =64
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
         self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
@@ -99,7 +99,9 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
 
         self.time_image_generation = time.time() - time_start
         # Output is t, d, s_d -> reorder to  d, s_d, t.
+        # time_start = time.time()
         cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
+        # print(f"CVAE sampling time: {time.time() - time_start:.4f} seconds for {self.settings.num_samples} samples.")
         cvae_samples = [[sample[1],sample[2],sample[0]] for sample in cvae_samples]
 
         # self.record_generated_sampling_parameters(cvae_samples, time_step_now)

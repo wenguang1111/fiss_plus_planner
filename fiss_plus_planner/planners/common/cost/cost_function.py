@@ -119,7 +119,7 @@ class CostFunction:
         time_step_now: int
     ) -> float:
         cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t)) 
-        cost_obstacle = 0.0 #self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
+        cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
         cost_speed = self.cost_velocity_offset(np.abs(traj.s_d), self.max_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
