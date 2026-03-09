@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Tuple
 from PIL import Image
+from matplotlib.backends.backend_pdf import PdfPages
 from omegaconf import DictConfig
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Polygon as MplPolygon
@@ -634,124 +635,152 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     if save_gif and fplist:
         best_traj_lines = None
         images = []
+        scenario_id = os.path.splitext(file)[0]
+        split_pdf_dirpath = os.path.join(output_dir, 'pdf', method, scenario_id)
+        if not os.path.exists(split_pdf_dirpath):
+            os.makedirs(split_pdf_dirpath)
+            print("Target directory: {} Created".format(split_pdf_dirpath))
+        pdf_dirpath = os.path.join(output_dir, 'pdf', method)
+        if not os.path.exists(pdf_dirpath):
+            os.makedirs(pdf_dirpath)
+            print("Target directory: {} Created".format(pdf_dirpath))
+        pdf_filepath = os.path.join(pdf_dirpath, f"{scenario_id}.pdf")
+        pdf_pages = PdfPages(pdf_filepath)
         # For each
-        for i in range(len(fplist)):
-            plt.figure(figsize=(25, 10))
-            mpl.rcParams['font.size'] = 20
-            rnd = MPRenderer()
-            rnd.draw_params.time_begin = i
-            # Disable drawing of dynamic obstacle trajectories (the black dots)
-            rnd.draw_params.dynamic_obstacle.trajectory.draw_trajectory = False
-            rnd.draw_params.dynamic_obstacle.occupancy.draw_occupancies = False
-            # Disable drawing of initial state arrow (green direction marker)
-            rnd.draw_params.planning_problem.initial_state.state.draw_arrow = False
-            scenario.draw(rnd)
-            # ...existing code...
-            rnd.draw_params.dynamic_obstacle.vehicle_shape.occupancy.shape.facecolor = "g"
-            ego_vehicle.draw(rnd)
-            planning_problem_set.draw(rnd)
-            rnd.render()
-            if show_sampled_trajs:
-                costs = []
-                xs = []
-                ys = []
-                for fp in fplist[i]:
-                    costs.append(fp.cost_final)
-                    xs.append(fp.x[1:])
-                    ys.append(fp.y[1:])
-                lc = multiline(xs, ys, costs, ax=rnd.ax,
-                               cmap='RdYlGn_r', lw=2, zorder=20)
-                plt.colorbar(lc)
-            else:
-                if i < len(best_trajs):
-                    best_fp = best_trajs[i]
-                    if best_fp is not None and len(best_fp.x) > 1 and len(best_fp.y) > 1:
-                        costs = [best_fp.cost_final]
-                        xs = [best_fp.x[1:]]
-                        ys = [best_fp.y[1:]]
-                        lc = multiline(xs, ys, costs, ax=rnd.ax,
-                                       cmap='RdYlGn_r', lw=2, zorder=20)
-                        plt.colorbar(lc)
+        try:
+            for i in range(len(fplist)):
+                plt.figure(figsize=(25, 10))
+                mpl.rcParams['font.size'] = 20
+                rnd = MPRenderer()
+                rnd.draw_params.time_begin = i
+                # Disable drawing of dynamic obstacle trajectories (the black dots)
+                rnd.draw_params.dynamic_obstacle.trajectory.draw_trajectory = False
+                rnd.draw_params.dynamic_obstacle.occupancy.draw_occupancies = False
+                rnd.draw_params.lanelet_network.traffic_light.draw_traffic_lights = False
+                rnd.draw_params.lanelet_network.traffic_sign.draw_traffic_signs = False
+                # Disable drawing of initial state arrow (green direction marker)
+                rnd.draw_params.planning_problem.initial_state.state.draw_arrow = False
+                scenario.draw(rnd, rnd.draw_params)
+                # ...existing code...
+                rnd.draw_params.dynamic_obstacle.vehicle_shape.occupancy.shape.facecolor = "g"
+                ego_vehicle.draw(rnd)
+                # planning_problem_set.draw(rnd)
+                v_min, v_max = 0, 200
+                norm = mpl.colors.Normalize(vmin=v_min, vmax=v_max)
+                rnd.render()
+                if show_sampled_trajs:
+                    costs = []
+                    xs = []
+                    ys = []
+                    for fp in fplist[i]:
+                        costs.append(fp.cost_final)
+                        xs.append(fp.x[1:])
+                        ys.append(fp.y[1:])
+                    lc = multiline(xs, ys, costs, ax=rnd.ax,
+                                   cmap='RdYlGn_r', lw=2, zorder=20)
+                    plt.colorbar(lc)
+                else:
+                    if i < len(best_trajs):
+                        best_fp = best_trajs[i]
+                        if best_fp is not None and len(best_fp.x) > 1 and len(best_fp.y) > 1:
+                            costs = [best_fp.cost_final]
+                            xs = [best_fp.x[1:]]
+                            ys = [best_fp.y[1:]]
+                            lc = multiline(xs, ys, costs, ax=rnd.ax,norm=norm,
+                                           cmap='RdYlGn_r', lw=2, zorder=20)
+                            plt.colorbar(lc)
 
-            x_coords = [state.position[0]
-                        for state in ego_vehicle_trajectory.state_list]
-            y_coords = [state.position[1]
-                        for state in ego_vehicle_trajectory.state_list]
-            x_coords_p = [state.position[0]
-                          for state in ego_vehicle_trajectory.state_list[0:i]]
-            y_coords_p = [state.position[1]
-                          for state in ego_vehicle_trajectory.state_list[0:i]]
-            x_coords_f = [state.position[0]
-                          for state in ego_vehicle_trajectory.state_list[i:]]
-            y_coords_f = [state.position[1]
-                          for state in ego_vehicle_trajectory.state_list[i:]]
-            dx_ego_f = np.diff(x_coords_f)
-            dy_ego_f = np.diff(y_coords_f)
-            # rnd.ax.plot(x_coords_p, y_coords_p, color='#9400D3',
-            #             alpha=1,  zorder=25, lw=1)
-            # rnd.ax.plot(x_coords_f, y_coords_f, color='#AFEEEE',
-            #             alpha=1,  zorder=25, lw=1)
-            # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
-            #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
+                x_coords = [state.position[0]
+                            for state in ego_vehicle_trajectory.state_list]
+                y_coords = [state.position[1]
+                            for state in ego_vehicle_trajectory.state_list]
+                x_coords_p = [state.position[0]
+                              for state in ego_vehicle_trajectory.state_list[0:i]]
+                y_coords_p = [state.position[1]
+                              for state in ego_vehicle_trajectory.state_list[0:i]]
+                x_coords_f = [state.position[0]
+                              for state in ego_vehicle_trajectory.state_list[i:]]
+                y_coords_f = [state.position[1]
+                              for state in ego_vehicle_trajectory.state_list[i:]]
+                dx_ego_f = np.diff(x_coords_f)
+                dy_ego_f = np.diff(y_coords_f)
+                # rnd.ax.plot(x_coords_p, y_coords_p, color='#9400D3',
+                #             alpha=1,  zorder=25, lw=1)
+                # rnd.ax.plot(x_coords_f, y_coords_f, color='#AFEEEE',
+                #             alpha=1,  zorder=25, lw=1)
+                # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
+                #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
 
-            x_min = min(x_coords)-30
-            x_max = max(x_coords)+30
-            y_min = min(y_coords)-30
-            y_max = max(y_coords)+30
-            l = max(x_max-x_min, y_max-y_min)
+                x_min = min(x_coords)-30
+                x_max = max(x_coords)+30
+                y_min = min(y_coords)-30
+                y_max = max(y_coords)+30
+                l = max(x_max-x_min, y_max-y_min)
 
-            if l == x_max - x_min:
-                plt.xlim(x_min, x_max)
-                plt.ylim(y_min - (l-(y_max-y_min))/2,
-                         y_max + (l-(y_max-y_min))/2)
-            else:
-                plt.xlim(x_min - (l-(x_max-x_min))/2,
-                         x_max + (l-(x_max-x_min))/2)
-                plt.ylim(y_min, y_max)
+                if l == x_max - x_min:
+                    plt.xlim(x_min, x_max)
+                    plt.ylim(y_min - (l-(y_max-y_min))/2,
+                             y_max + (l-(y_max-y_min))/2)
+                else:
+                    plt.xlim(x_min - (l-(x_max-x_min))/2,
+                             x_max + (l-(x_max-x_min))/2)
+                    plt.ylim(y_min, y_max)
 
-            for obs in scenario.dynamic_obstacles:
-                t = 0
-                obs_traj_x = []
-                obs_traj_y = []
-                while obs.state_at_time(t) is not None:
-                    obs_traj_x.append(obs.state_at_time(t).position[0])
-                    obs_traj_y.append(obs.state_at_time(t).position[1])
-                    t += 1
-                dx = np.diff(obs_traj_x)
-                dy = np.diff(obs_traj_y)
-                obs_traj_x = obs_traj_x[:-1]
-                obs_traj_y = obs_traj_y[:-1]
-                # rnd.ax.quiver(obs_traj_x[:i:5], obs_traj_y[:i:5], dx[:i:5], dy[:i:5],
-                #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#BA55D3', zorder=25)
-                # rnd.ax.quiver(obs_traj_x[i::5], obs_traj_y[i::5], dx[i::5], dy[i::5],
-                #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#1d7eea', zorder=25)
-                # rnd.ax.plot(obs_traj_x[0:i], obs_traj_y[0:i],
-                #             color='#BA55D3', alpha=0.8,  zorder=25, lw=0.6)
-                # rnd.ax.plot(obs_traj_x[i:], obs_traj_y[i:],
-                #             color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
-            time_list.append(0)
+                for obs in scenario.dynamic_obstacles:
+                    t = 0
+                    obs_traj_x = []
+                    obs_traj_y = []
+                    while obs.state_at_time(t) is not None:
+                        obs_traj_x.append(obs.state_at_time(t).position[0])
+                        obs_traj_y.append(obs.state_at_time(t).position[1])
+                        t += 1
+                    dx = np.diff(obs_traj_x)
+                    dy = np.diff(obs_traj_y)
+                    obs_traj_x = obs_traj_x[:-1]
+                    obs_traj_y = obs_traj_y[:-1]
+                    # rnd.ax.quiver(obs_traj_x[:i:5], obs_traj_y[:i:5], dx[:i:5], dy[:i:5],
+                    #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#BA55D3', zorder=25)
+                    # rnd.ax.quiver(obs_traj_x[i::5], obs_traj_y[i::5], dx[i::5], dy[i::5],
+                    #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#1d7eea', zorder=25)
+                    # rnd.ax.plot(obs_traj_x[0:i], obs_traj_y[0:i],
+                    #             color='#BA55D3', alpha=0.8,  zorder=25, lw=0.6)
+                    # rnd.ax.plot(obs_traj_x[i:], obs_traj_y[i:],
+                    #             color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
+                time_list.append(0)
 
-            plt.title("{method}: {time}s".format(
-                method=method, time=round(time_list[i], 3)))
-            scenario_id = os.path.splitext(file)[0]
-            plt.suptitle(f'Scenario ID: {scenario_id}',
-                         fontsize=20, x=0.59, y=0.06)
+                plt.title("{method}: {time}s".format(
+                    method=method, time=round(time_list[i], 3)))
+                plt.suptitle(f'Scenario ID: {scenario_id}',
+                             fontsize=20, x=0.59, y=0.06)
 
-            # Write the figure into a jpg file
-            result_path = os.path.join(
-                output_dir, 'gif_cache', method, scenario_id)
-            if not os.path.exists(result_path):
-                os.makedirs(result_path)
-                print("Target directory: {} Created".format(result_path))
-            fig_path = os.path.join(
-                result_path, "{time_step}.jpg".format(time_step=i))
-            plt.savefig(fig_path, dpi=200, bbox_inches='tight')
-            print("Fig saved to:", fig_path)
+                # Write the figure into a jpg file
+                result_path = os.path.join(
+                    output_dir, 'gif_cache', method, scenario_id)
+                if not os.path.exists(result_path):
+                    os.makedirs(result_path)
+                    print("Target directory: {} Created".format(result_path))
+                fig_path = os.path.join(
+                    result_path, "{time_step}.jpg".format(time_step=i))
+                plt.savefig(fig_path, dpi=200, bbox_inches='tight')
+                print("Fig saved to:", fig_path)
 
-            # plt.show()
-            plt.close()
+                # # Save one standalone PDF per time step for easy lookup.
+                # split_pdf_path = os.path.join(
+                #     split_pdf_dirpath, "{time_step}.pdf".format(time_step=i)
+                # )
+                # plt.savefig(split_pdf_path, format='pdf', bbox_inches='tight')
+                # print("Pdf (single frame) saved to:", split_pdf_path)
 
-            images.append(Image.open(fig_path))
+                # # Add this frame as one page into the scenario PDF
+                # pdf_pages.savefig(plt.gcf(), dpi=200, bbox_inches='tight')
+
+                # plt.show()
+                plt.close()
+
+                images.append(Image.open(fig_path))
+        finally:
+            pdf_pages.close()
+            print("Pdf saved to:", pdf_filepath)
 
         # Genereate a gif file from the previously saved jpg files
         gif_dirpath = os.path.join(output_dir, 'gif/', method)

@@ -2,26 +2,14 @@
 #include <limits>
 
 CostFunction::CostFunction(const std::string& cost_type) {
-    if (cost_type == "WX1") {
-        w_T = 1.0;
-        w_V = 0.1;
-        w_A = 10.0;
-        w_J = 10.0;
-        w_D = 100.0;
-        w_LC = 10.0;
-        w_dist = 0.1;
-        max_speed = 14.0;
-    } else {
-        // Default values
-        w_T = 1.0;
-        w_V = 0.1;
-        w_A = 10.0;
-        w_J = 10.0;
-        w_D = 100.0;
-        w_LC = 10.0;
-        w_dist = 0.1;
-        max_speed = 14.0;
-    }
+    w_T = 1.0;
+    w_V = 0.1;
+    w_A = 10.0;
+    w_J = 10.0;
+    w_D = 100.0;
+    w_LC = 10.0;
+    w_dist = 0.1;
+    max_speed = 14.0;
 }
 
 double CostFunction::cost_terminal_time(double terminal_time) {
