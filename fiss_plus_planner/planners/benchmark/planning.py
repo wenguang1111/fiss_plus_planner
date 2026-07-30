@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Tuple
 from PIL import Image
-from matplotlib.backends.backend_pdf import PdfPages
 from omegaconf import DictConfig
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Polygon as MplPolygon
@@ -43,7 +42,9 @@ from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
-from fiss_plus_planner.planners.common.utils import configure_numba_threads
+from fiss_plus_planner.planners.common.utils import configure_numba_threads, transform_points_to_ego, \
+    transform_points_from_ego, transform_obstacles_array_to_ego
+from fiss_plus_planner.planners.common.geometry.math_utils import unifyAngleRange
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
@@ -63,7 +64,6 @@ mpl.rcParams.update({
     "xtick.labelsize": S["large"],
     "ytick.labelsize": S["large"],
     "legend.fontsize": S["large"],
-    "pdf.fonttype": 42, "ps.fonttype": 42,        # keep text searchable
     "svg.fonttype": "none",                       # keep text as text in SVG
 })
 
@@ -330,15 +330,23 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     global_coordination_state_list = []
 
     time_list = []
-    
-    sampling_params_cross_all_scenarios = []
+
     goal_reached = False
     next_state = initial_state
     best_trajs_all_time_steps = []
-    
+
+    # Plan in an ego-centered frame (ego at origin, yaw=0): only for FOP_CPP while collecting ML data.
+    ego_centered_fop_cpp = (method == 'FOP_CPP' and collect_data_for_ml)
+    all_trajs_accumulated = []
+    reference_path_lookahead_m = ScenarioDrawer.VIEW_SIZE_DEFAULT / 2.0
+    optimal_path_x_local_list = []
+    optimal_path_y_local_list = []
+    ref_path_x_local_list = []
+    ref_path_y_local_list = []
+
     for i in range(final_time_step):
         num_cycles += 1
-        
+
         inital_state = InitialState(
             time_step=i,
             position=next_state.position,
@@ -351,9 +359,48 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         global_state_list.append(inital_state)
         frenet_state_list.append(current_frenet_state)
 
+        if ego_centered_fop_cpp:
+            ego_pos = np.asarray(next_state.position, dtype=float)
+            ego_yaw = float(next_state.orientation)
+            ego_lane_pts_local_xy = transform_points_to_ego(ego_lane_pts[:, :2], ego_pos, ego_yaw)
+            obstacles_array_local = transform_obstacles_array_to_ego(obstacles_array, ego_pos, ego_yaw)
+            planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array_local,
+                                       obstacles_num_vertices, number_threads, runtime_measurement)
+            _, ref_ego_lane_pts_local = planner.generate_frenet_frame(ego_lane_pts_local_xy)
+
+            # Slice to the section ahead of ego (nearest point onward), capped at reference_path_lookahead_m.
+            ref_local_xy = ref_ego_lane_pts_local[:, :2]
+            start_idx = int(np.argmin(np.linalg.norm(ref_local_xy, axis=1)))
+            ref_path_ahead_local = ref_local_xy[start_idx:]
+            if len(ref_path_ahead_local) > 1:
+                seg_dists = np.linalg.norm(np.diff(ref_path_ahead_local, axis=0), axis=1)
+                cum_dist = np.concatenate([[0.0], np.cumsum(seg_dists)])
+                ref_path_ahead_local = ref_path_ahead_local[cum_dist <= reference_path_lookahead_m]
+
         start_time = time.time()
         best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
+
+        if ego_centered_fop_cpp and best_traj_ego is not None:
+            # Keep the ego-centered (pre-back-transform) path for the ML dataset.
+            optimal_path_x_local = list(best_traj_ego.x)
+            optimal_path_y_local = list(best_traj_ego.y)
+
+            global_xy = transform_points_from_ego(
+                np.column_stack([best_traj_ego.x, best_traj_ego.y]), ego_pos, ego_yaw)
+            best_traj_ego.x = global_xy[:, 0].tolist()
+            best_traj_ego.y = global_xy[:, 1].tolist()
+            best_traj_ego.yaw = [unifyAngleRange(yaw + ego_yaw) for yaw in best_traj_ego.yaw]
+            if planner.all_trajs:
+                for fp in planner.all_trajs[-1]:
+                    fp_xy = transform_points_from_ego(
+                        np.column_stack([fp.x, fp.y]), ego_pos, ego_yaw)
+                    fp.x = fp_xy[:, 0].tolist()
+                    fp.y = fp_xy[:, 1].tolist()
+                    fp.yaw = [unifyAngleRange(yaw + ego_yaw) for yaw in fp.yaw]
+
+        if planner.all_trajs:
+            all_trajs_accumulated.append(planner.all_trajs[-1])
 
         best_trajs_all_time_steps.append(best_traj_ego)
 
@@ -397,7 +444,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         
         state_list.append(next_state)
         time_list.append(end_time - start_time)
-        sampling_params_cross_all_scenarios.append(best_traj_ego.sampling_param)
+
+        if ego_centered_fop_cpp:
+            optimal_path_x_local_list.append(optimal_path_x_local)
+            optimal_path_y_local_list.append(optimal_path_y_local)
+            ref_path_x_local_list.append(ref_path_ahead_local[:, 0].tolist())
+            ref_path_y_local_list.append(ref_path_ahead_local[:, 1].tolist())
 
         # break when goal is reached
         if goal_position_available:
@@ -488,14 +540,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         collect_data(
             drawer,
             scenario_name,
-            sampling_params_cross_all_scenarios,
-            frenet_state_list,
+            optimal_path_x_local_list,
+            optimal_path_y_local_list,
+            ref_path_x_local_list,
+            ref_path_y_local_list,
             global_coordination_state_list,
             output_dir,
             planner.settings.highest_speed,
         )
 
-    return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, planner.all_trajs, best_trajs_all_time_steps
+    return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, all_trajs_accumulated, best_trajs_all_time_steps
 
 
 def timeout_handler(signum, frame):
@@ -636,151 +690,126 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
         best_traj_lines = None
         images = []
         scenario_id = os.path.splitext(file)[0]
-        split_pdf_dirpath = os.path.join(output_dir, 'pdf', method, scenario_id)
-        if not os.path.exists(split_pdf_dirpath):
-            os.makedirs(split_pdf_dirpath)
-            print("Target directory: {} Created".format(split_pdf_dirpath))
-        pdf_dirpath = os.path.join(output_dir, 'pdf', method)
-        if not os.path.exists(pdf_dirpath):
-            os.makedirs(pdf_dirpath)
-            print("Target directory: {} Created".format(pdf_dirpath))
-        pdf_filepath = os.path.join(pdf_dirpath, f"{scenario_id}.pdf")
-        pdf_pages = PdfPages(pdf_filepath)
         # For each
-        try:
-            for i in range(len(fplist)):
-                plt.figure(figsize=(25, 10))
-                mpl.rcParams['font.size'] = 20
-                rnd = MPRenderer()
-                rnd.draw_params.time_begin = i
-                # Disable drawing of dynamic obstacle trajectories (the black dots)
-                rnd.draw_params.dynamic_obstacle.trajectory.draw_trajectory = False
-                rnd.draw_params.dynamic_obstacle.occupancy.draw_occupancies = False
-                rnd.draw_params.lanelet_network.traffic_light.draw_traffic_lights = False
-                rnd.draw_params.lanelet_network.traffic_sign.draw_traffic_signs = False
-                # Disable drawing of initial state arrow (green direction marker)
-                rnd.draw_params.planning_problem.initial_state.state.draw_arrow = False
-                scenario.draw(rnd, rnd.draw_params)
-                # ...existing code...
-                rnd.draw_params.dynamic_obstacle.vehicle_shape.occupancy.shape.facecolor = "g"
-                ego_vehicle.draw(rnd)
-                # planning_problem_set.draw(rnd)
-                v_min, v_max = 0, 200
-                norm = mpl.colors.Normalize(vmin=v_min, vmax=v_max)
-                rnd.render()
-                if show_sampled_trajs:
-                    costs = []
-                    xs = []
-                    ys = []
-                    for fp in fplist[i]:
-                        costs.append(fp.cost_final)
-                        xs.append(fp.x[1:])
-                        ys.append(fp.y[1:])
-                    lc = multiline(xs, ys, costs, ax=rnd.ax,
-                                   cmap='RdYlGn_r', lw=2, zorder=20)
-                    plt.colorbar(lc)
-                else:
-                    if i < len(best_trajs):
-                        best_fp = best_trajs[i]
-                        if best_fp is not None and len(best_fp.x) > 1 and len(best_fp.y) > 1:
-                            costs = [best_fp.cost_final]
-                            xs = [best_fp.x[1:]]
-                            ys = [best_fp.y[1:]]
-                            lc = multiline(xs, ys, costs, ax=rnd.ax,norm=norm,
-                                           cmap='RdYlGn_r', lw=2, zorder=20)
-                            plt.colorbar(lc)
+        for i in range(len(fplist)):
+            plt.figure(figsize=(25, 10))
+            mpl.rcParams['font.size'] = 20
+            rnd = MPRenderer()
+            rnd.draw_params.time_begin = i
+            # Disable drawing of dynamic obstacle trajectories (the black dots)
+            rnd.draw_params.dynamic_obstacle.trajectory.draw_trajectory = False
+            rnd.draw_params.dynamic_obstacle.occupancy.draw_occupancies = False
+            rnd.draw_params.lanelet_network.traffic_light.draw_traffic_lights = False
+            rnd.draw_params.lanelet_network.traffic_sign.draw_traffic_signs = False
+            # Disable drawing of initial state arrow (green direction marker)
+            rnd.draw_params.planning_problem.initial_state.state.draw_arrow = False
+            scenario.draw(rnd, rnd.draw_params)
+            # ...existing code...
+            rnd.draw_params.dynamic_obstacle.vehicle_shape.occupancy.shape.facecolor = "g"
+            ego_vehicle.draw(rnd)
+            # planning_problem_set.draw(rnd)
+            v_min, v_max = 0, 200
+            norm = mpl.colors.Normalize(vmin=v_min, vmax=v_max)
+            rnd.render()
+            if show_sampled_trajs:
+                costs = []
+                xs = []
+                ys = []
+                for fp in fplist[i]:
+                    costs.append(fp.cost_final)
+                    xs.append(fp.x[1:])
+                    ys.append(fp.y[1:])
+                lc = multiline(xs, ys, costs, ax=rnd.ax,
+                               cmap='RdYlGn_r', lw=2, zorder=20)
+                plt.colorbar(lc)
+            else:
+                if i < len(best_trajs):
+                    best_fp = best_trajs[i]
+                    if best_fp is not None and len(best_fp.x) > 1 and len(best_fp.y) > 1:
+                        costs = [best_fp.cost_final]
+                        xs = [best_fp.x[1:]]
+                        ys = [best_fp.y[1:]]
+                        lc = multiline(xs, ys, costs, ax=rnd.ax,norm=norm,
+                                       cmap='RdYlGn_r', lw=2, zorder=20)
+                        plt.colorbar(lc)
 
-                x_coords = [state.position[0]
-                            for state in ego_vehicle_trajectory.state_list]
-                y_coords = [state.position[1]
-                            for state in ego_vehicle_trajectory.state_list]
-                x_coords_p = [state.position[0]
-                              for state in ego_vehicle_trajectory.state_list[0:i]]
-                y_coords_p = [state.position[1]
-                              for state in ego_vehicle_trajectory.state_list[0:i]]
-                x_coords_f = [state.position[0]
-                              for state in ego_vehicle_trajectory.state_list[i:]]
-                y_coords_f = [state.position[1]
-                              for state in ego_vehicle_trajectory.state_list[i:]]
-                dx_ego_f = np.diff(x_coords_f)
-                dy_ego_f = np.diff(y_coords_f)
-                # rnd.ax.plot(x_coords_p, y_coords_p, color='#9400D3',
-                #             alpha=1,  zorder=25, lw=1)
-                # rnd.ax.plot(x_coords_f, y_coords_f, color='#AFEEEE',
-                #             alpha=1,  zorder=25, lw=1)
-                # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
-                #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
+            x_coords = [state.position[0]
+                        for state in ego_vehicle_trajectory.state_list]
+            y_coords = [state.position[1]
+                        for state in ego_vehicle_trajectory.state_list]
+            x_coords_p = [state.position[0]
+                          for state in ego_vehicle_trajectory.state_list[0:i]]
+            y_coords_p = [state.position[1]
+                          for state in ego_vehicle_trajectory.state_list[0:i]]
+            x_coords_f = [state.position[0]
+                          for state in ego_vehicle_trajectory.state_list[i:]]
+            y_coords_f = [state.position[1]
+                          for state in ego_vehicle_trajectory.state_list[i:]]
+            dx_ego_f = np.diff(x_coords_f)
+            dy_ego_f = np.diff(y_coords_f)
+            # rnd.ax.plot(x_coords_p, y_coords_p, color='#9400D3',
+            #             alpha=1,  zorder=25, lw=1)
+            # rnd.ax.plot(x_coords_f, y_coords_f, color='#AFEEEE',
+            #             alpha=1,  zorder=25, lw=1)
+            # rnd.ax.quiver(x_coords_f[:-1:5], y_coords_f[:-1:5], dx_ego_f[::5], dy_ego_f[::5],
+            #               scale_units='xy', angles='xy', scale=1, width=0.009, color='#AFEEEE', zorder=26)
 
-                x_min = min(x_coords)-30
-                x_max = max(x_coords)+30
-                y_min = min(y_coords)-30
-                y_max = max(y_coords)+30
-                l = max(x_max-x_min, y_max-y_min)
+            x_min = min(x_coords)-30
+            x_max = max(x_coords)+30
+            y_min = min(y_coords)-30
+            y_max = max(y_coords)+30
+            l = max(x_max-x_min, y_max-y_min)
 
-                if l == x_max - x_min:
-                    plt.xlim(x_min, x_max)
-                    plt.ylim(y_min - (l-(y_max-y_min))/2,
-                             y_max + (l-(y_max-y_min))/2)
-                else:
-                    plt.xlim(x_min - (l-(x_max-x_min))/2,
-                             x_max + (l-(x_max-x_min))/2)
-                    plt.ylim(y_min, y_max)
+            if l == x_max - x_min:
+                plt.xlim(x_min, x_max)
+                plt.ylim(y_min - (l-(y_max-y_min))/2,
+                         y_max + (l-(y_max-y_min))/2)
+            else:
+                plt.xlim(x_min - (l-(x_max-x_min))/2,
+                         x_max + (l-(x_max-x_min))/2)
+                plt.ylim(y_min, y_max)
 
-                for obs in scenario.dynamic_obstacles:
-                    t = 0
-                    obs_traj_x = []
-                    obs_traj_y = []
-                    while obs.state_at_time(t) is not None:
-                        obs_traj_x.append(obs.state_at_time(t).position[0])
-                        obs_traj_y.append(obs.state_at_time(t).position[1])
-                        t += 1
-                    dx = np.diff(obs_traj_x)
-                    dy = np.diff(obs_traj_y)
-                    obs_traj_x = obs_traj_x[:-1]
-                    obs_traj_y = obs_traj_y[:-1]
-                    # rnd.ax.quiver(obs_traj_x[:i:5], obs_traj_y[:i:5], dx[:i:5], dy[:i:5],
-                    #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#BA55D3', zorder=25)
-                    # rnd.ax.quiver(obs_traj_x[i::5], obs_traj_y[i::5], dx[i::5], dy[i::5],
-                    #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#1d7eea', zorder=25)
-                    # rnd.ax.plot(obs_traj_x[0:i], obs_traj_y[0:i],
-                    #             color='#BA55D3', alpha=0.8,  zorder=25, lw=0.6)
-                    # rnd.ax.plot(obs_traj_x[i:], obs_traj_y[i:],
-                    #             color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
-                time_list.append(0)
+            for obs in scenario.dynamic_obstacles:
+                t = 0
+                obs_traj_x = []
+                obs_traj_y = []
+                while obs.state_at_time(t) is not None:
+                    obs_traj_x.append(obs.state_at_time(t).position[0])
+                    obs_traj_y.append(obs.state_at_time(t).position[1])
+                    t += 1
+                dx = np.diff(obs_traj_x)
+                dy = np.diff(obs_traj_y)
+                obs_traj_x = obs_traj_x[:-1]
+                obs_traj_y = obs_traj_y[:-1]
+                # rnd.ax.quiver(obs_traj_x[:i:5], obs_traj_y[:i:5], dx[:i:5], dy[:i:5],
+                #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#BA55D3', zorder=25)
+                # rnd.ax.quiver(obs_traj_x[i::5], obs_traj_y[i::5], dx[i::5], dy[i::5],
+                #               scale_units='xy', angles='xy', scale=1, width=0.006, color='#1d7eea', zorder=25)
+                # rnd.ax.plot(obs_traj_x[0:i], obs_traj_y[0:i],
+                #             color='#BA55D3', alpha=0.8,  zorder=25, lw=0.6)
+                # rnd.ax.plot(obs_traj_x[i:], obs_traj_y[i:],
+                #             color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
+            time_list.append(0)
 
-                plt.title("{method}: {time}s".format(
-                    method=method, time=round(time_list[i], 3)))
-                plt.suptitle(f'Scenario ID: {scenario_id}',
-                             fontsize=20, x=0.59, y=0.06)
+            plt.title("{method}: {time}s".format(
+                method=method, time=round(time_list[i], 3)))
+            plt.suptitle(f'Scenario ID: {scenario_id}',
+                         fontsize=20, x=0.59, y=0.06)
 
-                # Write the figure into a jpg file
-                result_path = os.path.join(
-                    output_dir, 'gif_cache', method, scenario_id)
-                if not os.path.exists(result_path):
-                    os.makedirs(result_path)
-                    print("Target directory: {} Created".format(result_path))
-                fig_path = os.path.join(
-                    result_path, "{time_step}.jpg".format(time_step=i))
-                plt.savefig(fig_path, dpi=200, bbox_inches='tight')
-                print("Fig saved to:", fig_path)
+            # Write the figure into a jpg file
+            result_path = os.path.join(
+                output_dir, 'gif_cache', method, scenario_id)
+            if not os.path.exists(result_path):
+                os.makedirs(result_path)
+                print("Target directory: {} Created".format(result_path))
+            fig_path = os.path.join(
+                result_path, "{time_step}.jpg".format(time_step=i))
+            plt.savefig(fig_path, dpi=200, bbox_inches='tight')
+            print("Fig saved to:", fig_path)
 
-                # # Save one standalone PDF per time step for easy lookup.
-                # split_pdf_path = os.path.join(
-                #     split_pdf_dirpath, "{time_step}.pdf".format(time_step=i)
-                # )
-                # plt.savefig(split_pdf_path, format='pdf', bbox_inches='tight')
-                # print("Pdf (single frame) saved to:", split_pdf_path)
+            plt.close()
 
-                # # Add this frame as one page into the scenario PDF
-                # pdf_pages.savefig(plt.gcf(), dpi=200, bbox_inches='tight')
-
-                # plt.show()
-                plt.close()
-
-                images.append(Image.open(fig_path))
-        finally:
-            pdf_pages.close()
-            print("Pdf saved to:", pdf_filepath)
+            images.append(Image.open(fig_path))
 
         # Genereate a gif file from the previously saved jpg files
         gif_dirpath = os.path.join(output_dir, 'gif/', method)
@@ -794,12 +823,16 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
 
     return measurment
 
-def save_data(scenario_name: str, frenet_state_list: list, global_coordination_state_list: list, sampling_params: list, output_dir: str):
+def save_data(scenario_name: str, optimal_path_x_list: list, optimal_path_y_list: list,
+              ref_path_x_list: list, ref_path_y_list: list, output_dir: str):
+    """Persist the ego-centered optimal path (sampled_vars.parquet) and ego-centered
+    reference path (conditions.parquet) for one scenario. All coordinates here are
+    already in the ego frame (ego at origin, yaw=0) at the time step they were planned."""
     os.makedirs(output_dir, exist_ok=True)
-    
+
     samples_path = os.path.join(output_dir, 'sampled_vars.parquet')
     conditions_path = os.path.join(output_dir, 'conditions.parquet')
-    
+
     # Check if scenario already exists in the parquet files
     if os.path.exists(samples_path):
         df_samples_existing = pd.read_parquet(samples_path)
@@ -808,92 +841,72 @@ def save_data(scenario_name: str, frenet_state_list: list, global_coordination_s
             return
     else:
         df_samples_existing = None
-        
+
     if os.path.exists(conditions_path):
         df_conditions_existing = pd.read_parquet(conditions_path)
     else:
         df_conditions_existing = None
-    
-    # Build sampled_vars data from sampling_params
+
+    # Build sampled_vars data: the ego-centered optimal path returned by the planner.
     sampled_vars = {
-        "scenario": [],
-        "time_step": [],
-        "t": [],
-        "d": [],
-        "v": []
-    }
-    
-    # Build conditions data from state_list
-    conditions = {
         "scenario": [],
         "time_step": [],
         "x": [],
         "y": [],
-        "theta": [],
-        "velocity": [],
-        "acceleration": [],
-        "yaw_rate": [],
-        "s": [],
-        "s_d": [],
-        "s_dd": [],
-        "s_ddd": [],
-        "d": [],
-        "d_d": [],
-        "d_dd": [],
-        "d_ddd": []
+        "path_length": [],
     }
-    
-    for time_step, (frenet_state, global_state, sampling_param) in enumerate(zip(frenet_state_list, global_coordination_state_list, sampling_params)):
-        # Add sampling params
+
+    # Build conditions data: the ego-centered reference path ahead of the vehicle.
+    conditions = {
+        "scenario": [],
+        "time_step": [],
+        "ref_x": [],
+        "ref_y": [],
+        "ref_path_length": [],
+    }
+
+    for time_step, (path_x, path_y, ref_x, ref_y) in enumerate(
+            zip(optimal_path_x_list, optimal_path_y_list, ref_path_x_list, ref_path_y_list)):
         sampled_vars["scenario"].append(scenario_name)
         sampled_vars["time_step"].append(time_step)
-        sampled_vars["t"].append(sampling_param.t)
-        sampled_vars["d"].append(sampling_param.d)
-        sampled_vars["v"].append(sampling_param.s_d)
-        
-        # Add conditions from state
+        sampled_vars["x"].append(path_x)
+        sampled_vars["y"].append(path_y)
+        sampled_vars["path_length"].append(len(path_x))
+
         conditions["scenario"].append(scenario_name)
         conditions["time_step"].append(time_step)
-        conditions["x"].append(global_state.position[0])
-        conditions["y"].append(global_state.position[1])
-        conditions["theta"].append(global_state.orientation)
-        conditions["velocity"].append(global_state.velocity)
-        conditions["acceleration"].append(global_state.acceleration)
-        conditions["yaw_rate"].append(global_state.yaw_rate)
-        conditions["s"].append(frenet_state.s)
-        conditions["s_d"].append(frenet_state.s_d)
-        conditions["s_dd"].append(frenet_state.s_dd)
-        conditions["s_ddd"].append(frenet_state.s_ddd)
-        conditions["d"].append(frenet_state.d)
-        conditions["d_d"].append(frenet_state.d_d)
-        conditions["d_dd"].append(frenet_state.d_dd)
-        conditions["d_ddd"].append(frenet_state.d_ddd)
-    
+        conditions["ref_x"].append(ref_x)
+        conditions["ref_y"].append(ref_y)
+        conditions["ref_path_length"].append(len(ref_x))
+
     df_samples_new = pd.DataFrame(sampled_vars)
     df_conditions_new = pd.DataFrame(conditions)
-    
+
     # Append to existing data if available
     if df_samples_existing is not None:
         df_samples = pd.concat([df_samples_existing, df_samples_new], ignore_index=True)
     else:
         df_samples = df_samples_new
-        
+
     if df_conditions_existing is not None:
         df_conditions = pd.concat([df_conditions_existing, df_conditions_new], ignore_index=True)
     else:
         df_conditions = df_conditions_new
-    
+
     df_samples.to_parquet(samples_path, index=False)
     df_conditions.to_parquet(conditions_path, index=False)
-    
-    print(f"Saved {len(global_coordination_state_list)} time steps for scenario {scenario_name}")
+
+    print(f"Saved {len(optimal_path_x_list)} time steps for scenario {scenario_name}")
 
 
-def collect_data(drawer: ScenarioDrawer, scenario_name: str, sampling_params_cross_all_scenarios: list,
-                 frenet_state_list: list, global_coordination_state_list: list, output_dir: str,
+def collect_data(drawer: ScenarioDrawer, scenario_name: str,
+                 optimal_path_x_list: list, optimal_path_y_list: list,
+                 ref_path_x_list: list, ref_path_y_list: list,
+                 global_coordination_state_list: list, output_dir: str,
                  highest_speed: float):
-    save_data(scenario_name, frenet_state_list, global_coordination_state_list, sampling_params_cross_all_scenarios, str(output_dir))
-    
+    save_data(scenario_name, optimal_path_x_list, optimal_path_y_list,
+              ref_path_x_list, ref_path_y_list, str(output_dir))
+
     # Save images for all time steps
     if drawer.save_dir is not None:
         drawer.save_scenario_imgs(

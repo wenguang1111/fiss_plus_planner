@@ -135,9 +135,12 @@ class CostFunction:
         calculate the cost of the final executed trajectory
         """
         
-        cost_time = self.cost_terminal_time(0.1*len(traj.t))  # assuming each time step is 0.1s, and the total time is 10s
-        cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
-        cost_speed = self.cost_velocity_offset(np.abs(traj.v), self.max_speed)
+        cost_obstacle = 0.0
+        
+        cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t))  # assuming each time step is 0.1s, and the total time is 10s
+        for i in range(len(traj.t)):
+            cost_obstacle += self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj)
+        cost_speed = self.cost_velocity_offset(traj.s_d, self.max_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)
         cost_offset = self.cost_lane_center_offset(traj.d)

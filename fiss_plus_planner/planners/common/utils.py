@@ -7,6 +7,47 @@ def configure_numba_threads(n: int) -> None:
     if n and n > 0:
         numba.set_num_threads(n)
 
+
+def build_ego_transform(ego_pos: np.ndarray, ego_yaw: float) -> np.ndarray:
+    """3x3 homogeneous transform mapping global (x, y) into the ego frame (ego at origin, yaw=0)."""
+    cos_yaw = np.cos(-ego_yaw)
+    sin_yaw = np.sin(-ego_yaw)
+    rot = np.array([[cos_yaw, -sin_yaw], [sin_yaw, cos_yaw]])
+    transform = np.eye(3, dtype=float)
+    transform[:2, :2] = rot
+    transform[:2, 2] = -rot @ ego_pos
+    return transform
+
+
+def transform_points_to_ego(points_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: float) -> np.ndarray:
+    """Global (x, y) points -> ego-centered frame (ego at origin, yaw=0)."""
+    pts = np.asarray(points_xy, dtype=float)
+    if pts.size == 0:
+        return pts
+    transform = build_ego_transform(np.asarray(ego_pos, dtype=float), ego_yaw)
+    ones = np.ones((pts.shape[0], 1), dtype=float)
+    hom = np.hstack((pts, ones))
+    return (hom @ transform.T)[:, :2]
+
+
+def transform_points_from_ego(points_xy_local: np.ndarray, ego_pos: np.ndarray, ego_yaw: float) -> np.ndarray:
+    """Inverse of transform_points_to_ego: ego-local (x, y) points -> global frame."""
+    pts = np.asarray(points_xy_local, dtype=float)
+    if pts.size == 0:
+        return pts
+    cos_yaw = np.cos(ego_yaw)
+    sin_yaw = np.sin(ego_yaw)
+    rot = np.array([[cos_yaw, -sin_yaw], [sin_yaw, cos_yaw]])
+    return pts @ rot.T + np.asarray(ego_pos, dtype=float)
+
+
+def transform_obstacles_array_to_ego(obstacles_array: np.ndarray, ego_pos: np.ndarray, ego_yaw: float) -> np.ndarray:
+    """Rigid-transform every vertex of a (T, num_obstacles, max_vertices, 2) obstacle polygon array into the ego frame."""
+    original_shape = obstacles_array.shape
+    flat = obstacles_array.reshape(-1, 2)
+    transformed = transform_points_to_ego(flat, ego_pos, ego_yaw)
+    return transformed.reshape(original_shape)
+
 @njit
 def point_in_polygon(point: np.ndarray, polygon: np.ndarray) -> bool:
     x, y = point[0], point[1]

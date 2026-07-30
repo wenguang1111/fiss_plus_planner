@@ -7,7 +7,6 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.collections import LineCollection
 from matplotlib.patches import Polygon
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.visualization.draw_params import DynamicObstacleParams
@@ -27,13 +26,11 @@ class ScenarioDrawer:
 
     ARROW_LENGTH_CONSTANT = 0.2  # meters
     LINE_WIDTH = 1.0
-    LANE_DASH_LENGTH = 2.0
-    LANE_DASH_GAP = 2.0
     ARROW_WIDTH = 0.006
-    VIEW_SIZE_DEFAULT = 105.0 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
+    VIEW_SIZE_DEFAULT = 105.0/1.2 # highest_speed 13.4 x 5s < 70; 70*2=140: left and right
     COLOR_BLACK = "#000000"
+    COLOR_WHITE = "#FFFFFF"
     COLOR_GRAY = "#808080"
-    COLOR_LightGray = "#D3D3D3"
     GENERATE_GIF = True
     GIF_DURATION_MS = 100
     GIF_LOOP = 0
@@ -182,12 +179,12 @@ class ScenarioDrawer:
     ) -> Image.Image:
         view_size = self.VIEW_SIZE_DEFAULT
         if self._fig is None:
-            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=64, facecolor="white")
+            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=64, facecolor="black")
             self._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
             self._canvas = FigureCanvas(self._fig)
         ax = self._ax
         ax.clear()
-        ax.set_facecolor("white")
+        ax.set_facecolor("black")
         ax.set_aspect("equal", adjustable="box")
         ax.axis("off")
 
@@ -199,7 +196,6 @@ class ScenarioDrawer:
         ax.set_ylim(-view_size / 2.0, view_size / 2.0)
 
         self._draw_lanelet_boundaries(ax, transform)
-        self._draw_lane_ahead(ax, ego_state, transform)
         self._draw_obstacles(ax, time_step, transform)
         self._draw_ego(ax)
         # self._draw_speed_arrow(ax, ego_state, highest_speed)
@@ -209,47 +205,25 @@ class ScenarioDrawer:
         buf = np.frombuffer(self._canvas.tostring_rgb(), dtype=np.uint8).reshape(height, width, 3)
         return Image.fromarray(buf)
 
-    def _draw_lane_ahead(self, ax, ego_state: State, transform: np.ndarray):
-        if self.ref_ego_lane_pts is None:
-            return
-        lane_xy = self.ref_ego_lane_pts[:, :2]
-        if lane_xy.size == 0:
-            return
-        ego_pos = np.array(ego_state.position, dtype=float)
-        distances = np.linalg.norm(lane_xy - ego_pos, axis=1)
-        start_idx = int(np.argmin(distances))
-        lane_ahead = self._apply_transform(lane_xy[start_idx:], transform)
-        if len(lane_ahead) < 2:
-            return
-        ax.plot(
-            lane_ahead[:, 0],
-            lane_ahead[:, 1],
-            color=self.COLOR_GRAY,
-            linewidth=self.LINE_WIDTH,
-            linestyle=(0, (self.LANE_DASH_LENGTH, self.LANE_DASH_GAP)),
-            zorder=10,
-        )
-
     def _draw_lanelet_boundaries(self, ax, transform: np.ndarray):
         lanelet_network = getattr(self.scenario, "lanelet_network", None)
         if lanelet_network is None:
             return
-        segments = []
         for lanelet in lanelet_network.lanelets:
             left = self._apply_transform(np.asarray(lanelet.left_vertices, dtype=float), transform)
             right = self._apply_transform(np.asarray(lanelet.right_vertices, dtype=float), transform)
-            if left.shape[0] >= 2:
-                segments.append(left)
-            if right.shape[0] >= 2:
-                segments.append(right)
-        if segments:
-            collection = LineCollection(
-                segments,
-                colors=self.COLOR_LightGray,
-                linewidths=self.LINE_WIDTH,
+            if left.shape[0] < 2 or right.shape[0] < 2:
+                continue
+            lane_area = np.vstack([left, right[::-1]])
+            patch = Polygon(
+                lane_area,
+                closed=True,
+                facecolor=self.COLOR_GRAY,
+                edgecolor=self.COLOR_GRAY,
+                linewidth=self.LINE_WIDTH,
                 zorder=5,
             )
-            ax.add_collection(collection)
+            ax.add_patch(patch)
 
     def _draw_obstacles(self, ax, time_step: int, transform: np.ndarray):
         num_vertices_row = self.obstacles_num_vertices[time_step]
@@ -263,8 +237,8 @@ class ScenarioDrawer:
             patch = Polygon(
                 coords,
                 closed=True,
-                facecolor=self.COLOR_GRAY,
-                edgecolor=self.COLOR_GRAY,
+                facecolor=self.COLOR_WHITE,
+                edgecolor=self.COLOR_WHITE,
                 linewidth=self.LINE_WIDTH,
                 zorder=30,
             )
@@ -288,8 +262,8 @@ class ScenarioDrawer:
         patch = Polygon(
             corners,
             closed=True,
-            facecolor=self.COLOR_BLACK,
-            edgecolor=self.COLOR_BLACK,
+            facecolor=self.COLOR_WHITE,
+            edgecolor=self.COLOR_WHITE,
             linewidth=self.LINE_WIDTH,
             zorder=30,
         )

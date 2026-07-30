@@ -2,14 +2,22 @@
 #include <limits>
 
 CostFunction::CostFunction(const std::string& cost_type) {
-    w_T = 1.0;
-    w_V = 0.1;
-    w_A = 10.0;
-    w_J = 10.0;
-    w_D = 100.0;
-    w_LC = 10.0;
-    w_dist = 0.1;
-    max_speed = 14.0;
+    if (cost_type == "WX1") {
+        w_T = 10.0;
+        w_V = 1.0;
+        w_A = 0.1;
+        w_J = 0.1;
+        w_D = 0.1;
+        w_LC = 1.0;
+    } else {
+        // Default values
+        w_T = 10.0;
+        w_V = 1.0;
+        w_A = 0.1;
+        w_J = 0.1;
+        w_D = 0.1;
+        w_LC = 1.0;
+    }
 }
 
 double CostFunction::cost_terminal_time(double terminal_time) {
@@ -118,9 +126,18 @@ double CostFunction::cost_singleTrajectory(const FrenetTrajectory& traj,
         return std::numeric_limits<double>::infinity();
     }
 
-    double cost_time = cost_terminal_time(15.0 - 0.1 * static_cast<double>(traj.t.size()));
-    double cost_obstacle = cost_dist_obstacle(obstacles_array, num_vertices_array, num_time_steps, num_obstacles, max_vertices, traj, time_step_now);
-    double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
+    // Keep base formulation aligned with existing C++ cost_total.
+    double cost_time = cost_terminal_time(10.0 - traj.t.back());
+    double cost_obstacle = cost_dist_obstacle(
+        obstacles_array,
+        num_vertices_array,
+        num_time_steps,
+        num_obstacles,
+        max_vertices,
+        traj,
+        time_step_now
+    );
+    double cost_speed = cost_velocity_offset(traj.s_d, target_speed);
     double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
     double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
     double cost_offset = cost_lane_center_offset(traj.d);
@@ -151,23 +168,26 @@ void CostFunction::calc_cost(std::vector<FrenetTrajectory>& fplist,
     }
 }
 
-double CostFunction::cost_total(const FrenetTrajectory& traj, double target_speed) {
-    (void)target_speed;
+// double CostFunction::cost_total(const FrenetTrajectory& traj, double target_speed) {
+//     (void)target_speed;
 
-    if (traj.t.empty()) {
-        return std::numeric_limits<double>::infinity();
-    }
+//     if (traj.t.empty()) {
+//         return std::numeric_limits<double>::infinity();
+//     }
 
-    double cost_time = cost_terminal_time(15.0 - 0.1 * static_cast<double>(traj.t.size()));
-    double cost_obstacle = 0.0;
-    double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
-
-    double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
-    double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
-    double cost_offset = cost_lane_center_offset(traj.d);
-
-    double total_cost = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
-                        static_cast<double>(traj.t.size());
+//     // Cost for time: prefer shorter trajectories
+//     double cost_time = cost_terminal_time(10.0 - traj.t.back());
     
-    return total_cost;
-}
+//     // Cost for speed deviation
+//     double cost_speed = cost_velocity_offset(traj.s_d, target_speed);
+    
+//     // Cost for accelerations
+//     double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
+//     double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
+//     double cost_offset = cost_lane_center_offset(traj.d);
+
+//     double total_cost = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
+//                         static_cast<double>(traj.t.size());
+    
+//     return total_cost;
+// }
