@@ -205,7 +205,6 @@ class SparsePlannerWorldModel(FrenetOptimalPlanner):
         n_y = poly_y[next_wp_id] - poly_y[prev_wp_id]
         x_x = x_all - poly_x[prev_wp_id]
         x_y = y_all - poly_y[prev_wp_id]
-        x_yaw = np.arctan2(x_y, x_x)
 
         denom = n_x * n_x + n_y * n_y
         proj_norm = np.divide(x_x * n_x + x_y * n_y, denom, out=np.zeros_like(denom), where=denom != 0)
@@ -213,7 +212,8 @@ class SparsePlannerWorldModel(FrenetOptimalPlanner):
 
         d = np.hypot(x_x - proj_x, x_y - proj_y)
         wp_yaw = poly_yaw[prev_wp_id]
-        d = np.where(wp_yaw <= x_yaw, -d, d)  # CommonRoad sign convention, matches FrenetState.from_state
+        # d > 0 is left of the reference line; same cross-product test as FrenetState.from_state.
+        d = np.where((n_x * x_y - n_y * x_x) < 0, -d, d)
 
         delta_yaw = np.arctan2(np.sin(yaw_all - wp_yaw), np.cos(yaw_all - wp_yaw))
 

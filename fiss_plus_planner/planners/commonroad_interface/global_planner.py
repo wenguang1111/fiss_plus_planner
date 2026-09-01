@@ -4,6 +4,40 @@ from commonroad_route_planner.route_planner import RoutePlanner
 from commonroad_route_planner.utility.visualization import visualize_route
 from commonroad.scenario.scenario import Scenario
 
+def _outermost_boundaries(lanelet, llnet):
+    """Left and right boundary polylines of the whole same-direction roadway holding `lanelet`.
+
+    Walks the adjacency chain outward while the neighbour runs the same way, so the result spans every
+    lane the ego may legally occupy and stops at oncoming lanes. The visited set guards against maps
+    whose adjacency links form a cycle.
+    """
+    left = lanelet
+    seen = {left.lanelet_id}
+    while left.adj_left is not None and left.adj_left_same_direction and left.adj_left not in seen:
+        seen.add(left.adj_left)
+        left = llnet.find_lanelet_by_id(left.adj_left)
+
+    right = lanelet
+    seen = {right.lanelet_id}
+    while right.adj_right is not None and right.adj_right_same_direction and right.adj_right not in seen:
+        seen.add(right.adj_right)
+        right = llnet.find_lanelet_by_id(right.adj_right)
+
+    return left.left_vertices, right.right_vertices
+
+
+def _distance_to_polyline(points: np.ndarray, polyline: np.ndarray) -> np.ndarray:
+    """Distance from each point to the nearest point on `polyline`, clamped to its segments."""
+    a, b = polyline[:-1], polyline[1:]
+    ab = b - a
+    denom = np.einsum('ij,ij->i', ab, ab)
+    denom = np.where(denom > 0.0, denom, 1.0)
+    ap = points[:, None, :] - a[None, :, :]
+    t = np.clip(np.einsum('nmj,mj->nm', ap, ab) / denom, 0.0, 1.0)
+    proj = a[None, :, :] + t[:, :, None] * ab[None, :, :]
+    return np.linalg.norm(points[:, None, :] - proj, axis=2).min(axis=1)
+
+
 class GlobalPlan(object):
     def __init__(self):
         self.lanelets = None
@@ -72,7 +106,22 @@ class GlobalPlanner(object):
             for lanelet in global_plan.lanelets]
             )[np.sort(unqiue_indices)]
 
-        global_plan.concat_centerline = np.hstack((concat_centerline, yaws[:, np.newaxis], widths[:, np.newaxis]))
+        # Distance from the route centerline out to each edge of the whole same-direction roadway, not
+        # just the ego lane. Kept as two separate columns because a road is routinely asymmetric about
+        # the lane the route follows (ESP_Barcelona has two lanes to the left and none to the right),
+        # so a single symmetric half-width cannot describe where the vehicle may go.
+        left_extents = np.concatenate(
+            [_distance_to_polyline(lanelet.center_vertices, _outermost_boundaries(lanelet, llnet)[0])
+             for lanelet in global_plan.lanelets]
+            )[np.sort(unqiue_indices)]
+        right_extents = np.concatenate(
+            [_distance_to_polyline(lanelet.center_vertices, _outermost_boundaries(lanelet, llnet)[1])
+             for lanelet in global_plan.lanelets]
+            )[np.sort(unqiue_indices)]
+
+        global_plan.concat_centerline = np.hstack((
+            concat_centerline, yaws[:, np.newaxis], widths[:, np.newaxis],
+            left_extents[:, np.newaxis], right_extents[:, np.newaxis]))
         
         # Visualization
         if view_route:

@@ -5,6 +5,7 @@ from itertools import product
 import numpy as np
 from commonroad.scenario.scenario import Scenario
 from commonroad.scenario.state import InitialState
+from scipy.ndimage import median_filter
 from shapely import Polygon, affinity
 
 from fiss_plus_planner.planners.common.cost.cost_function import CostFunction
@@ -23,6 +24,12 @@ class Stats(object):
         self.num_trajs_generated = 0
         self.num_trajs_validated = 0
         self.num_collison_checks = 0
+        # Per-cycle breakdown of why sampled trajectories were discarded. Counted where the rejection
+        # happens (check_constraints / check_collision_multithread) so every planner accumulates them,
+        # however many times it calls those per cycle.
+        self.num_rejected_dynamic = 0    # over max speed or max acceleration
+        self.num_rejected_offroad = 0    # left the drivable roadway
+        self.num_rejected_collision = 0  # hit a predicted obstacle
         self.average_runtime = 0.0
         self.step_number = 0
         self.best_traj_costs = [] # float("inf")
@@ -38,6 +45,9 @@ class Stats(object):
         self.num_trajs_generated += other.num_trajs_generated
         self.num_trajs_validated += other.num_trajs_validated
         self.num_collison_checks += other.num_collison_checks
+        self.num_rejected_dynamic += other.num_rejected_dynamic
+        self.num_rejected_offroad += other.num_rejected_offroad
+        self.num_rejected_collision += other.num_rejected_collision
         self.num_FOP_intervention += other.num_FOP_intervention
         return self
     
@@ -46,6 +56,9 @@ class Stats(object):
         self.num_trajs_generated /= value
         self.num_trajs_validated /= value
         self.num_collison_checks /= value
+        self.num_rejected_dynamic /= value
+        self.num_rejected_offroad /= value
+        self.num_rejected_collision /= value
         self.average_runtime /= value
         if len(self.best_traj_costs) > 0:
             self.average_cost = np.mean(self.best_traj_costs)
@@ -79,6 +92,18 @@ class FrenetOptimalPlanner(object):
         self.cost_function = CostFunction("WX1")
         self.cubic_spline = None
         self.best_traj = None
+        # Road geometry along the reference line, read from the scenario in generate_frenet_frame().
+        # road_width is the ego LANE's width and bounds how far the samplers offset laterally.
+        # ref_left_extent[i] / ref_right_extent[i] are the distances from the reference line out to the
+        # edges of the whole same-direction ROADWAY at arc length ref_s[i]; check_constraints uses those
+        # so a trajectory is rejected for leaving the road, not for leaving its lane. They are kept
+        # separate because a roadway is routinely asymmetric about the route's own lane. All stay None
+        # (and road_width keeps the settings default) for centerlines without the extra columns.
+        self.road_width = planner_settings.max_road_width
+        self.ref_s = None
+        self.ref_widths = None
+        self.ref_left_extent = None
+        self.ref_right_extent = None
         self.all_trajs = []
         self.numof_fop_calls = 0 # only for sparse_planner_fop
         
@@ -92,7 +117,10 @@ class FrenetOptimalPlanner(object):
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
         
-        sampling_width = self.settings.max_road_width - self.vehicle.w
+        # Sample against the same road width check_constraints enforces, otherwise samples are generated
+        # beyond the road edge and thrown away again: on USA_US101-6 (real width ~3.4 m) the flat 3.5 m
+        # settings value put 200 of 1000 candidates out of the road before collision checking even ran.
+        sampling_width = self.road_width - self.vehicle.w
         
         d_samples = np.linspace(-sampling_width/2, sampling_width/2, self.settings.num_width)
         s__samples = np.linspace(self.settings.lowest_speed, self.settings.highest_speed, self.settings.num_speed)
@@ -180,6 +208,24 @@ class FrenetOptimalPlanner(object):
 
         return passed_fplist
     
+    def lateral_bounds_at(self, s):
+        """(d_min, d_max) [m] keeping the whole vehicle body on the road, at each arc length in `s`.
+
+        d is positive to the left of the reference line (the convention calc_global_paths applies when it
+        maps d back to a global position), so d_max comes from the roadway's left extent and d_min from
+        its right one. Falls back to a symmetric lane-width bound when generate_frenet_frame() got a
+        centerline without the extent columns.
+        """
+        half_vehicle = self.vehicle.w / 2.0
+        if self.ref_left_extent is None:
+            width = self.road_width if self.ref_widths is None else np.interp(s, self.ref_s, self.ref_widths)
+            half_road = width / 2.0
+            return -(half_road - half_vehicle), half_road - half_vehicle
+
+        left = np.interp(s, self.ref_s, self.ref_left_extent)
+        right = np.interp(s, self.ref_s, self.ref_right_extent)
+        return -(right - half_vehicle), left - half_vehicle
+
     def check_constraints(self, trajs: list) -> list:
         passed = []
 
@@ -193,10 +239,27 @@ class FrenetOptimalPlanner(object):
             #     continue
             # Max speed check
             if any([v > self.vehicle.max_speed for v in traj.s_d]):
+                self.stats.num_rejected_dynamic += 1
                 continue
             # Max accel check
             if any([abs(a) > self.vehicle.max_accel for a in traj.s_dd]):
+                self.stats.num_rejected_dynamic += 1
                 continue
+            # Road departure check: keep the whole vehicle body on the drivable roadway, evaluated
+            # against the road edges at each point's own arc length rather than one width for the whole
+            # route. This bounds the road, not the lane, so changing lanes is not a departure.
+            #
+            # Both bounds are relaxed to the starting offset where that already lies outside, because
+            # every candidate begins at the ego's current d, which is a given rather than something the
+            # planner can choose; without it a vehicle that starts outside has every candidate rejected
+            # on its first point and can never plan its way back in. Trajectories that drift further out
+            # than they started are still rejected.
+            lat = np.asarray(traj.d, dtype=float)
+            if len(lat) > 0:
+                d_min, d_max = self.lateral_bounds_at(traj.s)
+                if np.any((lat < np.minimum(d_min, lat[0])) | (lat > np.maximum(d_max, lat[0]))):
+                    self.stats.num_rejected_offroad += 1
+                    continue
 
             passed.append(i)
             
@@ -270,6 +333,7 @@ class FrenetOptimalPlanner(object):
         )
 
         passed_indices = np.where(~collision_mask)[0]
+        self.stats.num_rejected_collision += len(trajs) - len(passed_indices)
         return [trajs[i] for i in passed_indices]
 
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
@@ -302,6 +366,18 @@ class FrenetOptimalPlanner(object):
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         self.cubic_spline = CubicSpline2D(centerline_pts[:, 0], centerline_pts[:, 1])
         s = np.arange(0, self.cubic_spline.s[-1], 0.1)
+
+        if centerline_pts.ndim == 2 and centerline_pts.shape[1] >= 4:
+            widths = median_filter(centerline_pts[:, 3].astype(float), size=5, mode='nearest')
+            self.ref_s = s
+            self.ref_widths = np.interp(s, self.cubic_spline.s, widths)
+            self.road_width = float(np.median(widths))
+        if centerline_pts.ndim == 2 and centerline_pts.shape[1] >= 6:
+            left = median_filter(centerline_pts[:, 4].astype(float), size=5, mode='nearest')
+            right = median_filter(centerline_pts[:, 5].astype(float), size=5, mode='nearest')
+            self.ref_left_extent = np.interp(s, self.cubic_spline.s, left)
+            self.ref_right_extent = np.interp(s, self.cubic_spline.s, right)
+
         ref_xy = [self.cubic_spline.calc_position(i_s) for i_s in s]
         ref_yaw = [self.cubic_spline.calc_yaw(i_s) for i_s in s]
         ref_rk = [self.cubic_spline.calc_curvature(i_s) for i_s in s]

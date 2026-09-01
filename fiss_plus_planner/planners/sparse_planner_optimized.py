@@ -52,16 +52,13 @@ class SparsePlannerOptimized(FrenetOptimalPlanner):
         self.sampling_res = np.empty(3)
         self.sampling_min = np.empty(3)
         self.sampling_max = np.empty(3)
-        sampling_width = self.settings.max_road_width - self.vehicle.w + 0.3
-        _, self.sampling_res[0] = np.linspace(-sampling_width/2, sampling_width/2, self.settings.num_width, retstep=True)
         _, self.sampling_res[1] = np.linspace(self.settings.lowest_speed, self.settings.highest_speed, self.settings.num_speed, retstep=True)
         _, self.sampling_res[2] = np.linspace(self.settings.min_t, self.settings.max_t, self.settings.num_t, retstep=True)
-        self.sampling_min[0] = -sampling_width/2
-        self.sampling_max[0] = sampling_width/2
         self.sampling_min[1] = self.settings.lowest_speed
         self.sampling_max[1] = self.settings.highest_speed
         self.sampling_min[2] = self.settings.min_t
         self.sampling_max[2] = self.settings.max_t
+        self._update_lateral_sampling_bounds()
 
         self.refined_trajs = PriorityQueue()
         self.image_history = deque(maxlen=3)
@@ -70,7 +67,24 @@ class SparsePlannerOptimized(FrenetOptimalPlanner):
         self.start_state = None
         self.time_inference = 0.0
         self.time_image_generation = 0.0
-    
+
+    def _update_lateral_sampling_bounds(self):
+        """Set the lateral sampling range from the current road width.
+
+        Kept separate from __init__ because the real width only becomes known in generate_frenet_frame(),
+        which runs after construction; without the refresh this planner would keep sampling against the
+        flat settings default while check_constraints enforced the scenario's actual width.
+        """
+        sampling_width = self.road_width - self.vehicle.w + 0.3
+        _, self.sampling_res[0] = np.linspace(-sampling_width/2, sampling_width/2, self.settings.num_width, retstep=True)
+        self.sampling_min[0] = -sampling_width/2
+        self.sampling_max[0] = sampling_width/2
+
+    def generate_frenet_frame(self, centerline_pts: np.ndarray):
+        result = super().generate_frenet_frame(centerline_pts)
+        self._update_lateral_sampling_bounds()
+        return result
+
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
         """Plan using CVAE sampled trajectories."""
         # reset stats
