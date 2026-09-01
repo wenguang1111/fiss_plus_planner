@@ -65,7 +65,6 @@ class FrenetState(object):
         # vector x from previous waypoint to current position
         x_x = state.x - polyline[prev_wp_id, 0]
         x_y = state.y - polyline[prev_wp_id, 1]
-        x_yaw = np.arctan2(x_y, x_x)
         # find the projection of x on n
         # print(f"numerator: {(x_x * n_x + x_y * n_y)}")
         # print(f"demominator: {(n_x * n_x + n_y * n_y)}")
@@ -79,8 +78,13 @@ class FrenetState(object):
         wp_yaw = polyline[prev_wp_id, 2]
         delta_yaw = unifyAngleRange(state.yaw - wp_yaw)
 
-        # if wp_yaw > x_yaw: 
-        if wp_yaw <= x_yaw: # CommonRoad
+        # Sign convention: d > 0 is to the LEFT of the reference line, matching
+        # FrenetOptimalPlanner.calc_global_paths, which places a point at (yaw + pi/2) * d. Decide the
+        # side with the cross product of the segment direction n and the offset vector x; the previous
+        # `wp_yaw <= x_yaw` test compared two absolute angles, which wraps at +-pi and returned the wrong
+        # side on 4 of the 10 demo scenarios (on USA_US101-6 it mirrored the ego 1.52 m across the
+        # reference line).
+        if (n_x * x_y - n_y * x_x) < 0:
             self.d *= -1
 
         # calculate s value

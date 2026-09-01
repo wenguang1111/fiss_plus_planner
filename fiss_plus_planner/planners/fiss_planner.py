@@ -39,7 +39,7 @@ class FissPlanner(FrenetOptimalPlanner):
         max_sqr_dist = np.power(self.settings.num_width, 2) + np.power(self.settings.num_speed, 2) + np.power(self.settings.num_t, 2)
         
         # Define the lateral sampling positions (left being negative, right being positive)
-        sampling_width = self.settings.max_road_width - self.vehicle.w + 0.3
+        sampling_width = self.road_width - self.vehicle.w + 0.3
         left_bound = -sampling_width/2
         right_bound = sampling_width/2
 
