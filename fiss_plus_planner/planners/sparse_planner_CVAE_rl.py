@@ -50,7 +50,7 @@ class SparsePlannerWorldModelSettings(FrenetOptimalPlannerSettings):
         # Must match the checkpoint below exactly (verified against its state_dict tensor shapes).
         self.hidden_dim: int = 32
         self.input_dim: int = 2
-        self.traj_len: int = 20
+        self.traj_len: int = 10
         self.img_size: int = 256
         self.latent_dim: int = 64
 
@@ -60,7 +60,7 @@ class SparsePlannerWorldModelSettings(FrenetOptimalPlannerSettings):
         self.reference_path_lookahead_m: float = ScenarioDrawer.VIEW_SIZE_DEFAULT / 2.0
 
         project_root = Path(__file__).parent.parent.parent
-        self.weights_path = project_root / 'trajectory_planner_world_model' / 'CVAE_baseline_weights.pt'
+        self.weights_path = project_root / 'trajectory_planner_world_model' / 'CVAE_rl_world_model' / 'best_model.pt'
 
 
 class SparsePlannerWorldModel(FrenetOptimalPlanner):
