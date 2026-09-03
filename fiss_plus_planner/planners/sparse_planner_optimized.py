@@ -91,6 +91,7 @@ class SparsePlannerOptimized(FrenetOptimalPlanner):
         self.stats = Stats()
         self.refined_trajs = PriorityQueue()
         self.settings.highest_speed = max_target_speed
+        self.best_traj = None
         images_last_3_frame: List[Image.Image] = []
         self.start_state = frenet_state
         
