@@ -39,6 +39,9 @@ class Stats(object):
         self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
         self.success = False
         self.num_FOP_intervention = 0 # only for sparse_planner_fop
+        self.last_cycle_num_rejected_dynamic = 0
+        self.last_cycle_num_rejected_offroad = 0
+        self.last_cycle_num_rejected_collision = 0
         
     def __add__(self, other):
         self.num_iter += other.num_iter
@@ -306,6 +309,7 @@ class FrenetOptimalPlanner(object):
         for i, traj in enumerate(trajs):
             collision, num_polys = self.has_collision(traj, obstacles, time_step_now, 1)
             if collision:
+                self.stats.num_rejected_collision += 1
                 continue
             passed.append(i)
         return [trajs[i] for i in passed]

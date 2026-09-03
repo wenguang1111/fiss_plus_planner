@@ -23,13 +23,18 @@ def append_measurement_to_csv(csv_path, file, measurement):
         return 
     max_cost = max(measurement.best_traj_costs) if measurement.best_traj_costs else 0.0
     runtime_history_str = json.dumps(measurement.runtime_history)
+    intervention_percent = (
+        measurement.num_FOP_intervention / measurement.step_number * 100
+        if measurement.step_number else 0.0
+    )
     with open(csv_path, 'a', newline='') as csv_file:
         csv_file.write(
             f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
             f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
             f'{measurement.num_collison_checks},'
+            f'{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},{measurement.num_FOP_intervention},{intervention_percent},{measurement.success},'
             f'{measurement.num_rejected_dynamic},{measurement.num_rejected_offroad},{measurement.num_rejected_collision},'
-            f'{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},{measurement.num_FOP_intervention},{measurement.num_FOP_intervention/measurement.step_number*100},{measurement.success}\n'
+            f'{measurement.last_cycle_num_rejected_dynamic},{measurement.last_cycle_num_rejected_offroad},{measurement.last_cycle_num_rejected_collision}\n'
         )
 
 
@@ -63,8 +68,9 @@ if __name__ == '__main__':
             csv_file.write(
                 'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
                 'num_collision_checks,'
+                'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
                 'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
-                'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success\n'
+                'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision\n'
             )
 
     if cfg['FILES']:

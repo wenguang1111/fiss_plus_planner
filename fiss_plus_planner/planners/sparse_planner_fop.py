@@ -116,14 +116,26 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         fplist = self.check_collision_multithread(fplist, time_step_now)
 
         if(len(fplist) == 0):
+            # FrenetOptimalPlanner.plan() resets self.stats. Preserve the CVAE candidates rejected
+            # earlier in this same planning cycle so the final-cycle diagnosis covers both the
+            # sparse attempt and its dense FOP fallback.
+            sparse_rejections = (
+                self.stats.num_rejected_dynamic,
+                self.stats.num_rejected_offroad,
+                self.stats.num_rejected_collision,
+            )
             self.num_FOP_intervention  = 1
-            return super().plan(
+            best_traj = super().plan(
                 frenet_state,
                 max_target_speed,
                 obstacles,
                 time_step_now,
                 current_state,
             )
+            self.stats.num_rejected_dynamic += sparse_rejections[0]
+            self.stats.num_rejected_offroad += sparse_rejections[1]
+            self.stats.num_rejected_collision += sparse_rejections[2]
+            return best_traj
         
         # find minimum cost path
         min_cost = float("inf")

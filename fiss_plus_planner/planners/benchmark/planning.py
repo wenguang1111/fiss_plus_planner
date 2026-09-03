@@ -407,6 +407,13 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if planner.all_trajs:
             all_trajs_accumulated.append(planner.all_trajs[-1])
 
+        # planner.stats is reset at the start of every Python plan() call. Copy the values before
+        # the early-failure break below so the cycle which actually stopped planning is retained.
+        cycle_stats = planner.get_stats() if use_cpp_planner else planner.stats
+        stats.last_cycle_num_rejected_dynamic = getattr(cycle_stats, 'num_rejected_dynamic', 0)
+        stats.last_cycle_num_rejected_offroad = getattr(cycle_stats, 'num_rejected_offroad', 0)
+        stats.last_cycle_num_rejected_collision = getattr(cycle_stats, 'num_rejected_collision', 0)
+
         best_trajs_all_time_steps.append(best_traj_ego)
 
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
@@ -672,6 +679,10 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
+            # A failure in the very first planning cycle still contains useful rejection
+            # diagnostics. Return them instead of dropping the measurement entirely.
+            if method != 'informed':
+                return measurment
             raise RuntimeError
 
         # The ego vehicle can be visualized by converting it into a DynamicObstacle
