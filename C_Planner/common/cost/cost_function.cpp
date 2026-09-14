@@ -9,6 +9,8 @@ CostFunction::CostFunction(const std::string& cost_type) {
         w_J = 0.1;
         w_D = 0.1;
         w_LC = 1.0;
+        w_dist = 0.1;
+        max_speed = 14.0;
     } else {
         // Default values
         w_T = 10.0;
@@ -17,6 +19,8 @@ CostFunction::CostFunction(const std::string& cost_type) {
         w_J = 0.1;
         w_D = 0.1;
         w_LC = 1.0;
+        w_dist = 0.1;
+        max_speed = 14.0;
     }
 }
 
@@ -168,26 +172,23 @@ void CostFunction::calc_cost(std::vector<FrenetTrajectory>& fplist,
     }
 }
 
-// double CostFunction::cost_total(const FrenetTrajectory& traj, double target_speed) {
-//     (void)target_speed;
+double CostFunction::cost_total(const FrenetTrajectory& traj, double target_speed) {
+    (void)target_speed;
 
-//     if (traj.t.empty()) {
-//         return std::numeric_limits<double>::infinity();
-//     }
+    if (traj.t.empty()) {
+        return std::numeric_limits<double>::infinity();
+    }
 
-//     // Cost for time: prefer shorter trajectories
-//     double cost_time = cost_terminal_time(10.0 - traj.t.back());
-    
-//     // Cost for speed deviation
-//     double cost_speed = cost_velocity_offset(traj.s_d, target_speed);
-    
-//     // Cost for accelerations
-//     double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
-//     double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
-//     double cost_offset = cost_lane_center_offset(traj.d);
+    // Keep this obstacle-independent candidate cost aligned with Python cost_total().
+    const double cost_time = cost_terminal_time(
+        15.0 - 0.1 * static_cast<double>(traj.t.size()));
+    const double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
+    const double cost_accel =
+        cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
+    const double cost_jerk_val =
+        cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
+    const double cost_offset = cost_lane_center_offset(traj.d);
 
-//     double total_cost = (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
-//                         static_cast<double>(traj.t.size());
-    
-//     return total_cost;
-// }
+    return (cost_time + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
+           static_cast<double>(traj.t.size());
+}

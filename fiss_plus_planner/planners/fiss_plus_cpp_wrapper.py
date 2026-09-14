@@ -17,8 +17,8 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlannerSettings
+from fiss_plus_planner.planners.frenet_optimal_planner import Stats
 from typing import Tuple
-from fiss_plus_planner.planners.FOP_cpp_wrapper import Stats
 import sys
 from pathlib import Path
 

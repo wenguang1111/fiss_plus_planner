@@ -17,7 +17,7 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
-from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlannerSettings
+from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlannerSettings, Stats
 from typing import Tuple
 import sys
 from pathlib import Path
@@ -45,39 +45,6 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     CPP_MODULE_AVAILABLE = False
-
-class Stats(object):
-    def __init__(self):
-        self.num_iter = 0
-        self.num_trajs_generated = 0
-        self.num_trajs_validated = 0
-        self.num_collison_checks = 0
-        self.average_runtime = 0.0
-        self.step_number = 0
-        self.best_traj_costs = [] # float("inf")
-        self.average_cost = 0.0
-        self.runtime_history = []
-        self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
-        self.success = False
-        self.num_FOP_intervention = 0
-        
-    def __add__(self, other):
-        self.num_iter += other.num_iter
-        self.num_trajs_generated += other.num_trajs_generated
-        self.num_trajs_validated += other.num_trajs_validated
-        self.num_collison_checks += other.num_collison_checks
-        self.num_FOP_intervention += other.num_FOP_intervention
-        return self
-    
-    def average(self, value: int):
-        self.num_iter /= value
-        self.num_trajs_generated /= value
-        self.num_trajs_validated /= value
-        self.num_collison_checks /= value
-        self.average_runtime /= value
-        if len(self.best_traj_costs) > 0:
-            self.average_cost = np.mean(self.best_traj_costs)
-        return self
 
 class FOP_CPP_Wrapper(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
