@@ -72,5 +72,6 @@ def split_scenarios(source_dir: str, target_dir: str = None):
 
 
 if __name__ == "__main__":
-    source_directory = "/home/wenguang/Desktop/IROS2026/FOP_Scenarios_transformed"
-    split_scenarios(source_directory)
+    source_directory = "/home/wenguang/workspace/fiss_plus_planner/fiss_plus_planner/data/demo/Scenarios_30000/files"
+    target_directory = "/home/wenguang/workspace/fiss_plus_planner/fiss_plus_planner/data/demo/CollectionWorldModel"
+    split_scenarios(source_directory, target_directory)

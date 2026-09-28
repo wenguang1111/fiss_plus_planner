@@ -143,6 +143,7 @@ class FOP_CPP_Wrapper(object):
                 stats.num_trajs_validated = cpp_stats.num_trajs_validated
                 stats.num_collison_checks = cpp_stats.num_collision_checks
                 stats.num_FOP_intervention = cpp_stats.num_FOP_intervention
+                stats.num_rejected_offroad = cpp_stats.num_rejected_offroad
             except Exception as e:
                 print(f"Warning: Failed to get stats from C++ planner: {e}")
         return stats
@@ -452,13 +453,17 @@ class FOP_CPP_Wrapper(object):
         # C++ implementation: pass centerline directly to C++ planner
         # C++ planner will internally create and store the cubic spline
         if self.cpp_planner is not None:
-            try:
-                centerline_pts_cpp = np.asarray(centerline_pts, dtype=np.float64)
-                centerline_pts_xy = np.column_stack(
-                    (centerline_pts_cpp[:, 0], centerline_pts_cpp[:, 1])
-                )
-                self.cpp_planner.generate_frenet_frame(centerline_pts_xy)
-            except Exception as e:
-                print(f"Warning: Failed to set C++ planner frenet frame: {e}")
+            centerline_pts_cpp = np.asarray(centerline_pts, dtype=np.float64)
+            centerline_pts_xy = np.ascontiguousarray(centerline_pts_cpp[:, :2])
+            self.cpp_planner.generate_frenet_frame(centerline_pts_xy)
+            if centerline_pts_cpp.shape[1] >= 4:
+                widths = centerline_pts_cpp[:, 3]
+                if centerline_pts_cpp.shape[1] >= 6:
+                    left, right = centerline_pts_cpp[:, 4], centerline_pts_cpp[:, 5]
+                else:
+                    left = right = widths / 2.0
+                # Use the spline's own s knots. Do not smooth away narrow sections
+                # or silently continue without geometry if profile setup fails.
+                self.cpp_planner.set_road_profile(self.cubic_spline.s, widths, left, right)
         #-----------CPP end-------------------------------------------
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))

@@ -3,23 +3,35 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 
 class CostFunction:
     def __init__(self, cost_type: str):
-        if cost_type is "WX1":
-            self.w_T = 1.0
-            self.w_V = 0.1
-            self.w_A = 10.0
-            self.w_J = 10.0
-            self.w_D = 100.0
-            self.w_LC = 10.0
-            self.w_dist = 0.1
-            self.max_speed = 14.0  # for normalization, can be adjusted based on
+        # Importance weights: dimensionless, sum to 1.0 so each can be read as a
+        # share of total priority. Every cost term below is first non-dimensionalized
+        # (divided by a reference scale) to a comparable ~[0,1]-per-timestep range,
+        # so these weights don't also have to absorb unit conversions between e.g.
+        # m/s^2 and m -- kept identical to the C++ WX1 profile in cost_function.cpp.
+        if cost_type == "WX1":
+            self.w_T = 0.05
+            self.w_V = 0.30
+            self.w_A = 0.10
+            self.w_J = 0.05
+            self.w_D = 0.35
+            self.w_LC = 0.15
 
-    
+        # Reference scales used only to non-dimensionalize the raw physical
+        # quantities above. Cost-shaping references, not hard dynamic limits
+        # (those are enforced separately in check_constraints/collision check).
+        self.max_speed = 14.0          # velocity normalization reference [m/s]
+        self.max_accel_ref = 11.5      # acceleration normalization reference [m/s^2]
+        self.max_jerk_ref = 10.0       # jerk normalization reference [m/s^3]
+        self.max_lat_offset_ref = 1.75 # lane-center-offset normalization reference [m]
+        self.time_horizon_ref = 10.0   # terminal-time normalization reference [s]
+        self.d_safe = 8.0              # safety-distance threshold for the obstacle risk ramp [m]
+
     def cost_time(self) -> float:
         pass
-    
+
     def cost_terminal_time(self, terminal_time: float) -> float:
-        return self.w_T * terminal_time
-    
+        return self.w_T * (terminal_time / self.time_horizon_ref)
+
     def _compute_polygon_center(self, vertices: np.ndarray, num_verts: int) -> np.ndarray:
         if num_verts <= 0:
             return np.array([np.inf, np.inf])
@@ -83,21 +95,28 @@ class CostFunction:
         
         if len(min_dists) == 0:
             return 0.0
-        
-        Xis = np.exp(-np.array(min_dists)*self.w_dist)
-        return self.w_D * np.sum(Xis)
-    
+
+        # Quadratic risk ramp: 0 once clear of d_safe, rising steeply as the gap
+        # closes, capped at 1 (matching the actual-collision case, which never
+        # reaches here since it's already rejected by the hard collision check).
+        # Replaces the old exp(-min_dist * w_dist) shape, which was nearly flat
+        # across the whole d_safe range and gave the weight almost no leverage to
+        # actually prefer a wider berth over raw speed tracking.
+        gaps = np.maximum(0.0, self.d_safe - np.array(min_dists))
+        normalized = np.minimum(gaps / self.d_safe, 1.0)
+        return self.w_D * np.sum(normalized ** 2)
+
     def cost_velocity_offset(self, vels: list, v_target: float) -> float:
-        return self.w_V * sum(np.power(np.subtract(vels, v_target), 2))
-    
+        return self.w_V * sum(np.power(np.subtract(vels, v_target), 2)) / self.max_speed ** 2
+
     def cost_acceleration(self, accels: list) -> float:
-        return self.w_A * sum(np.power(accels, 2))
-            
+        return self.w_A * sum(np.power(accels, 2)) / self.max_accel_ref ** 2
+
     def cost_jerk(self, jerks: list) -> float:
-        return self.w_J * sum(np.power(jerks, 2))
-    
+        return self.w_J * sum(np.power(jerks, 2)) / self.max_jerk_ref ** 2
+
     def cost_lane_center_offset(self, offsets: list) -> float:
-        return self.w_LC * sum(np.power(offsets, 2))
+        return self.w_LC * sum(np.power(offsets, 2)) / self.max_lat_offset_ref ** 2
     
     def cost_total(self, traj: FrenetTrajectory, target_speed: float) -> float:
         cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t))

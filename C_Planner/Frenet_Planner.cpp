@@ -7,6 +7,7 @@
 #include <mutex>
 #include <limits>
 #include <iostream>
+#include <stdexcept>
 
 Frenet_Planner::Frenet_Planner(const SettingParameters& settings_param, 
                                const VehicleParams& vehicle_param,
@@ -56,14 +57,21 @@ void Frenet_Planner::recordObstacleArray()
     #endif
 }
 
-std::vector<std::tuple<double, double, double>> Frenet_Planner::get_samples() {
+std::vector<std::tuple<double, double, double>> Frenet_Planner::get_samples(double current_s) {
     // TODO: Generate sampling parameters (d, s_d, t)
     // Calculate sampling range for lateral position
-    double sampling_width = settings.max_road_width - vehicle_params.w;
+    double lane_width = settings.max_road_width;
+    double left, right;
+    if (!road_s.empty() && !road_geometry_at(current_s, lane_width, left, right)) {
+        return {};
+    }
+    double sampling_width = lane_width - vehicle_params.w;
+    if (sampling_width < 0.0) return {};
     
     std::vector<double> d_samples;
     for (int i = 0; i < settings.num_width; i++) {
-        double d = -sampling_width / 2.0 + i * sampling_width / (settings.num_width-1);
+        double d = settings.num_width == 1 ? 0.0 :
+            -sampling_width / 2.0 + i * sampling_width / (settings.num_width-1);
         d_samples.push_back(d);
     }
     
@@ -211,7 +219,8 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_global_paths(const std::vecto
     return passed_fplist;
 }
 
-std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vector<FrenetTrajectory>& trajs) {
+std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vector<FrenetTrajectory>& trajs,
+                                                               int* rejected_offroad) {
     // Check trajectory constraints (speed, acceleration, etc.)
     std::vector<FrenetTrajectory> passed;
     
@@ -236,6 +245,11 @@ std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vecto
             }
         }
         
+        if (valid && settings.check_boundary && !road_s.empty() && !within_road(traj)) {
+            if (rejected_offroad != nullptr) ++*rejected_offroad;
+            valid = false;
+        }
+
         if (valid) {
             passed.push_back(traj);
             passed.back().constraint_passed = true;
@@ -463,7 +477,7 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
                                       double max_target_speed,
                                       int time_step_now,
                                       int num_threads) {
-    std::vector<std::tuple<double, double, double>> samples = get_samples();
+    std::vector<std::tuple<double, double, double>> samples = get_samples(frenet_state.s);
     return best_traj_generation(frenet_state, samples, max_target_speed, time_step_now, num_threads);
 }
 
@@ -474,6 +488,9 @@ FrenetTrajectory Frenet_Planner::best_traj_generation(
     int time_step_now,
     int num_threads) {
     settings.highest_speed = max_target_speed;
+    last_stats = PlanStats();
+    last_fplist.clear();
+    best_traj = FrenetTrajectory();
 
     // Ensure num_threads is at least 1
     if (num_threads <= 0) {
@@ -555,7 +572,8 @@ PlanResult Frenet_Planner::plan_multithread(
             std::vector<FrenetTrajectory> global_paths = calc_global_paths(frenet_paths);
 
             // Step 3: Check constraints
-            std::vector<FrenetTrajectory> constrained_paths = check_constraints(global_paths);
+            std::vector<FrenetTrajectory> constrained_paths = check_constraints(
+                global_paths, &local_stats.num_rejected_offroad);
             local_stats.num_trajs_validated = constrained_paths.size();
 
             // Step 4: Check collisions (within each thread for better cache locality)
@@ -639,5 +657,71 @@ void Frenet_Planner::generate_frenet_frame(const double* centerline_pts, int num
     }
     
     cubic_spline = new CubicSpline2D(x_coords, y_coords);
+    // A profile belongs to one reference frame; never reuse it for a new route.
+    road_s.clear();
+    lane_widths.clear();
+    road_left.clear();
+    road_right.clear();
+}
 
+void Frenet_Planner::set_road_profile(const std::vector<double>& s,
+                                      const std::vector<double>& lane_width,
+                                      const std::vector<double>& left_extent,
+                                      const std::vector<double>& right_extent) {
+    if (cubic_spline == nullptr || s.size() < 2 || lane_width.size() != s.size() ||
+        left_extent.size() != s.size() || right_extent.size() != s.size()) {
+        throw std::invalid_argument("Road profile requires a reference frame and equally sized arrays of at least two points");
+    }
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (!std::isfinite(s[i]) || (i > 0 && s[i] <= s[i - 1]) ||
+            !std::isfinite(lane_width[i]) || lane_width[i] < 0.0 ||
+            !std::isfinite(left_extent[i]) || left_extent[i] < 0.0 ||
+            !std::isfinite(right_extent[i]) || right_extent[i] < 0.0) {
+            throw std::invalid_argument("Road profile needs increasing finite s and nonnegative finite widths/extents");
+        }
+    }
+    if (std::abs(s.front()) > 1e-6 || std::abs(s.back() - cubic_spline->s.back()) > 1e-6) {
+        throw std::invalid_argument("Road profile must span the reference frame's s range");
+    }
+    road_s = s;
+    lane_widths = lane_width;
+    road_left = left_extent;
+    road_right = right_extent;
+}
+
+bool Frenet_Planner::road_geometry_at(double s, double& lane_width, double& left, double& right) const {
+    if (road_s.empty() || !std::isfinite(s) || s < road_s.front() - 1e-6 || s > road_s.back() + 1e-6) {
+        return false;
+    }
+    s = std::clamp(s, road_s.front(), road_s.back());
+    size_t upper = std::upper_bound(road_s.begin(), road_s.end(), s) - road_s.begin();
+    upper = std::min(upper, road_s.size() - 1);
+    size_t lower = upper - 1;
+    double ratio = (s - road_s[lower]) / (road_s[upper] - road_s[lower]);
+    auto interpolate = [lower, upper, ratio](const std::vector<double>& values) {
+        return values[lower] + ratio * (values[upper] - values[lower]);
+    };
+    lane_width = interpolate(lane_widths);
+    left = interpolate(road_left);
+    right = interpolate(road_right);
+    return true;
+}
+
+bool Frenet_Planner::within_road(const FrenetTrajectory& traj) const {
+    // Reject incomplete horizons rather than silently checking only their prefix.
+    if (traj.s.empty() || traj.d.size() != traj.s.size() || traj.yaw.size() != traj.s.size()) return false;
+    for (size_t i = 0; i < traj.s.size(); ++i) {
+        double width, left, right;
+        if (!road_geometry_at(traj.s[i], width, left, right) ||
+            !std::isfinite(traj.d[i]) || !std::isfinite(traj.yaw[i])) return false;
+        // Project the rectangular footprint onto the local reference normal.
+        // This is a local Frenet envelope, not an exact polygon containment test
+        // on curved roads or between discrete time steps.
+        double delta_yaw = traj.yaw[i] - cubic_spline->calc_yaw(traj.s[i]);
+        double half_extent = 0.5 * (vehicle_params.w * std::abs(std::cos(delta_yaw)) +
+                                    vehicle_params.l * std::abs(std::sin(delta_yaw)));
+        if (!std::isfinite(half_extent) || traj.d[i] - half_extent < -right - 1e-6 ||
+            traj.d[i] + half_extent > left + 1e-6) return false;
+    }
+    return true;
 }

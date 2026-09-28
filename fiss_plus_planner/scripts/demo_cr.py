@@ -1,6 +1,7 @@
 import argparse
 import os
 import json
+import logging
 import yaml
 
 from fiss_plus_planner.planners.benchmark.planning import planning
@@ -55,38 +56,52 @@ if __name__ == '__main__':
     measurement_dir = os.path.join(os.getcwd(), cfg['MEASUREMENTS_DIR'])
     name_planner = cfg['PLANNER']
     data_collection = cfg['Collect_Data_For_ML']
-    reading_dir = '/home/wenguang/workplace/fiss_plus_planner/fiss_plus_planner/data/output/imgs'
+    reading_dir = os.path.join(output_dir, "completed")
     if data_collection and os.path.isdir(reading_dir):
-        exsited_files = readExsistedScenarios(os.listdir(reading_dir))
+        exsited_files = readExsistedScenarios(
+            name for name in os.listdir(reading_dir)
+            if name.endswith(".done") and os.path.isfile(os.path.join(reading_dir, name))
+        )
     else:
         exsited_files = set()
+
+    os.makedirs(output_dir, exist_ok=True)
+    logging.basicConfig(
+        level=logging.ERROR,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(output_dir, "collection_errors.log")),
+            logging.StreamHandler(),
+        ],
+    )
 
     if save_measurments:
         os.makedirs(measurement_dir, exist_ok=True)
         csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + '.csv')
-        with open(csv_path, 'w', newline='') as csv_file:
-            csv_file.write(
-                'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                'num_collision_checks,'
-                'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
-                'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
-                'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision\n'
-            )
+        if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
+            with open(csv_path, 'a', newline='') as csv_file:
+                csv_file.write(
+                    'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
+                    'num_collision_checks,'
+                    'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
+                    'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
+                    'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision\n'
+                )
 
-    if cfg['FILES']:
-        # Only run the specified scenario files under the input directory
-        for i, file in enumerate(cfg['FILES']):
+    scenario_files = cfg['FILES'] or sorted(
+        name for name in os.listdir(input_dir)
+        if name.lower().endswith('.xml')
+        and os.path.isfile(os.path.join(input_dir, name))
+    )
+    for file in scenario_files:
+        if file in exsited_files:
+            print(f"Skipping completed scenario: {file}")
+            continue
+        print(f"Processing {file}...")
+        try:
             measurement = planning(cfg, output_dir, input_dir, file)
             if save_measurments:
                 append_measurement_to_csv(csv_path, file, measurement)
-    else:
-        # Read all scenario files under the input directory
-        for i, file in enumerate(os.listdir(input_dir)):
-            if file in exsited_files:
-                print(f"Skipping {file} as it already exists in the reading_dir.")
-                continue
-            else:
-                print(f"Processing {file}...")
-                measurement = planning(cfg, output_dir, input_dir, file)
-                if save_measurments:
-                    append_measurement_to_csv(csv_path, file, measurement)
+        except Exception:
+            # Incomplete exports have no marker and can be retried on restart.
+            logging.exception("Failed to process scenario %s; continuing", file)

@@ -3,60 +3,71 @@
 
 CostFunction::CostFunction(const std::string& cost_type) {
     if (cost_type == "WX1") {
-        w_T = 10.0;
-        w_V = 1.0;
-        w_A = 0.1;
-        w_J = 0.1;
-        w_D = 0.1;
-        w_LC = 1.0;
-        w_dist = 0.1;
-        max_speed = 14.0;
+        // Importance weights: dimensionless, sum to 1.0 so each can be read as a
+        // share of total priority. Safety (w_D) is weighted above raw speed
+        // tracking (w_V) on purpose -- see the reference constants below for how
+        // each raw term gets mapped into the same ~[0,1]-per-timestep scale first.
+        w_T = 0.05;
+        w_V = 0.30;
+        w_A = 0.10;
+        w_J = 0.05;
+        w_D = 0.35;
+        w_LC = 0.15;
     } else {
-        // Default values
-        w_T = 10.0;
-        w_V = 1.0;
-        w_A = 0.1;
-        w_J = 0.1;
-        w_D = 0.1;
-        w_LC = 1.0;
-        w_dist = 0.1;
-        max_speed = 14.0;
+        // Default values (same profile as WX1)
+        w_T = 0.05;
+        w_V = 0.30;
+        w_A = 0.10;
+        w_J = 0.05;
+        w_D = 0.35;
+        w_LC = 0.15;
     }
+
+    max_speed = 14.0;
+    max_accel_ref = 11.5;
+    max_jerk_ref = 10.0;
+    max_lat_offset_ref = 1.75;
+    time_horizon_ref = 10.0;
+    d_safe = 8.0;
 }
 
 double CostFunction::cost_terminal_time(double terminal_time) {
-    return w_T * terminal_time;
+    return w_T * (terminal_time / time_horizon_ref);
 }
 
 double CostFunction::cost_velocity_offset(const std::vector<double>& vels, double v_target) {
     double cost = 0.0;
+    const double norm = max_speed * max_speed;
     for (double vel : vels) {
         double diff = vel - v_target;
-        cost += diff * diff;
+        cost += (diff * diff) / norm;
     }
     return w_V * cost;
 }
 
 double CostFunction::cost_acceleration(const std::vector<double>& accels) {
     double cost = 0.0;
+    const double norm = max_accel_ref * max_accel_ref;
     for (double accel : accels) {
-        cost += accel * accel;
+        cost += (accel * accel) / norm;
     }
     return w_A * cost;
 }
 
 double CostFunction::cost_jerk(const std::vector<double>& jerks) {
     double cost = 0.0;
+    const double norm = max_jerk_ref * max_jerk_ref;
     for (double jerk : jerks) {
-        cost += jerk * jerk;
+        cost += (jerk * jerk) / norm;
     }
     return w_J * cost;
 }
 
 double CostFunction::cost_lane_center_offset(const std::vector<double>& offsets) {
     double cost = 0.0;
+    const double norm = max_lat_offset_ref * max_lat_offset_ref;
     for (double offset : offsets) {
-        cost += offset * offset;
+        cost += (offset * offset) / norm;
     }
     return w_LC * cost;
 }
@@ -75,7 +86,7 @@ double CostFunction::cost_dist_obstacle(const double* obstacles_array,
     }
 
     const size_t num_traj_points = std::min(traj.x.size(), traj.y.size());
-    double exp_sum = 0.0;
+    double risk_sum = 0.0;
 
     for (size_t i = 0; i < num_traj_points; ++i) {
         const int t_idx = time_step_now + i;
@@ -111,11 +122,13 @@ double CostFunction::cost_dist_obstacle(const double* obstacles_array,
         }
 
         if (std::isfinite(min_dist)) {
-            exp_sum += std::exp(-min_dist * w_dist);
+            const double gap = std::max(0.0, d_safe - min_dist);
+            const double normalized = std::min(gap / d_safe, 1.0);
+            risk_sum += normalized * normalized;
         }
     }
 
-    return w_D * exp_sum;
+    return w_D * risk_sum;
 }
 
 double CostFunction::cost_singleTrajectory(const FrenetTrajectory& traj,

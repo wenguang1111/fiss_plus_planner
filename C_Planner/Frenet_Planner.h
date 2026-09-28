@@ -71,8 +71,9 @@ struct PlanStats {
     int num_trajs_validated;    // Number of trajectories that passed constraint check
     int num_collision_checks;   // Number of collision checks performed
     int num_FOP_intervention; // Number of times FOP was used for intervention (if applicable)
+    int num_rejected_offroad;
     
-    PlanStats() : num_trajs_generated(0), num_trajs_validated(0), num_collision_checks(0), num_FOP_intervention(0) {}
+    PlanStats() : num_trajs_generated(0), num_trajs_validated(0), num_collision_checks(0), num_FOP_intervention(0), num_rejected_offroad(0) {}
     
     // Accumulate stats from another PlanStats
     PlanStats& operator+=(const PlanStats& other) {
@@ -80,6 +81,7 @@ struct PlanStats {
         num_trajs_validated += other.num_trajs_validated;
         num_collision_checks += other.num_collision_checks;
         num_FOP_intervention += other.num_FOP_intervention;
+        num_rejected_offroad += other.num_rejected_offroad;
         return *this;
     }
 };
@@ -116,7 +118,7 @@ public:
     void recordTrajectory(const FrenetTrajectory& traj);
     
     // Generate sampling parameters (d, s_d, t)
-    std::vector<std::tuple<double, double, double>> get_samples();
+    std::vector<std::tuple<double, double, double>> get_samples(double current_s = 0.0);
     
     // Calculate Frenet frame trajectories
     std::vector<FrenetTrajectory> calc_frenet_paths(const FrenetState& frenet_state,
@@ -126,7 +128,8 @@ public:
     std::vector<FrenetTrajectory> calc_global_paths(const std::vector<FrenetTrajectory>& fplist);
     
     // Check trajectory constraints (speed, acceleration, etc.)
-    std::vector<FrenetTrajectory> check_constraints(const std::vector<FrenetTrajectory>& trajs);
+    std::vector<FrenetTrajectory> check_constraints(const std::vector<FrenetTrajectory>& trajs,
+                                                   int* rejected_offroad = nullptr);
     
     // Multi-threaded collision detection using pre-processed obstacle data
     std::vector<FrenetTrajectory> check_collision_multithread(const std::vector<FrenetTrajectory>& trajs,
@@ -163,6 +166,18 @@ public:
     
     // Generate Frenet frame from centerline points
     void generate_frenet_frame(const double* centerline_pts, int num_points, int pts_dim);
+
+    // Distances in the same reference frame as trajectory s. Positive extents
+    // measure from the reference line to the left/right same-direction road edge.
+    void set_road_profile(const std::vector<double>& s,
+                          const std::vector<double>& lane_width,
+                          const std::vector<double>& left_extent,
+                          const std::vector<double>& right_extent);
+
+private:
+    std::vector<double> road_s, lane_widths, road_left, road_right;
+    bool road_geometry_at(double s, double& lane_width, double& left, double& right) const;
+    bool within_road(const FrenetTrajectory& traj) const;
 };
 
 #endif // FRENET_PLANNER_H

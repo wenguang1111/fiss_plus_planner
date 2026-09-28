@@ -360,7 +360,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             acceleration=next_state.acceleration,
             yaw_rate=next_state.yaw_rate
         )
-        global_coordination_state_list.append(inital_state)
+        # global_coordination_state_list.append(inital_state)
         global_state_list.append(inital_state)
         frenet_state_list.append(current_frenet_state)
 
@@ -458,6 +458,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         time_list.append(end_time - start_time)
 
         if ego_centered_fop_cpp:
+            global_coordination_state_list.append(inital_state)
             optimal_path_x_local_list.append(optimal_path_x_local)
             optimal_path_y_local_list.append(optimal_path_y_local)
             ref_path_x_local_list.append(ref_path_ahead_local[:, 0].tolist())
@@ -515,7 +516,29 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if i == final_time_step-1:
             stats.success = True
             goal_reached = True
-            
+
+    if collect_data_for_ml and method == 'FOP_CPP' and optimal_path_x_local_list:
+        scenario_name = os.path.splitext(file)[0]
+        drawer = ScenarioDrawer(
+            scenario_name=scenario_name,
+            scenario_dir=input_dir,
+            save_dir=output_dir,
+            ref_ego_lane_pts=ref_ego_lane_pts,
+            vehicle_params=vehicle_params,
+            obstacles_array=obstacles_array,
+            obstacles_num_vertices=obstacles_num_vertices,
+        )
+        collect_data(
+            drawer,
+            scenario_name,
+            optimal_path_x_local_list,
+            optimal_path_y_local_list,
+            ref_path_x_local_list,
+            ref_path_y_local_list,
+            global_coordination_state_list,
+            output_dir,
+            planner.settings.highest_speed,
+        )    
     # construct the final frenet trajectory and calculate the final cost
     final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list, global_state_list)
     final_trajectory.cost_final = planner.cost_function.final_trajectory_cost(
@@ -538,28 +561,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     else:
         ego_vehicle_traj = None
 
-    if collect_data_for_ml and method == 'FOP_CPP' and goal_reached:
-        scenario_name = os.path.splitext(file)[0]
-        drawer = ScenarioDrawer(
-            scenario_name=scenario_name,
-            scenario_dir=input_dir,
-            save_dir=output_dir,
-            ref_ego_lane_pts=ref_ego_lane_pts,
-            vehicle_params=vehicle_params,
-            obstacles_array=obstacles_array,
-            obstacles_num_vertices=obstacles_num_vertices,
-        )
-        collect_data(
-            drawer,
-            scenario_name,
-            optimal_path_x_local_list,
-            optimal_path_y_local_list,
-            ref_path_x_local_list,
-            ref_path_y_local_list,
-            global_coordination_state_list,
-            output_dir,
-            planner.settings.highest_speed,
-        )
 
     return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, all_trajs_accumulated, best_trajs_all_time_steps
 
@@ -930,6 +931,13 @@ def collect_data(drawer: ScenarioDrawer, scenario_name: str,
             highest_speed=highest_speed,
         )
         print(f"Saved images for scenario {scenario_name}")
+
+    done_dir = os.path.join(output_dir, "completed")
+    os.makedirs(done_dir, exist_ok=True)
+
+    marker_path = os.path.join(done_dir, f"{scenario_name}.done")
+    with open(marker_path, "w") as marker:
+        marker.write(str(len(optimal_path_x_list)))
 
 def record_sampling_parameters_to_csv(fplist: list, output_path: str = "samplingParameterWithCost.csv"):
         """

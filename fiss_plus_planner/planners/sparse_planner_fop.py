@@ -18,7 +18,7 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
-from CVAE_efficient_sampling.CVAE import CVAE_Efficient
+from CVAE_efficient_sampling.CVAE_original import CVAE_Efficient
 class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
@@ -28,7 +28,7 @@ class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
         self.num_samples: int =64
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
-        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
+        self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/best_model.pth")
         
 class SparsePlannerFOP(FrenetOptimalPlanner):
     # -------may check the code from FissPlanner--------- #

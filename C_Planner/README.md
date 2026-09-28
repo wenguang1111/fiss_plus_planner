@@ -64,6 +64,41 @@ Stores trajectory data in both Frenet and world frames:
 - `plan()`: Main entry point orchestrating the full pipeline
 - `generate_frenet_frame()`: Initializes centerline spline
 
+### FOP_CPP road-width profiles
+
+The Python FOP wrapper passes CommonRoad geometry once per reference frame using
+`set_road_profile(s, lane_width, left_extent, right_extent)`. The four arrays have
+matching lengths; `s` is strictly increasing and spans the spline's full chord-length
+coordinate range. Extents are positive distances from the reference line to the
+left and right edges of the same-direction roadway. They need not be symmetric.
+
+Each `plan()` call samples lateral endpoints inside the current lane using the
+linearly interpolated width at the initial state's `s`, minus vehicle width.
+`get_samples(current_s=0.0)` exposes the same sampling behavior. A lane narrower
+than the vehicle produces no samples. Sampling at the current position can be
+conservative when the road widens farther ahead.
+
+When `check_boundary` is enabled and a profile is present, every candidate point
+is checked against the left/right extents at its own `s`. The lateral vehicle
+envelope includes width, length, and heading relative to the reference tangent.
+Bounds are never relaxed to the starting offset. Out-of-range or incomplete
+horizons are rejected, and boundary rejections populate `num_rejected_offroad`.
+This is a discrete local Frenet envelope check, not exact vehicle-polygon
+containment on curved roads or continuous collision checking between time steps.
+
+The wrapper accepts existing centerline columns `[x, y, yaw, lane_width, left, right]`.
+Four-column input uses half the lane width for each road edge. XY-only callers
+retain fixed `max_road_width` sampling and have no map-boundary check. Generating
+a new frame clears the old profile. Ego-frame ML collection preserves the width
+and extent columns when rotating/translating the reference. The separate FISS+
+wrapper does not yet supply profiles or use FOP's per-cycle sampling method.
+
+Regression tests (after rebuilding both extensions):
+
+```bash
+poetry run python -m unittest discover -s tests -p 'test_cpp_*.py' -v
+```
+
 ### 5. **Polynomial Classes** (common/geometry/)
 - **QuarticPolynomial**: 4th-order polynomial for longitudinal motion
   - Takes: initial state (x, vx, ax), final velocity (vx_e), final acceleration, time
@@ -223,4 +258,3 @@ TEST(FrenetPlannerTest, SamplingTest) {
     EXPECT_EQ(samples.size(), 5*5*5);  // 125 samples
 }
 ```
-

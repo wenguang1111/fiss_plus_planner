@@ -9,15 +9,27 @@
 
 class CostFunction {
 public:
-    double w_T;   // weight for terminal time
-    double w_V;   // weight for velocity offset
-    double w_A;   // weight for acceleration
-    double w_J;   // weight for jerk
-    double w_D;   // weight for distance to obstacle
+    // Importance weights. Each cost term below is first non-dimensionalized to a
+    // comparable ~[0,1]-per-timestep scale using the reference constants further
+    // down, so these weights express *relative priority* between terms rather than
+    // having to also absorb unit conversions between e.g. m/s^2 and m.
+    double w_T;   // weight for terminal time preference
+    double w_V;   // weight for velocity tracking
+    double w_A;   // weight for acceleration comfort
+    double w_J;   // weight for jerk comfort
+    double w_D;   // weight for obstacle-distance safety
     double w_LC;  // weight for lane center offset
-    double w_dist; // weight for distance to obstacles
-    double max_speed; // maximum speed for normalization
-    
+
+    // Reference scales used only to non-dimensionalize the raw physical quantities
+    // above. These are cost-shaping references, not hard dynamic limits (those are
+    // enforced separately, e.g. in the planner's check_constraints/collision check).
+    double max_speed;          // velocity normalization reference [m/s]
+    double max_accel_ref;      // acceleration normalization reference [m/s^2]
+    double max_jerk_ref;       // jerk normalization reference [m/s^3]
+    double max_lat_offset_ref; // lane-center-offset normalization reference [m]
+    double time_horizon_ref;   // terminal-time normalization reference [s]
+    double d_safe;             // safety-distance threshold for the obstacle risk ramp [m]
+
     CostFunction(const std::string& cost_type = "WX1");
     
     double cost_terminal_time(double terminal_time);

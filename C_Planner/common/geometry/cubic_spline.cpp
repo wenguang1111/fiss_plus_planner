@@ -22,7 +22,10 @@ CubicSpline1D::CubicSpline1D(const std::vector<double>& x_coords, const std::vec
     std::vector<double> A_vec = calc_A(h);
     std::vector<double> B_vec = calc_B(h, a);
     
-    Eigen::MatrixXd A_matrix = Eigen::Map<Eigen::MatrixXd>(A_vec.data(), nx, nx);
+    // calc_A stores rows contiguously; a column-major map would transpose the
+    // system and change its non-symmetric natural boundary conditions.
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::MatrixXd A_matrix = Eigen::Map<const RowMajorMatrix>(A_vec.data(), nx, nx);
     Eigen::VectorXd b_vector = Eigen::Map<Eigen::VectorXd>(B_vec.data(), nx);
     Eigen::VectorXd c_vector = A_matrix.colPivHouseholderQr().solve(b_vector);
     c.resize(nx);

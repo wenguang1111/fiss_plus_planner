@@ -98,6 +98,7 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("num_trajs_generated", &PlanStats::num_trajs_generated)
         .def_readwrite("num_trajs_validated", &PlanStats::num_trajs_validated)
         .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks)
+        .def_readwrite("num_rejected_offroad", &PlanStats::num_rejected_offroad)
         .def_readwrite("num_FOP_intervention", &PlanStats::num_FOP_intervention);
 
     // Bind Frenet_Planner class
@@ -129,13 +130,18 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("num_obstacles"),
              py::arg("max_vertices"))
         .def("generate_frenet_frame", 
-             [](Frenet_Planner& self, py::array_t<double> centerline_pts) {
+             [](Frenet_Planner& self, py::array_t<double, py::array::c_style | py::array::forcecast> centerline_pts) {
                 auto buf = centerline_pts.request();
+                if (buf.ndim != 2 || buf.shape[0] < 2 || buf.shape[1] != 2) {
+                    throw py::value_error("centerline_pts must have shape (N, 2), N >= 2");
+                }
                 int num_points = buf.shape[0];
                 int pts_dim = buf.shape[1];
                 self.generate_frenet_frame(static_cast<double*>(buf.ptr), num_points, pts_dim);
              },
              py::arg("centerline_pts"))
+        .def("set_road_profile", &Frenet_Planner::set_road_profile,
+             py::arg("s"), py::arg("lane_width"), py::arg("left_extent"), py::arg("right_extent"))
         .def("plan",
              [](Frenet_Planner& self,
                 const FrenetState& frenet_state,
@@ -169,7 +175,7 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("max_target_speed"),
              py::arg("time_step_now") = 0,
              py::arg("num_threads") = 1)
-        .def("get_samples", &Frenet_Planner::get_samples)
+        .def("get_samples", &Frenet_Planner::get_samples, py::arg("current_s") = 0.0)
      //    .def("calc_frenet_paths",
      //         [](Frenet_Planner& self, const FrenetState& frenet_state) {
      //            std::vector<std::tuple<double, double, double>> empty_samples;
@@ -180,7 +186,9 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              &Frenet_Planner::calc_global_paths,
              py::arg("fplist"))
         .def("check_constraints",
-             &Frenet_Planner::check_constraints,
+             [](Frenet_Planner& self, const std::vector<FrenetTrajectory>& trajs) {
+                return self.check_constraints(trajs);
+             },
              py::arg("trajs"))
         .def("check_collision_multithread",
              &Frenet_Planner::check_collision_multithread,
