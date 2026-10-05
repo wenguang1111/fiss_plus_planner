@@ -38,6 +38,28 @@ def _distance_to_polyline(points: np.ndarray, polyline: np.ndarray) -> np.ndarra
     return np.linalg.norm(points[:, None, :] - proj, axis=2).min(axis=1)
 
 
+# Traffic-sign elements whose first additional value is a maximum speed [m/s]
+_SPEED_LIMIT_SIGNS = ('MAX_SPEED', 'MAX_SPEED_ZONE_START')
+
+
+def _route_speed_limits(lanelets, llnet):
+    """Speed limit [m/s] valid on each route lanelet, None before the first limit sign.
+
+    A limit sign applies from its lanelet onward along the route until the next limit sign; if a
+    lanelet carries several limits, the lowest one is used.
+    """
+    limits, current = [], None
+    for lanelet in lanelets:
+        values = [float(el.additional_values[0])
+                  for sign_id in lanelet.traffic_signs
+                  for el in llnet.find_traffic_sign_by_id(sign_id).traffic_sign_elements
+                  if el.traffic_sign_element_id.name in _SPEED_LIMIT_SIGNS and el.additional_values]
+        if values:
+            current = min(values)
+        limits.append(current)
+    return limits
+
+
 class GlobalPlan(object):
     def __init__(self):
         self.lanelets = None
@@ -87,6 +109,7 @@ class GlobalPlanner(object):
             lastlanelet = llnet.find_lanelet_by_id(lastlanelet)
             global_plan.lanelets.append(lastlanelet)
         global_plan.lanelet_centerlines = np.array([lanelet.center_vertices for lanelet in global_plan.lanelets],dtype=object)
+        global_plan.speed_limits = _route_speed_limits(global_plan.lanelets, llnet)
         
         # Concatenate the centerlines into one np.ndarray, and remove duplicates
         concat_centerline = np.concatenate(global_plan.lanelet_centerlines)

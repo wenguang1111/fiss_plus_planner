@@ -1,207 +1,94 @@
 #include "cost_function.h"
-#include <limits>
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
 
-CostFunction::CostFunction(const std::string& cost_type) {
-    if (cost_type == "WX1") {
-        // Importance weights: dimensionless, sum to 1.0 so each can be read as a
-        // share of total priority. Safety (w_D) is weighted above raw speed
-        // tracking (w_V) on purpose -- see the reference constants below for how
-        // each raw term gets mapped into the same ~[0,1]-per-timestep scale first.
-        w_T = 0.05;
-        w_V = 0.30;
-        w_A = 0.10;
-        w_J = 0.05;
-        w_D = 0.35;
-        w_LC = 0.15;
-    } else {
-        // Default values (same profile as WX1)
-        w_T = 0.05;
-        w_V = 0.30;
-        w_A = 0.10;
-        w_J = 0.05;
-        w_D = 0.35;
-        w_LC = 0.15;
+namespace {
+
+double sum_sq(const std::vector<double>& values) {
+    double sum = 0.0;
+    for (double v : values) sum += v * v;
+    return sum;
+}
+
+double sum_sq_offset(const std::vector<double>& values, double ref) {
+    double sum = 0.0;
+    for (double v : values) {
+        const double diff = ref - v;
+        sum += diff * diff;
     }
-
-    max_speed = 14.0;
-    max_accel_ref = 11.5;
-    max_jerk_ref = 10.0;
-    max_lat_offset_ref = 1.75;
-    time_horizon_ref = 10.0;
-    d_safe = 8.0;
+    return sum;
 }
 
-double CostFunction::cost_terminal_time(double terminal_time) {
-    return w_T * (terminal_time / time_horizon_ref);
+}  // namespace
+
+CostBreakdown CostFunction::frenet_terms(const FrenetTrajectory& traj, double v_des,
+                                         double t_max, double t_f, double dt) const {
+    CostBreakdown cost;
+    cost.time = weights.w_T * (t_max - t_f);
+    cost.velocity = weights.w_V * sum_sq_offset(traj.s_d, v_des) * dt;
+    cost.acceleration = weights.w_A * (sum_sq(traj.s_dd) + sum_sq(traj.d_dd)) * dt;
+    cost.jerk = weights.w_J * (sum_sq(traj.s_ddd) + sum_sq(traj.d_ddd)) * dt;
+    cost.lane_center = weights.w_LC * sum_sq(traj.d) * dt;
+    return cost;
 }
 
-double CostFunction::cost_velocity_offset(const std::vector<double>& vels, double v_target) {
-    double cost = 0.0;
-    const double norm = max_speed * max_speed;
-    for (double vel : vels) {
-        double diff = vel - v_target;
-        cost += (diff * diff) / norm;
-    }
-    return w_V * cost;
-}
-
-double CostFunction::cost_acceleration(const std::vector<double>& accels) {
-    double cost = 0.0;
-    const double norm = max_accel_ref * max_accel_ref;
-    for (double accel : accels) {
-        cost += (accel * accel) / norm;
-    }
-    return w_A * cost;
-}
-
-double CostFunction::cost_jerk(const std::vector<double>& jerks) {
-    double cost = 0.0;
-    const double norm = max_jerk_ref * max_jerk_ref;
-    for (double jerk : jerks) {
-        cost += (jerk * jerk) / norm;
-    }
-    return w_J * cost;
-}
-
-double CostFunction::cost_lane_center_offset(const std::vector<double>& offsets) {
-    double cost = 0.0;
-    const double norm = max_lat_offset_ref * max_lat_offset_ref;
-    for (double offset : offsets) {
-        cost += (offset * offset) / norm;
-    }
-    return w_LC * cost;
-}
-
-double CostFunction::cost_dist_obstacle(const double* obstacles_array,
-                                        const int* num_vertices_array,
-                                        int num_time_steps,
-                                        int num_obstacles,
-                                        int max_vertices,
-                                        const FrenetTrajectory& traj,
-                                        int time_step_now) {
-    if (obstacles_array == nullptr || num_vertices_array == nullptr ||
-        num_time_steps <= 0 || num_obstacles <= 0 || max_vertices <= 0 ||
-        traj.x.empty() || traj.y.empty()) {
+double CostFunction::obstacle_term(const FrenetTrajectory& traj, const ObstacleView& obstacles,
+                                   int time_step_now, double dt) const {
+    if (obstacles.empty()) {
         return 0.0;
     }
 
-    const size_t num_traj_points = std::min(traj.x.size(), traj.y.size());
-    double risk_sum = 0.0;
-
-    for (size_t i = 0; i < num_traj_points; ++i) {
-        const int t_idx = time_step_now + i;
-        if (t_idx < 0 || t_idx >= num_time_steps) {
+    const size_t num_points = std::min({traj.x.size(), traj.y.size(), traj.yaw.size()});
+    double xi_sum = 0.0;
+    for (size_t k = 0; k < num_points; ++k) {
+        const int t_idx = time_step_now + static_cast<int>(k);
+        if (t_idx < 0 || t_idx >= obstacles.num_time_steps) {
             break;
         }
+        const double heading_x = std::cos(traj.yaw[k]);
+        const double heading_y = std::sin(traj.yaw[k]);
 
-        const double traj_x = traj.x[i];
-        const double traj_y = traj.y[i];
-        double min_dist = std::numeric_limits<double>::infinity();
-
-        for (int obs_idx = 0; obs_idx < num_obstacles; ++obs_idx) {
-            const int num_verts = num_vertices_array[t_idx * num_obstacles + obs_idx];
-            const int valid_num_verts = std::min(num_verts, max_vertices);
-            if (valid_num_verts <= 0) {
+        double max_xi = 0.0;
+        for (int j = 0; j < obstacles.num_obstacles; ++j) {
+            const int n = obstacles.vertex_count(t_idx, j);
+            if (n <= 0) {
                 continue;
             }
-
-            double center_x = 0.0;
-            double center_y = 0.0;
-            for (int v = 0; v < valid_num_verts; ++v) {
-                const int array_idx = (t_idx * num_obstacles + obs_idx) * max_vertices * 2 + v * 2;
-                center_x += obstacles_array[array_idx];
-                center_y += obstacles_array[array_idx + 1];
+            const double* poly = obstacles.polygon(t_idx, j);
+            double cx = 0.0, cy = 0.0;
+            for (int v = 0; v < n; ++v) {
+                cx += poly[2 * v];
+                cy += poly[2 * v + 1];
             }
-            center_x /= static_cast<double>(valid_num_verts);
-            center_y /= static_cast<double>(valid_num_verts);
-
-            const double dist = std::hypot(traj_x - center_x, traj_y - center_y);
-            if (dist < min_dist) {
-                min_dist = dist;
+            const double dx = cx / n - traj.x[k];
+            const double dy = cy / n - traj.y[k];
+            if (dx * heading_x + dy * heading_y <= 0.0) {
+                continue;  // only obstacles in front of the ego vehicle
             }
+            max_xi = std::max(max_xi, std::exp(-weights.w_dist * std::hypot(dx, dy)));
         }
-
-        if (std::isfinite(min_dist)) {
-            const double gap = std::max(0.0, d_safe - min_dist);
-            const double normalized = std::min(gap / d_safe, 1.0);
-            risk_sum += normalized * normalized;
-        }
+        xi_sum += max_xi;
     }
-
-    return w_D * risk_sum;
+    return weights.w_D * xi_sum * dt;
 }
 
-double CostFunction::cost_singleTrajectory(const FrenetTrajectory& traj,
-                                           double target_speed,
-                                           const double* obstacles_array,
-                                           const int* num_vertices_array,
-                                           int num_time_steps,
-                                           int num_obstacles,
-                                           int max_vertices,
-                                           int time_step_now) {
-    if (traj.t.empty()) {
-        return std::numeric_limits<double>::infinity();
+CostBreakdown CostFunction::scenario_cost(const FrenetTrajectory& executed,
+                                          const std::vector<double>& v_des,
+                                          double dt, const ObstacleView& obstacles) const {
+    const size_t n = executed.s_d.size();
+    if (v_des.size() != n) {
+        throw std::invalid_argument("scenario_cost needs one v_des per executed sample");
     }
-
-    // Keep base formulation aligned with existing C++ cost_total.
-    double cost_time = cost_terminal_time(10.0 - traj.t.back());
-    double cost_obstacle = cost_dist_obstacle(
-        obstacles_array,
-        num_vertices_array,
-        num_time_steps,
-        num_obstacles,
-        max_vertices,
-        traj,
-        time_step_now
-    );
-    double cost_speed = cost_velocity_offset(traj.s_d, target_speed);
-    double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
-    double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
-    double cost_offset = cost_lane_center_offset(traj.d);
-
-    return (cost_time + cost_obstacle + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
-           static_cast<double>(traj.t.size());
-}
-
-void CostFunction::calc_cost(std::vector<FrenetTrajectory>& fplist,
-                             double target_speed,
-                             const double* obstacles_array,
-                             const int* num_vertices_array,
-                             int num_time_steps,
-                             int num_obstacles,
-                             int max_vertices,
-                             int time_step_now) {
-    for (auto& traj : fplist) {
-        traj.cost_final = cost_singleTrajectory(
-            traj,
-            target_speed,
-            obstacles_array,
-            num_vertices_array,
-            num_time_steps,
-            num_obstacles,
-            max_vertices,
-            time_step_now
-        );
+    const double t_f = n > 0 ? static_cast<double>(n - 1) * dt : 0.0;
+    CostBreakdown cost = frenet_terms(executed, 0.0, 0.0, t_f, dt);
+    double velocity_sq = 0.0;
+    for (size_t k = 0; k < n; ++k) {
+        const double diff = v_des[k] - executed.s_d[k];
+        velocity_sq += diff * diff;
     }
-}
-
-double CostFunction::cost_total(const FrenetTrajectory& traj, double target_speed) {
-    (void)target_speed;
-
-    if (traj.t.empty()) {
-        return std::numeric_limits<double>::infinity();
-    }
-
-    // Keep this obstacle-independent candidate cost aligned with Python cost_total().
-    const double cost_time = cost_terminal_time(
-        15.0 - 0.1 * static_cast<double>(traj.t.size()));
-    const double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
-    const double cost_accel =
-        cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
-    const double cost_jerk_val =
-        cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);
-    const double cost_offset = cost_lane_center_offset(traj.d);
-
-    return (cost_time + cost_speed + cost_accel + cost_jerk_val + cost_offset) /
-           static_cast<double>(traj.t.size());
+    cost.velocity = weights.w_V * velocity_sq * dt;
+    cost.time = weights.w_T * t_f;
+    cost.obstacle = obstacle_term(executed, obstacles, 0, dt);
+    return cost;
 }

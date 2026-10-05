@@ -135,18 +135,12 @@ class FOP_CPP_Wrapper(object):
 
     def get_stats(self) -> Stats:
         """Get statistics from C++ planner and convert to Python Stats object"""
-        stats = Stats()
         if self.cpp_planner is not None:
             try:
-                cpp_stats = self.cpp_planner.get_stats()
-                stats.num_trajs_generated = cpp_stats.num_trajs_generated
-                stats.num_trajs_validated = cpp_stats.num_trajs_validated
-                stats.num_collison_checks = cpp_stats.num_collision_checks
-                stats.num_FOP_intervention = cpp_stats.num_FOP_intervention
-                stats.num_rejected_offroad = cpp_stats.num_rejected_offroad
+                return Stats.from_cpp(self.cpp_planner.get_stats())
             except Exception as e:
                 print(f"Warning: Failed to get stats from C++ planner: {e}")
-        return stats
+        return Stats()
 
     def recordObstaclesForDebug(self, output_path: str = "python_obstacle.csv"):
         """Record obstacle array data to CSV file in the same format as C++ recordObstacleArray"""
@@ -281,7 +275,10 @@ class FOP_CPP_Wrapper(object):
                         row.append("")
                 writer.writerow(row)
 
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, initial_state: InitialState = None,
+             desired_speed: float = None) -> FrenetTrajectory:
+        """max_target_speed bounds the sampled terminal speed; desired_speed is v_des of J_V
+        (None: v_des = max_target_speed)."""
         if self.cpp_planner is not None:
             try:
                 cpp_state = frenet_planner_cpp.FrenetState()
@@ -295,7 +292,8 @@ class FOP_CPP_Wrapper(object):
                 cpp_state.d_dd = frenet_state.d_dd
                 cpp_state.d_ddd = frenet_state.d_ddd
                 
-                cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads)
+                cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads,
+                                                 -1.0 if desired_speed is None else desired_speed)
                 
                 if cpp_traj.is_generated:
                     py_traj = FrenetTrajectory()

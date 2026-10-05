@@ -85,11 +85,14 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 self.generate_frenet_frame(static_cast<double*>(buf.ptr), num_points, pts_dim);
              },
              py::arg("centerline_pts"))
+        .def("set_road_profile", &Fiss_Plus_Planner::set_road_profile,
+             py::arg("s"), py::arg("lane_width"), py::arg("left_extent"), py::arg("right_extent"))
         .def("plan",
              [](Fiss_Plus_Planner& self,
                 py::object frenet_state,
                 double max_target_speed,
-                int time_step_now) {
+                int time_step_now,
+                double desired_speed) {
                 FrenetState fs;
                 fs.t = frenet_state.attr("t").cast<double>();
                 fs.s = frenet_state.attr("s").cast<double>();
@@ -101,7 +104,7 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 fs.d_dd = frenet_state.attr("d_dd").cast<double>();
                 fs.d_ddd = frenet_state.attr("d_ddd").cast<double>();
                 
-                FrenetTrajectory traj = self.plan(fs, max_target_speed, time_step_now);
+                FrenetTrajectory traj = self.plan(fs, max_target_speed, time_step_now, desired_speed);
                 
                 py::dict d;
                 d["t"] = traj.t;
@@ -132,7 +135,8 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
              },
              py::arg("frenet_state"),
              py::arg("max_target_speed"),
-             py::arg("time_step_now") = 0)
+             py::arg("time_step_now") = 0,
+             py::arg("desired_speed") = -1.0)
         .def("getAllSuccessfulTrajectories", 
              [](Fiss_Plus_Planner& self) {
                 auto trajs = self.getAllSuccessfulTrajectories();
@@ -171,10 +175,27 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
              [](Fiss_Plus_Planner& self) {
                 auto stats = self.get_stats();
                 py::dict d;
+                d["num_search_iterations"] = stats.num_search_iterations;
                 d["num_trajs_generated"] = stats.num_trajs_generated;
-                d["num_trajs_validated"] = stats.num_trajs_validated;
+                d["num_global_transforms"] = stats.num_global_transforms;
+                d["num_rejected_transform"] = stats.num_rejected_transform;
+                d["num_constraint_checks"] = stats.num_constraint_checks;
+                d["num_constraint_passed"] = stats.num_constraint_passed;
+                d["num_rejected_dynamic"] = stats.num_rejected_dynamic;
+                d["num_rejected_offroad"] = stats.num_rejected_offroad;
                 d["num_collision_checks"] = stats.num_collision_checks;
+                d["num_collision_free"] = stats.num_collision_free;
+                d["num_rejected_collision"] = stats.num_rejected_collision();
+                d["num_cost_evaluations"] = stats.num_cost_evaluations;
                 d["num_FOP_intervention"] = stats.num_FOP_intervention;
+                py::dict timing;
+                timing["generation_ms"] = stats.timing.generation_ms;
+                timing["transform_ms"] = stats.timing.transform_ms;
+                timing["constraint_ms"] = stats.timing.constraint_ms;
+                timing["collision_ms"] = stats.timing.collision_ms;
+                timing["cost_ms"] = stats.timing.cost_ms;
+                timing["total_ms"] = stats.timing.total_ms;
+                d["timing"] = timing;
                 return d;
              })
         .def_readwrite("fiss_settings", &Fiss_Plus_Planner::fiss_settings);

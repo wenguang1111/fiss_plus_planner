@@ -57,6 +57,12 @@ set(UTILS_SOURCES
     common/utils/array_utils.cpp
 )
 
+# Source files for the shared trajectory backend (scenario data + evaluator)
+set(EVALUATOR_SOURCES
+    common/scenario/road_profile.cpp
+    common/evaluator/trajectory_evaluator.cpp
+)
+
 # Source files for the main planner
 set(PLANNER_SOURCES
     Frenet_Planner.cpp
@@ -64,6 +70,7 @@ set(PLANNER_SOURCES
     ${COST_SOURCES}
     ${COLLISION_SOURCES}
     ${UTILS_SOURCES}
+    ${EVALUATOR_SOURCES}
 )
 
 # Source files for FISS+ planner (includes base planner sources)
@@ -74,6 +81,7 @@ set(FISS_PLUS_PLANNER_SOURCES
     ${COST_SOURCES}
     ${COLLISION_SOURCES}
     ${UTILS_SOURCES}
+    ${EVALUATOR_SOURCES}
 )
 
 # Create Python extension module using PyBind11 for Frenet Planner

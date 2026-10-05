@@ -42,6 +42,32 @@ class Stats(object):
         self.last_cycle_num_rejected_dynamic = 0
         self.last_cycle_num_rejected_offroad = 0
         self.last_cycle_num_rejected_collision = 0
+        # Filled only by the C++ planners (shared TrajectoryEvaluator)
+        self.num_constraint_checks = 0
+        self.num_cost_evaluations = 0
+        self.timing_ms = {}              # per-stage time, summed over cycles
+        self.final_cost_terms = {}       # Eq. (7)+(8) terms of the executed trajectory
+
+    @staticmethod
+    def from_cpp(cpp_stats) -> "Stats":
+        """Convert the C++ PlanStats (object or dict) of one planning cycle."""
+        get = cpp_stats.get if isinstance(cpp_stats, dict) else (lambda k, d=0: getattr(cpp_stats, k, d))
+        stats = Stats()
+        stats.num_iter = get("num_search_iterations", 0)
+        stats.num_trajs_generated = get("num_trajs_generated", 0)
+        stats.num_trajs_validated = get("num_constraint_passed", 0)
+        stats.num_collison_checks = get("num_collision_checks", 0)
+        stats.num_rejected_dynamic = get("num_rejected_dynamic", 0)
+        stats.num_rejected_offroad = get("num_rejected_offroad", 0)
+        stats.num_rejected_collision = get("num_rejected_collision", 0)
+        stats.num_FOP_intervention = get("num_FOP_intervention", 0)
+        stats.num_constraint_checks = get("num_constraint_checks", 0)
+        stats.num_cost_evaluations = get("num_cost_evaluations", 0)
+        timing = get("timing", None)
+        if timing is not None:
+            keys = ("generation_ms", "transform_ms", "constraint_ms", "collision_ms", "cost_ms", "total_ms")
+            stats.timing_ms = {k: (timing[k] if isinstance(timing, dict) else getattr(timing, k)) for k in keys}
+        return stats
         
     def __add__(self, other):
         self.num_iter += other.num_iter
@@ -52,6 +78,10 @@ class Stats(object):
         self.num_rejected_offroad += other.num_rejected_offroad
         self.num_rejected_collision += other.num_rejected_collision
         self.num_FOP_intervention += other.num_FOP_intervention
+        self.num_constraint_checks += getattr(other, 'num_constraint_checks', 0)
+        self.num_cost_evaluations += getattr(other, 'num_cost_evaluations', 0)
+        for k, v in getattr(other, 'timing_ms', {}).items():
+            self.timing_ms[k] = self.timing_ms.get(k, 0.0) + v
         return self
     
     def average(self, value: int):
@@ -62,6 +92,9 @@ class Stats(object):
         self.num_rejected_dynamic /= value
         self.num_rejected_offroad /= value
         self.num_rejected_collision /= value
+        self.num_constraint_checks /= value
+        self.num_cost_evaluations /= value
+        self.timing_ms = {k: v / value for k, v in self.timing_ms.items()}
         self.average_runtime /= value
         if len(self.best_traj_costs) > 0:
             self.average_cost = np.mean(self.best_traj_costs)

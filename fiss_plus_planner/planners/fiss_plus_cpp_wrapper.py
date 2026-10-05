@@ -136,17 +136,12 @@ class FissPlusCppWrapper(object):
 
     def get_stats(self) -> Stats:
         """Get statistics from C++ planner and convert to Python Stats object"""
-        stats = Stats()
         if self.cpp_planner is not None:
             try:
-                cpp_stats = self.cpp_planner.get_stats()  # Returns dict
-                stats.num_trajs_generated = cpp_stats["num_trajs_generated"]
-                stats.num_trajs_validated = cpp_stats["num_trajs_validated"]
-                stats.num_collison_checks = cpp_stats["num_collision_checks"]
-                stats.num_FOP_intervention = cpp_stats.get("num_FOP_intervention", 0)
+                return Stats.from_cpp(self.cpp_planner.get_stats())  # Returns dict
             except Exception as e:
                 print(f"Warning: Failed to get stats from C++ planner: {e}")
-        return stats
+        return Stats()
 
     def _dict_to_frenet_trajectory(self, d: dict) -> FrenetTrajectory:
         """Convert a dict returned from C++ to FrenetTrajectory"""
@@ -172,11 +167,13 @@ class FissPlusCppWrapper(object):
         return fp
 
     def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, 
-             time_step_now: int = 0, initial_state: InitialState = None) -> FrenetTrajectory:
+             time_step_now: int = 0, initial_state: InitialState = None,
+             desired_speed: float = None) -> FrenetTrajectory:
         if self.cpp_planner is not None:
             try:
                 # Pass Python FrenetState directly - C++ will extract attributes
-                cpp_traj_dict = self.cpp_planner.plan(frenet_state, max_target_speed, time_step_now)
+                cpp_traj_dict = self.cpp_planner.plan(frenet_state, max_target_speed, time_step_now,
+                                                      -1.0 if desired_speed is None else desired_speed)
                 
                 if cpp_traj_dict["is_generated"]:
                     py_traj = self._dict_to_frenet_trajectory(cpp_traj_dict)
@@ -213,13 +210,22 @@ class FissPlusCppWrapper(object):
         # C++ implementation: pass centerline directly to C++ planner
         # C++ planner will internally create and store the cubic spline
         if self.cpp_planner is not None:
+            centerline_pts_cpp = np.asarray(centerline_pts, dtype=np.float64)
             try:
-                centerline_pts_cpp = np.asarray(centerline_pts, dtype=np.float64)
                 centerline_pts_xy = np.column_stack(
                     (centerline_pts_cpp[:, 0], centerline_pts_cpp[:, 1])
                 )
                 self.cpp_planner.generate_frenet_frame(centerline_pts_xy)
             except Exception as e:
                 print(f"Warning: Failed to set C++ planner frenet frame: {e}")
+            # Same road-width profile as FOP_CPP, so both share sampling bounds and
+            # the road-boundary constraint.
+            if centerline_pts_cpp.shape[1] >= 4:
+                widths = centerline_pts_cpp[:, 3]
+                if centerline_pts_cpp.shape[1] >= 6:
+                    left, right = centerline_pts_cpp[:, 4], centerline_pts_cpp[:, 5]
+                else:
+                    left = right = widths / 2.0
+                self.cpp_planner.set_road_profile(self.cubic_spline.s, widths, left, right)
         #-----------CPP end-------------------------------------------
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))

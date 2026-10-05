@@ -10,6 +10,11 @@
 #include "common/geometry/cubic_spline.h"
 #include "common/geometry/polynomial.h"
 #include "common/cost/cost_function.h"
+#include "common/evaluator/plan_stats.h"
+#include "common/evaluator/trajectory_evaluator.h"
+#include "common/scenario/obstacles.h"
+#include "common/scenario/road_profile.h"
+#include "common/scenario/vehicle_params.h"
 
 struct SettingParameters {
     // time resolution between two planned waypoints
@@ -45,45 +50,16 @@ struct SettingParameters {
           check_boundary(true) {}
 };
 
-// Vehicle parameters struct
-struct VehicleParams {
-    double l;          // length [m]
-    double w;          // width [m]
-    double a;          // distance from base_link to CoG [m]
-    double b;          // distance from CoG to front_link [m]
-    double T_f;        // front track width [m]
-    double T_r;        // rear track width [m]
-    double max_speed;  // maximum speed [m/s]
-    double max_accel;  // maximum acceleration [m/ss]
-    double max_steering_angle;  // maximum steering angle [rad]
-    double max_steering_rate;   // maximum steering rate [rad/s]
+// Admissible region of the sampling parameters z = (d, s_d, t), shared by all planners.
+struct SearchSpace {
+    double d_min, d_max;   // terminal lateral offset [m]
+    double v_min, v_max;   // terminal longitudinal speed [m/s]
+    double t_min, t_max;   // planning horizon [s]
 };
 
 // Result structure for plan_multithread
 struct PlanResult {
-    std::vector<FrenetTrajectory> frenet_paths;       // All generated frenet paths
-    std::vector<FrenetTrajectory> collision_free_paths; // Paths that passed collision check
-};
-
-// Statistics structure for planning
-struct PlanStats {
-    int num_trajs_generated;    // Number of frenet paths generated
-    int num_trajs_validated;    // Number of trajectories that passed constraint check
-    int num_collision_checks;   // Number of collision checks performed
-    int num_FOP_intervention; // Number of times FOP was used for intervention (if applicable)
-    int num_rejected_offroad;
-    
-    PlanStats() : num_trajs_generated(0), num_trajs_validated(0), num_collision_checks(0), num_FOP_intervention(0), num_rejected_offroad(0) {}
-    
-    // Accumulate stats from another PlanStats
-    PlanStats& operator+=(const PlanStats& other) {
-        num_trajs_generated += other.num_trajs_generated;
-        num_trajs_validated += other.num_trajs_validated;
-        num_collision_checks += other.num_collision_checks;
-        num_FOP_intervention += other.num_FOP_intervention;
-        num_rejected_offroad += other.num_rejected_offroad;
-        return *this;
-    }
+    std::vector<FrenetTrajectory> collision_free_paths; // Feasible paths with their cost
 };
 
 class Frenet_Planner {
@@ -92,19 +68,14 @@ public:
     VehicleParams vehicle_params;
     CostFunction cost_function;
     CubicSpline2D* cubic_spline;
+    RoadProfile road_profile;
+    ObstacleView obstacles;
     FrenetTrajectory best_traj;
     std::vector<std::vector<FrenetTrajectory>> all_trajs;
     std::vector<FrenetTrajectory> last_fplist;
     
     // Statistics for the last planning cycle
     PlanStats last_stats;
-    
-    // Obstacle data members
-    const double* obstacles_array;
-    const int* num_vertices_array;
-    int num_time_steps;
-    int num_obstacles;
-    int max_vertices;
     
     Frenet_Planner(const SettingParameters& settings_param, 
                    const VehicleParams& vehicle_param,
@@ -117,29 +88,25 @@ public:
     void recordObstacleArray();
     void recordTrajectory(const FrenetTrajectory& traj);
     
-    // Generate sampling parameters (d, s_d, t)
+    // Sampling region at the current position: lateral bounds are the lane width at
+    // current_s minus the vehicle width. False if the vehicle does not fit.
+    bool search_space(double current_s, SearchSpace& space) const;
+
+    // Generate the sampling grid (d, s_d, t) inside search_space(current_s)
     std::vector<std::tuple<double, double, double>> get_samples(double current_s = 0.0);
     
-    // Calculate Frenet frame trajectories
-    std::vector<FrenetTrajectory> calc_frenet_paths(const FrenetState& frenet_state,
-                                                     const std::vector<std::tuple<double, double, double>>& samples);
-    
-    // Convert Frenet paths to global (x, y) coordinates using cubic spline
-    std::vector<FrenetTrajectory> calc_global_paths(const std::vector<FrenetTrajectory>& fplist);
-    
-    // Check trajectory constraints (speed, acceleration, etc.)
-    std::vector<FrenetTrajectory> check_constraints(const std::vector<FrenetTrajectory>& trajs,
-                                                   int* rejected_offroad = nullptr);
-    
-    // Multi-threaded collision detection using pre-processed obstacle data
-    std::vector<FrenetTrajectory> check_collision_multithread(const std::vector<FrenetTrajectory>& trajs,
-                                                               int time_step_now = 0);
-    
-    // Main planning function - simplified interface
+    // The planning problem of one cycle. Every planner evaluates its candidates with
+    // a TrajectoryEvaluator built from this context.
+    PlanningContext make_context(double v_des, int time_step_now, bool use_obstacle_cost) const;
+
+    // Main planning function - simplified interface.
+    // max_target_speed: upper bound of the sampled terminal speed. desired_speed: v_des of
+    // J_V; a negative value means v_des = max_target_speed.
     FrenetTrajectory plan(const FrenetState& frenet_state,
                          double max_target_speed,
                          int time_step_now = 0,
-                         int num_threads=1);
+                         int num_threads=1,
+                         double desired_speed = -1.0);
 
     // Main planning function using externally provided sampling parameters (d, s_d, t)
     FrenetTrajectory best_traj_generation(
@@ -147,13 +114,24 @@ public:
         const std::vector<std::tuple<double, double, double>>& samples,
         double max_target_speed,
         int time_step_now = 0,
-        int num_threads = 1);
+        int num_threads = 1,
+        double desired_speed = -1.0);
+
+    // Evaluates every sample with the shared evaluator (single thread) and returns
+    // one result per sample, e.g. for offline teacher data or violation analysis.
+    std::vector<EvaluationResult> evaluate_samples(
+        const FrenetState& frenet_state,
+        const std::vector<std::tuple<double, double, double>>& samples,
+        double max_target_speed,
+        int time_step_now = 0,
+        bool full_violation = true,
+        double desired_speed = -1.0);
 
     // Multithreaded planning function
     PlanResult plan_multithread(
         const std::vector<std::vector<std::tuple<double, double, double>>>& samples_per_thread_vec,
         const FrenetState& frenet_state,
-        int time_step_now);
+        const PlanningContext& context);
 
     std::vector<FrenetTrajectory> getAllSuccessfulTrajectories() const {
         return last_fplist;
@@ -173,11 +151,6 @@ public:
                           const std::vector<double>& lane_width,
                           const std::vector<double>& left_extent,
                           const std::vector<double>& right_extent);
-
-private:
-    std::vector<double> road_s, lane_widths, road_left, road_right;
-    bool road_geometry_at(double s, double& lane_width, double& left, double& right) const;
-    bool within_road(const FrenetTrajectory& traj) const;
 };
 
 #endif // FRENET_PLANNER_H

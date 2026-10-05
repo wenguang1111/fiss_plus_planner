@@ -19,6 +19,10 @@ def readExsistedScenarios(existing_entries):
     return existing_scenarios
 
 
+# Weighted terms of the scenario cost J_total = J_run + J_ter (FISS+ Eq. 7, 8)
+FINAL_COST_TERMS = ('time', 'velocity', 'acceleration', 'jerk', 'lane_center', 'obstacle', 'running')
+
+
 def append_measurement_to_csv(csv_path, file, measurement):
     if not hasattr(measurement, 'best_traj_costs'):
         return 
@@ -28,6 +32,7 @@ def append_measurement_to_csv(csv_path, file, measurement):
         measurement.num_FOP_intervention / measurement.step_number * 100
         if measurement.step_number else 0.0
     )
+    terms = getattr(measurement, 'final_cost_terms', {}) or {}
     with open(csv_path, 'a', newline='') as csv_file:
         csv_file.write(
             f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
@@ -35,7 +40,8 @@ def append_measurement_to_csv(csv_path, file, measurement):
             f'{measurement.num_collison_checks},'
             f'{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},{measurement.num_FOP_intervention},{intervention_percent},{measurement.success},'
             f'{measurement.num_rejected_dynamic},{measurement.num_rejected_offroad},{measurement.num_rejected_collision},'
-            f'{measurement.last_cycle_num_rejected_dynamic},{measurement.last_cycle_num_rejected_offroad},{measurement.last_cycle_num_rejected_collision}\n'
+            f'{measurement.last_cycle_num_rejected_dynamic},{measurement.last_cycle_num_rejected_offroad},{measurement.last_cycle_num_rejected_collision},'
+            + ','.join(str(terms.get(k, '')) for k in FINAL_COST_TERMS) + '\n'
         )
 
 
@@ -85,7 +91,8 @@ if __name__ == '__main__':
                     'num_collision_checks,'
                     'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
                     'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
-                    'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision\n'
+                    'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision,'
+                    'J_ter,J_V,J_A,J_J,J_LC,J_D,J_run\n'
                 )
 
     scenario_files = cfg['FILES'] or sorted(

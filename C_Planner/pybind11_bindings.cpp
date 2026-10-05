@@ -92,14 +92,106 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         // Sampling parameters
         .def_readwrite("sampling_param", &FrenetTrajectory::sampling_param);
 
+    // Bind TimingStats struct
+    py::class_<TimingStats>(m, "TimingStats")
+        .def(py::init<>())
+        .def_readwrite("generation_ms", &TimingStats::generation_ms)
+        .def_readwrite("transform_ms", &TimingStats::transform_ms)
+        .def_readwrite("constraint_ms", &TimingStats::constraint_ms)
+        .def_readwrite("collision_ms", &TimingStats::collision_ms)
+        .def_readwrite("cost_ms", &TimingStats::cost_ms)
+        .def_readwrite("total_ms", &TimingStats::total_ms);
+
     // Bind PlanStats struct
     py::class_<PlanStats>(m, "PlanStats")
         .def(py::init<>())
+        .def_readwrite("num_search_iterations", &PlanStats::num_search_iterations)
         .def_readwrite("num_trajs_generated", &PlanStats::num_trajs_generated)
-        .def_readwrite("num_trajs_validated", &PlanStats::num_trajs_validated)
-        .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks)
+        .def_readwrite("num_global_transforms", &PlanStats::num_global_transforms)
+        .def_readwrite("num_rejected_transform", &PlanStats::num_rejected_transform)
+        .def_readwrite("num_constraint_checks", &PlanStats::num_constraint_checks)
+        .def_readwrite("num_constraint_passed", &PlanStats::num_constraint_passed)
+        .def_readwrite("num_rejected_dynamic", &PlanStats::num_rejected_dynamic)
         .def_readwrite("num_rejected_offroad", &PlanStats::num_rejected_offroad)
-        .def_readwrite("num_FOP_intervention", &PlanStats::num_FOP_intervention);
+        .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks)
+        .def_readwrite("num_collision_free", &PlanStats::num_collision_free)
+        .def_property_readonly("num_rejected_collision", &PlanStats::num_rejected_collision)
+        .def_readwrite("num_cost_evaluations", &PlanStats::num_cost_evaluations)
+        .def_readwrite("num_FOP_intervention", &PlanStats::num_FOP_intervention)
+        .def_readwrite("timing", &PlanStats::timing);
+
+    // Bind CostBreakdown struct (weighted terms of Eq. 4 / Eq. 7-8)
+    py::class_<CostBreakdown>(m, "CostBreakdown")
+        .def(py::init<>())
+        .def_readwrite("time", &CostBreakdown::time)
+        .def_readwrite("velocity", &CostBreakdown::velocity)
+        .def_readwrite("acceleration", &CostBreakdown::acceleration)
+        .def_readwrite("jerk", &CostBreakdown::jerk)
+        .def_readwrite("lane_center", &CostBreakdown::lane_center)
+        .def_readwrite("obstacle", &CostBreakdown::obstacle)
+        .def("running", &CostBreakdown::running)
+        .def("total", &CostBreakdown::total);
+
+    py::class_<ConstraintViolation>(m, "ConstraintViolation")
+        .def(py::init<>())
+        .def_readwrite("speed", &ConstraintViolation::speed)
+        .def_readwrite("acceleration", &ConstraintViolation::acceleration)
+        .def_readwrite("road", &ConstraintViolation::road)
+        .def_readwrite("collision", &ConstraintViolation::collision)
+        .def_readwrite("transform", &ConstraintViolation::transform)
+        .def("total", &ConstraintViolation::total);
+
+    py::enum_<Rejection>(m, "Rejection")
+        .value("NONE", Rejection::kNone)
+        .value("TRANSFORM", Rejection::kTransform)
+        .value("DYNAMIC", Rejection::kDynamic)
+        .value("OFFROAD", Rejection::kOffroad)
+        .value("COLLISION", Rejection::kCollision);
+
+    py::class_<EvaluationResult>(m, "EvaluationResult")
+        .def(py::init<>())
+        .def_readwrite("feasible", &EvaluationResult::feasible)
+        .def_readwrite("rejection", &EvaluationResult::rejection)
+        .def_readwrite("violation", &EvaluationResult::violation)
+        .def_readwrite("has_cost", &EvaluationResult::has_cost)
+        .def_readwrite("cost", &EvaluationResult::cost);
+
+    m.def("ranks_before", &ranks_before, py::arg("a"), py::arg("b"));
+
+    // Cost weights (defaults: CommonRoad WX1)
+    py::class_<CostWeights>(m, "CostWeights")
+        .def(py::init<>())
+        .def_readwrite("w_T", &CostWeights::w_T)
+        .def_readwrite("w_V", &CostWeights::w_V)
+        .def_readwrite("w_A", &CostWeights::w_A)
+        .def_readwrite("w_J", &CostWeights::w_J)
+        .def_readwrite("w_D", &CostWeights::w_D)
+        .def_readwrite("w_dist", &CostWeights::w_dist)
+        .def_readwrite("w_LC", &CostWeights::w_LC);
+
+    // Scenario-level evaluation of the executed trajectory, Eq. (7) + (8)
+    m.def("scenario_cost",
+          [](const FrenetTrajectory& executed, const std::vector<double>& v_des, double dt,
+             py::array_t<double, py::array::c_style | py::array::forcecast> obstacles_array,
+             py::array_t<int, py::array::c_style | py::array::forcecast> num_vertices_array,
+             const CostWeights& weights) {
+              auto obs_buf = obstacles_array.request();
+              auto num_buf = num_vertices_array.request();
+              if (obs_buf.ndim != 4 || obs_buf.shape[3] != 2 || num_buf.ndim != 2 ||
+                  num_buf.shape[0] != obs_buf.shape[0] || num_buf.shape[1] != obs_buf.shape[1]) {
+                  throw py::value_error("obstacles_array must be (T, O, V, 2) and num_vertices_array (T, O)");
+              }
+              ObstacleView obstacles;
+              obstacles.vertices = static_cast<const double*>(obs_buf.ptr);
+              obstacles.num_vertices = static_cast<const int*>(num_buf.ptr);
+              obstacles.num_time_steps = static_cast<int>(obs_buf.shape[0]);
+              obstacles.num_obstacles = static_cast<int>(obs_buf.shape[1]);
+              obstacles.max_vertices = static_cast<int>(obs_buf.shape[2]);
+              return CostFunction(weights).scenario_cost(executed, v_des, dt, obstacles);
+          },
+          py::arg("executed"), py::arg("v_des"), py::arg("dt"),
+          py::arg("obstacles_array"), py::arg("num_vertices_array"),
+          py::arg("weights") = CostWeights());
 
     // Bind Frenet_Planner class
     py::class_<Frenet_Planner>(m, "FrenetPlanner")
@@ -147,53 +239,45 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
                 const FrenetState& frenet_state,
                 double max_target_speed,
                 int time_step_now,
-                int num_threads) {
-                auto best_traj = self.plan(frenet_state, max_target_speed, time_step_now, num_threads);
+                int num_threads,
+                double desired_speed) {
+                auto best_traj = self.plan(frenet_state, max_target_speed, time_step_now, num_threads,
+                                           desired_speed);
                return best_traj;
              },
              py::arg("frenet_state"),
              py::arg("max_target_speed"),
              py::arg("time_step_now") = 0,
-             py::arg("num_threads") =1)
+             py::arg("num_threads") =1,
+             py::arg("desired_speed") = -1.0)
         .def("best_traj_generation",
              [](Frenet_Planner& self,
                 const FrenetState& frenet_state,
                 const std::vector<std::tuple<double, double, double>>& samples,
                 double max_target_speed,
                 int time_step_now,
-                int num_threads) {
+                int num_threads,
+                double desired_speed) {
                 return self.best_traj_generation(
                     frenet_state,
                     samples,
                     max_target_speed,
                     time_step_now,
-                    num_threads
+                    num_threads,
+                    desired_speed
                 );
              },
              py::arg("frenet_state"),
              py::arg("samples"),
              py::arg("max_target_speed"),
              py::arg("time_step_now") = 0,
-             py::arg("num_threads") = 1)
+             py::arg("num_threads") = 1,
+             py::arg("desired_speed") = -1.0)
         .def("get_samples", &Frenet_Planner::get_samples, py::arg("current_s") = 0.0)
-     //    .def("calc_frenet_paths",
-     //         [](Frenet_Planner& self, const FrenetState& frenet_state) {
-     //            std::vector<std::tuple<double, double, double>> empty_samples;
-     //            return self.calc_frenet_paths(frenet_state, empty_samples);
-     //         },
-     //         py::arg("frenet_state"))
-        .def("calc_global_paths",
-             &Frenet_Planner::calc_global_paths,
-             py::arg("fplist"))
-        .def("check_constraints",
-             [](Frenet_Planner& self, const std::vector<FrenetTrajectory>& trajs) {
-                return self.check_constraints(trajs);
-             },
-             py::arg("trajs"))
-        .def("check_collision_multithread",
-             &Frenet_Planner::check_collision_multithread,
-             py::arg("trajs"),
-             py::arg("time_step_now") = 0)
+        .def("evaluate_samples", &Frenet_Planner::evaluate_samples,
+             py::arg("frenet_state"), py::arg("samples"), py::arg("max_target_speed"),
+             py::arg("time_step_now") = 0, py::arg("full_violation") = true,
+             py::arg("desired_speed") = -1.0)
         .def("getAllSuccessfulTrajectories", &Frenet_Planner::getAllSuccessfulTrajectories)
         .def("get_stats", &Frenet_Planner::get_stats)
         .def_readwrite("settings", &Frenet_Planner::settings)

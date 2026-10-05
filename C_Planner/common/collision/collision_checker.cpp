@@ -1,4 +1,6 @@
 #include "collision_checker.h"
+#include <algorithm>
+#include <limits>
 
 bool point_in_polygon(const Eigen::Vector2d& point, const std::vector<Eigen::Vector2d>& polygon) {
     double x = point.x();
@@ -130,72 +132,77 @@ std::vector<Eigen::Vector2d> compute_vehicle_polygon(double x, double y, double 
     return polygon;
 }
 
-std::vector<FrenetTrajectory> check_collision(
-    const std::vector<FrenetTrajectory>& trajs,
-    const double* obstacles_array,
-    const int* num_vertices_array,
-    int num_time_steps,
-    int num_obstacles,
-    int max_vertices,
-    double vehicle_length,
-    double vehicle_width,
-    int time_step_now,
-    int check_resolution
-) {
-    std::vector<FrenetTrajectory> passed_trajs;
-    
-    // Check each trajectory for collisions
-    for (const auto& traj : trajs) {
-        bool has_collision = false;
-        
-        // Check trajectory points
-        int traj_len = traj.x.size();
-        int max_steps = std::min(traj_len, num_time_steps - time_step_now);
-        
-        for (int step_idx = 0; step_idx < max_steps && !has_collision; step_idx += check_resolution) {
-            // Compute ego vehicle polygon at this step
-            auto ego_poly = compute_vehicle_polygon(
-                traj.x[step_idx], 
-                traj.y[step_idx],
-                traj.yaw[step_idx],
-                vehicle_length, 
-                vehicle_width
-            );
-            
-            int time_step = time_step_now + step_idx;
-            
-            // Check against all obstacles at this time step
-            for (int obs_idx = 0; obs_idx < num_obstacles && !has_collision; obs_idx++) {
-                // Get vertex count for this obstacle at this time step
-                int vertex_count = num_vertices_array[time_step * num_obstacles + obs_idx];
-                
-                if (vertex_count <= 0) {
-                    continue;
-                }
-                
-                // Extract obstacle polygon from flat array
-                std::vector<Eigen::Vector2d> obs_poly;
-                for (int v = 0; v < vertex_count; v++) {
-                    int array_idx = (time_step * num_obstacles + obs_idx) * max_vertices * 2 + v * 2;
-                    obs_poly.push_back({
-                        obstacles_array[array_idx],
-                        obstacles_array[array_idx + 1]
-                    });
-                }
-                
-                // Check collision between ego and obstacle
-                if (polygon_collision(ego_poly, obs_poly)) {
-                    has_collision = true;
-                }
-            }
-        }
-        
-        // Add trajectory to result if no collision
-        if (!has_collision) {
-            passed_trajs.push_back(traj);
-            passed_trajs.back().collision_passed = true;
+double polygon_penetration_depth(const std::vector<Eigen::Vector2d>& poly1,
+                                 const std::vector<Eigen::Vector2d>& poly2) {
+    double depth = std::numeric_limits<double>::infinity();
+    for (const auto* poly : {&poly1, &poly2}) {
+        const size_t n = poly->size();
+        for (size_t i = 0; i < n; ++i) {
+            const Eigen::Vector2d edge = (*poly)[(i + 1) % n] - (*poly)[i];
+            const double len = edge.norm();
+            if (len < 1e-12) continue;
+            const Eigen::Vector2d axis(-edge.y() / len, edge.x() / len);
+            double min1 = std::numeric_limits<double>::infinity(), max1 = -min1;
+            double min2 = min1, max2 = -min1;
+            for (const auto& p : poly1) { double v = p.dot(axis); min1 = std::min(min1, v); max1 = std::max(max1, v); }
+            for (const auto& p : poly2) { double v = p.dot(axis); min2 = std::min(min2, v); max2 = std::max(max2, v); }
+            const double overlap = std::min(max1, max2) - std::max(min1, min2);
+            if (overlap <= 0.0) return 0.0;
+            depth = std::min(depth, overlap);
         }
     }
-    
-    return passed_trajs;
+    return std::isfinite(depth) ? depth : 0.0;
+}
+
+TrajectoryCollision check_trajectory_collision(const FrenetTrajectory& traj,
+                                               const ObstacleView& obstacles,
+                                               double vehicle_length,
+                                               double vehicle_width,
+                                               int time_step_now,
+                                               bool stop_at_first) {
+    // A colliding step always contributes, even when the polygons only touch or are
+    // non-convex (where the SAT depth may be 0), so violation > 0 <=> collided.
+    constexpr double kMinDepth = 1e-3;
+    TrajectoryCollision result;
+    if (obstacles.empty() || traj.x.empty()) {
+        return result;
+    }
+
+    const int traj_len = static_cast<int>(std::min({traj.x.size(), traj.y.size(), traj.yaw.size()}));
+    const int max_steps = std::min(traj_len, obstacles.num_time_steps - time_step_now);
+    std::vector<Eigen::Vector2d> obs_poly;
+    double depth_sq_sum = 0.0;
+
+    for (int k = 0; k < max_steps; ++k) {
+        const auto ego_poly = compute_vehicle_polygon(traj.x[k], traj.y[k], traj.yaw[k],
+                                                      vehicle_length, vehicle_width);
+        const int time_step = time_step_now + k;
+        double step_depth = -1.0;  // < 0: no collision at this step
+
+        for (int j = 0; j < obstacles.num_obstacles; ++j) {
+            const int n = obstacles.vertex_count(time_step, j);
+            if (n <= 0) continue;
+            const double* verts = obstacles.polygon(time_step, j);
+            obs_poly.clear();
+            for (int v = 0; v < n; ++v) {
+                obs_poly.emplace_back(verts[2 * v], verts[2 * v + 1]);
+            }
+            if (!polygon_collision(ego_poly, obs_poly)) continue;
+
+            const double depth = std::max(polygon_penetration_depth(ego_poly, obs_poly), kMinDepth);
+            step_depth = std::max(step_depth, depth);
+            if (stop_at_first) break;
+        }
+
+        if (step_depth >= 0.0) {
+            result.collided = true;
+            ++result.colliding_steps;
+            const double normalized = step_depth / vehicle_width;
+            depth_sq_sum += normalized * normalized;
+            if (stop_at_first) break;
+        }
+    }
+
+    result.violation = depth_sq_sum / static_cast<double>(traj_len);
+    return result;
 }

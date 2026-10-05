@@ -9,15 +9,21 @@ C_Planner/
 ├── CMakeLists.txt                    # Build configuration
 ├── Frenet_Planner.h                  # Main planner class header
 ├── Frenet_Planner.cpp                # Main planner implementation
-├── Stats.cpp                         # Statistics tracking
+├── Fiss_Plus_Planner.h/cpp           # FISS+ search on top of the same backend
 └── common/
     ├── scenario/
-    │   └── frenet.h                  # FrenetState, FrenetTrajectory structs
+    │   ├── frenet.h                  # FrenetState, FrenetTrajectory structs
+    │   ├── obstacles.h               # ObstacleView over the Python obstacle arrays
+    │   ├── road_profile.h/cpp        # Lane width / road extents along s
+    │   └── vehicle_params.h          # VehicleParams
     ├── geometry/
     │   ├── polynomial.h/cpp          # QuarticPolynomial, QuinticPolynomial
     │   └── cubic_spline.h/cpp        # CubicSpline1D, CubicSpline2D
     ├── cost/
-    │   └── cost_function.h/cpp       # CostFunction for trajectory evaluation
+    │   └── cost_function.h/cpp       # FISS+ Eq. (4) planning cost, Eq. (7)+(8) scenario cost
+    ├── evaluator/
+    │   ├── plan_stats.h              # PlanStats / TimingStats counters
+    │   └── trajectory_evaluator.h/cpp # Shared generate -> transform -> check -> cost backend
     ├── collision/
     │   └── collision_checker.h/cpp   # Polygon collision detection
     └── utils/
@@ -35,7 +41,7 @@ Configuration struct with sampling parameters:
 - `min_t`, `max_t`: Time horizon bounds
 - Obstacle and boundary checking flags
 
-### 2. **VehicleParams** (Frenet_Planner.h)
+### 2. **VehicleParams** (common/scenario/vehicle_params.h)
 Vehicle specifications:
 - Dimensions: length, width
 - Kinematic parameters: wheelbase, track widths
@@ -50,19 +56,32 @@ Stores trajectory data in both Frenet and world frames:
 ### 4. **Frenet_Planner** (Main Class)
 
 #### Methods:
+- `search_space(current_s)`: Sampling bounds of (d, s_d, t), shared by every planner
 - `get_samples()`: Generates all combinations of (d, s_d, t) parameters
-- `calc_frenet_paths()`: Creates trajectories using polynomial curves
-  - Uses **QuinticPolynomial** for lateral motion
-  - Uses **QuarticPolynomial** for longitudinal motion
-- `calc_global_paths()`: Converts Frenet to Cartesian coordinates
-  - Uses **CubicSpline2D** for centerline interpolation
-  - Calculates yaw and curvature
-- `check_constraints()`: Validates speed and acceleration limits
-- `check_collision_multithread()`: Array-based collision detection
-  - Takes pre-processed obstacle arrays from Python
-  - Returns collision-free trajectories
+- `make_context()`: Builds the `PlanningContext` of one planning cycle
 - `plan()`: Main entry point orchestrating the full pipeline
+- `best_traj_generation()`: Same pipeline for externally provided samples
+- `evaluate_samples()`: Per-sample `EvaluationResult` (feasibility, violation, cost)
 - `generate_frenet_frame()`: Initializes centerline spline
+
+### TrajectoryEvaluator (common/evaluator/)
+
+Every planner (FOP, FISS+, and later Random / CEM / learned samplers) evaluates its
+candidates through one `TrajectoryEvaluator`, so generator, constraints, collision
+check and objective are identical:
+
+- `generate()`: quintic lateral / quartic longitudinal polynomial for z = (d, s_d, t)
+- `frenet_cost()`: Eq. (4) without J_D (FISS+ ranks with this before any check)
+- `check_feasibility()`: Cartesian transform, dynamic limits, road boundary, polygon collision
+- `evaluate()`: `check_feasibility()` + planning objective; FOP adds J_D
+
+`EvaluationResult` holds the feasibility flag, the first failed check, the
+continuous constraint violation V and the cost terms. V is 0 exactly when every
+hard check passes; `ranks_before()` orders trajectories lexicographically by
+(feasible, V, J). `EvalMode::kEarlyExit` stops at the first failed check (normal
+planning); `EvalMode::kFullViolation` runs every check and computes V and J for
+all candidates (CEM ranking, teacher data). All counters and stage timings are
+incremented inside the evaluator (`PlanStats`).
 
 ### FOP_CPP road-width profiles
 
@@ -90,8 +109,8 @@ The wrapper accepts existing centerline columns `[x, y, yaw, lane_width, left, r
 Four-column input uses half the lane width for each road edge. XY-only callers
 retain fixed `max_road_width` sampling and have no map-boundary check. Generating
 a new frame clears the old profile. Ego-frame ML collection preserves the width
-and extent columns when rotating/translating the reference. The separate FISS+
-wrapper does not yet supply profiles or use FOP's per-cycle sampling method.
+and extent columns when rotating/translating the reference. The FISS+ wrapper
+supplies the same profile and FISS+ samples inside the same `search_space()`.
 
 Regression tests (after rebuilding both extensions):
 
@@ -118,12 +137,18 @@ poetry run python -m unittest discover -s tests -p 'test_cpp_*.py' -v
   - Methods: calc_position(), calc_yaw(), calc_curvature()
 
 ### 7. **CostFunction** (common/cost/)
-Evaluates trajectory quality:
-- `cost_velocity_offset()`: Speed deviation from target
-- `cost_acceleration()`: Smoothness of motion
-- `cost_jerk()`: Comfort (rate of acceleration change)
-- `cost_lane_center_offset()`: Staying near lane center
-- `cost_total()`: Weighted sum of all costs
+Cost of FISS+ (Sun et al., IROS 2023), no normalization. Weights
+w_T=0.1, w_V=0.01, w_A=0.1, w_J=0.1, w_D=1, w_dist=0.1, w_LC=10 (CommonRoad WX1
+with w_T, w_V, w_D and w_dist re-weighted, see `CostWeights`).
+Integrals are sums over the samples times dt:
+- `frenet_terms()`: Eq. (4), J_T = w_T (t_max - t_f), J_V, J_A, J_J, J_LC
+- `obstacle_term()`: J_D of Eq. (7), max over obstacles in front of exp(-w_dist d_i)
+- `scenario_cost()`: Eq. (7) + (8) on the executed trajectory (`frenet_planner_cpp.scenario_cost`);
+  the terminal term is J_ter = w_T * t_f (time taken), Eq. (8) as printed has the sign of
+  Eq. (4) and would reward slower arrival
+
+FOP plans with Eq. (4) + J_D, FISS+ with Eq. (4) only (it ranks before the
+Cartesian transform). Every executed scenario is scored with `scenario_cost()`.
 
 ### 8. **Collision Detection** (common/collision/)
 Polygon-based collision checking:
@@ -132,6 +157,8 @@ Polygon-based collision checking:
 - `aabb_collision()`: Axis-aligned bounding box pre-check
 - `polygon_collision()`: Complete polygon intersection test
 - `compute_vehicle_polygon()`: Vehicle footprint at given pose
+- `polygon_penetration_depth()`: SAT overlap depth (collision violation)
+- `check_trajectory_collision()`: Footprint vs. obstacles over a trajectory
 
 ### 9. **Array Utilities** (common/utils/)
 Helper functions for NumPy/Python array compatibility:
@@ -150,13 +177,10 @@ plan(frenet_state, obstacles_array, num_vertices_array)
     ↓
 get_samples() → Generate (d, s_d, t) combinations
     ↓
-calc_frenet_paths() → Polynomial trajectory generation
+TrajectoryEvaluator::generate() → Polynomial trajectory generation
     ↓
-calc_global_paths() → Frenet → Cartesian conversion
-    ↓
-check_constraints() → Validate speed/acceleration
-    ↓
-check_collision_multithread() → Array-based collision checking
+TrajectoryEvaluator::evaluate() → Cartesian transform, constraints,
+                                  polygon collision, cost
     ↓
 Select minimum cost trajectory
     ↓

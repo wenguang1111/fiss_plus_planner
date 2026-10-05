@@ -38,6 +38,7 @@ from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlann
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
+from fiss_plus_planner.planners import FOP_cpp_wrapper as fop_cpp
 from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
@@ -156,6 +157,41 @@ def prepare_obstacles_polygons_time_series(
     return obstacles_array, num_vertices
 
 
+# [m/s] v_des when neither a goal velocity nor a speed-limit sign on the route applies
+DEFAULT_SPEED_LIMIT = 14.0
+
+
+def route_lanelet_index(position, global_plan, lanelet_network):
+    """Index of the furthest route lanelet containing `position`, None when off the route."""
+    ids = lanelet_network.find_lanelet_by_position([np.asarray(position, dtype=float)])[0]
+    route_ids = [lanelet.lanelet_id for lanelet in global_plan.lanelets]
+    indices = [route_ids.index(i) for i in ids if i in route_ids]
+    return max(indices) if indices else None
+
+
+def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
+                           obstacles_array: np.ndarray, obstacles_num_vertices: np.ndarray) -> Tuple[float, dict]:
+    """Scenario-level cost J_total = J_run + J_ter (FISS+ Eq. 7, 8) of the executed trajectory.
+
+    Every planner is scored by the same C++ implementation, independent of the objective
+    it used while planning.
+    """
+    if not fop_cpp.CPP_MODULE_AVAILABLE:
+        print("Warning: frenet_planner_cpp not available, scenario cost not computed")
+        return float('nan'), {}
+    traj = fop_cpp.frenet_planner_cpp.FrenetTrajectory()
+    for name in ('t', 's', 's_d', 's_dd', 's_ddd', 'd', 'd_d', 'd_dd', 'd_ddd', 'x', 'y', 'yaw'):
+        setattr(traj, name, [float(v) for v in getattr(executed, name)])
+    cost = fop_cpp.frenet_planner_cpp.scenario_cost(
+        traj, [float(v) for v in v_des], dt,
+        np.ascontiguousarray(obstacles_array, dtype=np.float64),
+        np.ascontiguousarray(obstacles_num_vertices, dtype=np.int32))
+    terms = {name: getattr(cost, name)
+             for name in ('time', 'velocity', 'acceleration', 'jerk', 'lane_center', 'obstacle')}
+    terms['running'] = cost.running()
+    return cost.total(), terms
+
+
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool
                             ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
@@ -181,13 +217,14 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         len(goal_region.lanelets_of_goal_position) > 0
     ) or (has_goal_state and goal_region.state_list[0].has_value("position"))
 
+    # v_des of J_V: the goal velocity bound if given, otherwise the speed limit of the route
+    # lanelet the ego is on (updated every cycle below), otherwise DEFAULT_SPEED_LIMIT
     if has_goal_state and goal_region.state_list[0].has_value("velocity"):
-        speed_interval = goal_region.state_list[0].velocity
-        min_speed = speed_interval.start
-        max_speed = speed_interval.end
+        goal_speed = goal_region.state_list[0].velocity.end
     else:
-        min_speed = 0.0
-        max_speed = 14
+        goal_speed = None
+    desired_speed = goal_speed if goal_speed is not None else DEFAULT_SPEED_LIMIT
+    desired_speed_list = []  # v_des(x(t)) of every executed state, for the scenario cost
     
     # Get goal lanelet and center position
     if goal_region.lanelets_of_goal_position is not None and len(goal_region.lanelets_of_goal_position) > 0:
@@ -364,6 +401,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         global_state_list.append(inital_state)
         frenet_state_list.append(current_frenet_state)
 
+        if goal_speed is None:
+            route_idx = route_lanelet_index(next_state.position, global_plan, scenario.lanelet_network)
+            if route_idx is not None:  # off the route: keep the previous cycle's value
+                limit = global_plan.speed_limits[route_idx]
+                desired_speed = limit if limit is not None else DEFAULT_SPEED_LIMIT
+        desired_speed_list.append(desired_speed)
+        # Sampling bound: never below the current speed, so a vehicle that starts above
+        # v_des is not forced to brake hard; J_V pulls it back to v_des.
+        max_speed = max(desired_speed, current_frenet_state.s_d)
+
         if ego_centered_fop_cpp:
             ego_pos = np.asarray(next_state.position, dtype=float)
             ego_yaw = float(next_state.orientation)
@@ -383,7 +430,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 ref_path_ahead_local = ref_path_ahead_local[cum_dist <= reference_path_lookahead_m]
 
         start_time = time.time()
-        best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
+        if method in ('FOP_CPP', 'FISS+_CPP'):
+            best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state,
+                                         desired_speed=desired_speed)
+        else:
+            best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
 
         if ego_centered_fop_cpp and best_traj_ego is not None:
@@ -541,11 +592,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         )    
     # construct the final frenet trajectory and calculate the final cost
     final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list, global_state_list)
-    final_trajectory.cost_final = planner.cost_function.final_trajectory_cost(
-        traj=final_trajectory,
-        obstacles_array=obstacles_array,
-        obstacles_num_vertices=obstacles_num_vertices,
-    )
+    dt = planner.settings.tick_t
+    final_trajectory.cost_final, stats.final_cost_terms = evaluate_scenario_cost(
+        final_trajectory, desired_speed_list, dt, obstacles_array, obstacles_num_vertices)
     stats.final_traj_cost = final_trajectory.cost_final
     # print(f"Final trajectory cost: {final_trajectory.cost_final}")
     avg_processing_time = processing_time / num_cycles

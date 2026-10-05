@@ -55,6 +55,10 @@ public:
     
     // Start state for current planning cycle
     FrenetState start_state;
+
+    // Planning problem of the current cycle; FISS+ ranks candidates before the
+    // Cartesian transform, so its objective is Eq. (4) without J_D.
+    PlanningContext context;
     
     // Previous best trajectory index (for heuristic)
     std::array<int, 3> prev_best_idx;
@@ -78,8 +82,8 @@ public:
                       int n_obstacles,
                       int max_verts);
     
-    // Sample end Frenet states and create 3D trajectory array
-    Trajs3D sample_end_frenet_states();
+    // Sample end Frenet states inside the shared search space and create 3D trajectory array
+    Trajs3D sample_end_frenet_states(const SearchSpace& space);
     
     // Generate trajectory at given index
     // Returns (is_new, cost)
@@ -102,14 +106,20 @@ public:
                      std::array<double, 3> resolutions, double decaying_factor);
     
     // Refine solution using gradient descent
-    FrenetTrajectory* refine_solution(const FrenetTrajectory& traj, double time_limit, int time_step_now);
+    FrenetTrajectory* refine_solution(const FrenetTrajectory& traj, double time_limit);
     
     // Main planning function - overrides base class
     FrenetTrajectory plan(const FrenetState& frenet_state,
                           double max_target_speed,
-                          int time_step_now = 0);
+                          int time_step_now = 0,
+                          double desired_speed = -1.0);
     
 private:
+    TrajectoryEvaluator evaluator() const { return TrajectoryEvaluator(context, cost_function); }
+
+    // Fills traj from its end state and returns its cost (Eq. 4 without J_D)
+    double generate_from_end_state(FrenetTrajectory& traj);
+
     // Helper to clear priority queues
     void clear_queues();
     

@@ -1,5 +1,4 @@
 #include "Fiss_Plus_Planner.h"
-#include "common/collision/collision_checker.h"
 #include <algorithm>
 #include <cmath>
 #include <chrono>
@@ -47,7 +46,7 @@ std::array<double, 3> Fiss_Plus_Planner::clip_array(const std::array<double, 3>&
     return result;
 }
 
-Trajs3D Fiss_Plus_Planner::sample_end_frenet_states() {
+Trajs3D Fiss_Plus_Planner::sample_end_frenet_states(const SearchSpace& space) {
     trajs_3d.clear();
     
     // Heuristic parameters
@@ -55,48 +54,45 @@ Trajs3D Fiss_Plus_Planner::sample_end_frenet_states() {
                           std::pow(fiss_settings.num_speed, 2) + 
                           std::pow(fiss_settings.num_t, 2);
     
-    // Define the lateral sampling positions
-    double sampling_width = fiss_settings.max_road_width - vehicle_params.w + 0.3;
-    double left_bound = -sampling_width / 2.0;
-    double right_bound = sampling_width / 2.0;
+    // Set sampling bounds (same search space as every other planner)
+    sampling_min = {space.d_min, space.v_min, space.t_min};
+    sampling_max = {space.d_max, space.v_max, space.t_max};
+    const std::array<int, 3> nums = {fiss_settings.num_width, fiss_settings.num_speed, fiss_settings.num_t};
     
-    // Set sampling bounds
-    sampling_min[0] = left_bound;
-    sampling_max[0] = right_bound;
-    sampling_min[1] = fiss_settings.lowest_speed;
-    sampling_max[1] = fiss_settings.highest_speed;
-    sampling_min[2] = fiss_settings.min_t;
-    sampling_max[2] = fiss_settings.max_t;
-    
-    // Calculate sampling resolutions
-    sampling_res[0] = (right_bound - left_bound) / (fiss_settings.num_width - 1);
-    sampling_res[1] = (fiss_settings.highest_speed - fiss_settings.lowest_speed) / (fiss_settings.num_speed - 1);
-    sampling_res[2] = (fiss_settings.max_t - fiss_settings.min_t) / (fiss_settings.num_t - 1);
+    // Calculate sampling resolutions; a single sample sits in the middle of the range
+    for (int dim = 0; dim < 3; ++dim) {
+        sampling_res[dim] = nums[dim] > 1 ? (sampling_max[dim] - sampling_min[dim]) / (nums[dim] - 1) : 0.0;
+    }
+    auto grid_value = [&](int dim, int i) {
+        return nums[dim] > 1 ? sampling_min[dim] + i * sampling_res[dim]
+                             : 0.5 * (sampling_min[dim] + sampling_max[dim]);
+    };
     
     // Estimate lateral cost normalization
-    double lat_norm = std::max(std::pow(left_bound, 2), std::pow(right_bound, 2));
+    double lat_norm = std::max({std::pow(space.d_min, 2), std::pow(space.d_max, 2), 1e-12});
+    double speed_range = std::max(space.v_max - space.v_min, 1e-12);
+    double time_range = std::max(space.t_max - space.t_min, 1e-12);
     
     // Sample lateral positions
     for (int i = 0; i < fiss_settings.num_width; ++i) {
-        double d = left_bound + i * sampling_res[0];
+        double d = grid_value(0, i);
         double cost_est_lat = std::pow(d, 2) / lat_norm;
         
         std::vector<std::vector<FrenetTrajectory>> trajs_2d;
         
         // Sample velocities
         for (int j = 0; j < fiss_settings.num_speed; ++j) {
-            double v = fiss_settings.lowest_speed + j * sampling_res[1];
-            double cost_est_speed = std::pow(fiss_settings.highest_speed - v, 2) / 
-                                    std::pow(fiss_settings.highest_speed - fiss_settings.lowest_speed, 2);
+            double v = grid_value(1, j);
+            double cost_est_speed = std::pow(space.v_max - v, 2) / std::pow(speed_range, 2);
             
             std::vector<FrenetTrajectory> trajs_1d;
             
             // Sample time horizons
             for (int k = 0; k < fiss_settings.num_t; ++k) {
-                double t = fiss_settings.min_t + k * sampling_res[2];
+                double t = grid_value(2, k);
                 
                 // Planning horizon cost (encourage longer planning horizon)
-                double cost_est_time = 1.0 - (t - fiss_settings.min_t) / (fiss_settings.max_t - fiss_settings.min_t);
+                double cost_est_time = 1.0 - (t - space.t_min) / time_range;
                 
                 // Fixed cost terms
                 double cost_est = cost_est_lat + cost_est_time + cost_est_speed;
@@ -117,12 +113,8 @@ Trajs3D Fiss_Plus_Planner::sample_end_frenet_states() {
                 traj.idx[2] = k;
                 // Set end state
                 traj.end_state.t = t;
-                traj.end_state.s = 0.0;
                 traj.end_state.s_d = v;
-                traj.end_state.s_dd = 0.0;
                 traj.end_state.d = d;
-                traj.end_state.d_d = 0.0;
-                traj.end_state.d_dd = 0.0;
                 traj.cost_heu = cost_heu;
                 traj.cost_est = cost_est + cost_heu;
                 traj.is_generated = false;
@@ -137,6 +129,18 @@ Trajs3D Fiss_Plus_Planner::sample_end_frenet_states() {
     return trajs_3d;
 }
 
+double Fiss_Plus_Planner::generate_from_end_state(FrenetTrajectory& traj) {
+    const TrajectoryEvaluator ev = evaluator();
+    FrenetTrajectory generated = ev.generate(
+        start_state, SamplingParam(traj.end_state.d, traj.end_state.s_d, traj.end_state.t), last_stats);
+    std::copy(std::begin(traj.idx), std::end(traj.idx), std::begin(generated.idx));
+    generated.cost_heu = traj.cost_heu;
+    generated.cost_est = traj.cost_est;
+    traj = std::move(generated);
+    traj.cost_final = ev.frenet_cost(traj, last_stats).total();
+    return traj.cost_final;
+}
+
 std::pair<bool, double> Fiss_Plus_Planner::generate_trajectory(const std::array<int, 3>& idx) {
     FrenetTrajectory& traj = trajs_3d[idx[0]][idx[1]][idx[2]];
     
@@ -144,99 +148,24 @@ std::pair<bool, double> Fiss_Plus_Planner::generate_trajectory(const std::array<
         return {false, traj.cost_final};
     }
     
-    last_stats.num_trajs_generated++;
-    traj.is_generated = true;
     traj.idx[0] = idx[0];
     traj.idx[1] = idx[1];
     traj.idx[2] = idx[2];
-    
-    // Generate time steps
-    const auto& end_state = traj.end_state;
-    traj.t.clear();
-    for (double t = 0.0; t < end_state.t; t += fiss_settings.tick_t) {
-        traj.t.push_back(t);
-    }
-    
-    // Generate lateral quintic polynomial
-    QuinticPolynomial lat_qp(start_state.d, start_state.d_d, start_state.d_dd,
-                             end_state.d, end_state.d_d, end_state.d_dd, end_state.t);
-    traj.d.clear();
-    traj.d_d.clear();
-    traj.d_dd.clear();
-    traj.d_ddd.clear();
-    for (double t : traj.t) {
-        traj.d.push_back(lat_qp.calc_point(t));
-        traj.d_d.push_back(lat_qp.calc_first_derivative(t));
-        traj.d_dd.push_back(lat_qp.calc_second_derivative(t));
-        traj.d_ddd.push_back(lat_qp.calc_third_derivative(t));
-    }
-    
-    // Generate longitudinal quartic polynomial
-    QuarticPolynomial lon_qp(start_state.s, start_state.s_d, start_state.s_dd,
-                             end_state.s_d, end_state.s_dd, end_state.t);
-    traj.s.clear();
-    traj.s_d.clear();
-    traj.s_dd.clear();
-    traj.s_ddd.clear();
-    for (double t : traj.t) {
-        traj.s.push_back(lon_qp.calc_point(t));
-        traj.s_d.push_back(lon_qp.calc_first_derivative(t));
-        traj.s_dd.push_back(lon_qp.calc_second_derivative(t));
-        traj.s_ddd.push_back(lon_qp.calc_third_derivative(t));
-    }
-    
-    // Compute the final cost
-    traj.cost_final = cost_function.cost_total(traj, fiss_settings.highest_speed);
+    const double cost = generate_from_end_state(traj);
     
     // Add to candidate queue
     trajs_per_timestep.push_back(traj);
-    candidate_trajs.push({traj.cost_final, idx});
+    candidate_trajs.push({cost, idx});
     
-    return {true, traj.cost_final};
+    return {true, cost};
 }
 
 double Fiss_Plus_Planner::generate_trajectory_by_end_state(const FrenetState& end_state) {
     FrenetTrajectory traj;
-    // Copy end state values
     traj.end_state.t = end_state.t;
-    traj.end_state.s = end_state.s;
     traj.end_state.s_d = end_state.s_d;
-    traj.end_state.s_dd = end_state.s_dd;
     traj.end_state.d = end_state.d;
-    traj.end_state.d_d = end_state.d_d;
-    traj.end_state.d_dd = end_state.d_dd;
-    
-    last_stats.num_trajs_generated++;
-    traj.is_generated = true;
-    
-    // Generate time steps
-    traj.t.clear();
-    for (double t = 0.0; t < end_state.t; t += fiss_settings.tick_t) {
-        traj.t.push_back(t);
-    }
-    
-    // Generate lateral quintic polynomial
-    QuinticPolynomial lat_qp(start_state.d, start_state.d_d, start_state.d_dd,
-                             end_state.d, end_state.d_d, end_state.d_dd, end_state.t);
-    for (double t : traj.t) {
-        traj.d.push_back(lat_qp.calc_point(t));
-        traj.d_d.push_back(lat_qp.calc_first_derivative(t));
-        traj.d_dd.push_back(lat_qp.calc_second_derivative(t));
-        traj.d_ddd.push_back(lat_qp.calc_third_derivative(t));
-    }
-    
-    // Generate longitudinal quartic polynomial
-    QuarticPolynomial lon_qp(start_state.s, start_state.s_d, start_state.s_dd,
-                             end_state.s_d, end_state.s_dd, end_state.t);
-    for (double t : traj.t) {
-        traj.s.push_back(lon_qp.calc_point(t));
-        traj.s_d.push_back(lon_qp.calc_first_derivative(t));
-        traj.s_dd.push_back(lon_qp.calc_second_derivative(t));
-        traj.s_ddd.push_back(lon_qp.calc_third_derivative(t));
-    }
-    
-    // Compute the final cost
-    traj.cost_final = cost_function.cost_total(traj, fiss_settings.highest_speed);
+    const double cost = generate_from_end_state(traj);
     
     // Add to refined queue
     refined_trajs.push(traj);
@@ -245,7 +174,7 @@ double Fiss_Plus_Planner::generate_trajectory_by_end_state(const FrenetState& en
         all_trajs.push_back({traj});
     }
     
-    return traj.cost_final;
+    return cost;
 }
 
 std::array<int, 3> Fiss_Plus_Planner::find_initial_guess(bool& found) {
@@ -374,7 +303,7 @@ Fiss_Plus_Planner::gradient_descent(double J, const std::array<double, 3>& x,
     return {true, J_new, x_new_clipped, resolutions};
 }
 
-FrenetTrajectory* Fiss_Plus_Planner::refine_solution(const FrenetTrajectory& traj, double time_limit, int time_step_now) {
+FrenetTrajectory* Fiss_Plus_Planner::refine_solution(const FrenetTrajectory& traj, double time_limit) {
     auto t_start = std::chrono::high_resolution_clock::now();
     std::array<double, 3> resolutions = sampling_res;
     double alpha = fiss_settings.decaying_factor;
@@ -409,34 +338,8 @@ FrenetTrajectory* Fiss_Plus_Planner::refine_solution(const FrenetTrajectory& tra
             break;
         }
         
-        last_stats.num_trajs_validated++;
-        
-        // Convert to global frame
-        std::vector<FrenetTrajectory> candidates = calc_global_paths({candidate});
-        if (candidates.empty()) continue;
-        
-        // Check constraints
-        std::vector<FrenetTrajectory> passed_candidates = check_constraints(candidates);
-        if (passed_candidates.empty()) continue;
-        
-        // Check collisions
-        last_stats.num_collision_checks++;
-        std::vector<FrenetTrajectory> safe_candidates = check_collision(
-            passed_candidates,
-            obstacles_array,
-            num_vertices_array,
-            num_time_steps,
-            num_obstacles,
-            max_vertices,
-            vehicle_params.l,
-            vehicle_params.w,
-            time_step_now,
-            1  // check_resolution
-        );
-        
-        if (!safe_candidates.empty()) {
-            // Return the first safe candidate - store in member variable
-            best_traj = safe_candidates[0];
+        if (evaluator().check_feasibility(candidate, last_stats).feasible) {
+            best_traj = candidate;
             return &best_traj;
         }
     }
@@ -446,7 +349,8 @@ FrenetTrajectory* Fiss_Plus_Planner::refine_solution(const FrenetTrajectory& tra
 
 FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
                                           double max_target_speed,
-                                          int time_step_now) {
+                                          int time_step_now,
+                                          double desired_speed) {
     auto t_start = std::chrono::high_resolution_clock::now();
     
     // Reset values for each planning cycle
@@ -457,9 +361,19 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
     clear_queues();
     best_traj = FrenetTrajectory();
     trajs_per_timestep.clear();
+    context = make_context(desired_speed >= 0.0 ? desired_speed : max_target_speed, time_step_now, false);
+    auto finish = [&]() {
+        last_stats.timing.total_ms =
+            std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_start).count();
+        return best_traj;
+    };
     
-    // Sample all end states in 3D
-    trajs_3d = sample_end_frenet_states();
+    // Sample all end states in 3D, inside the search space shared with FOP
+    SearchSpace space;
+    if (!search_space(frenet_state.s, space)) {
+        return finish();
+    }
+    trajs_3d = sample_end_frenet_states(space);
     sizes = {static_cast<int>(trajs_3d.size()),
              static_cast<int>(trajs_3d[0].size()),
              static_cast<int>(trajs_3d[0][0].size())};
@@ -468,7 +382,7 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
     bool best_traj_found = false;
     
     while (!best_traj_found) {
-        last_stats.num_trajs_validated++;  // Using as iteration counter
+        last_stats.num_search_iterations++;
         
         // ===================== Initial Guess =====================
         if (candidate_trajs.empty()) {
@@ -500,38 +414,14 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
             TrajCandidate candidate_entry = candidate_trajs.top();
             candidate_trajs.pop();
             
-            FrenetTrajectory& candidate = trajs_3d[candidate_entry.idx[0]]
-                                                  [candidate_entry.idx[1]]
-                                                  [candidate_entry.idx[2]];
+            FrenetTrajectory candidate = trajs_3d[candidate_entry.idx[0]]
+                                                 [candidate_entry.idx[1]]
+                                                 [candidate_entry.idx[2]];
             
-            last_stats.num_trajs_validated++;
-            
-            // Convert to global frame
-            std::vector<FrenetTrajectory> candidates = calc_global_paths({candidate});
-            if (candidates.empty()) continue;
-            
-            // Check constraints
-            std::vector<FrenetTrajectory> passed_candidates = check_constraints(candidates);
-            if (passed_candidates.empty()) continue;
-            
-            // Check collisions
-            last_stats.num_collision_checks++;
-            std::vector<FrenetTrajectory> safe_candidates = check_collision(
-                passed_candidates,
-                obstacles_array,
-                num_vertices_array,
-                num_time_steps,
-                num_obstacles,
-                max_vertices,
-                vehicle_params.l,
-                vehicle_params.w,
-                time_step_now,
-                1  // check_resolution
-            );
-            
-            if (!safe_candidates.empty()) {
+            // Cartesian transform, constraints and collision in the shared evaluator
+            if (evaluator().check_feasibility(candidate, last_stats).feasible) {
+                best_traj = candidate;
                 best_traj_found = true;
-                best_traj = safe_candidates[0];
                 prev_best_idx = {best_traj.idx[0], best_traj.idx[1], best_traj.idx[2]};
                 has_prev_best_idx = true;
                 break;
@@ -548,7 +438,7 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
         double time_left = fiss_settings.time_limit - time_spent;
         
         if (!fiss_settings.has_time_limit || time_left > 0.0) {
-            FrenetTrajectory* refined_traj = refine_solution(best_traj, time_left, time_step_now);
+            FrenetTrajectory* refined_traj = refine_solution(best_traj, time_left);
             if (refined_traj != nullptr) {
                 best_traj = *refined_traj;
             }
@@ -557,12 +447,16 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
     
     // Store trajectories for visualization
     if (fiss_settings.vis_all_candidates) {
-        std::vector<FrenetTrajectory> global_trajs = calc_global_paths(trajs_per_timestep);
+        std::vector<FrenetTrajectory> global_trajs;
+        const TrajectoryEvaluator ev = evaluator();
+        for (FrenetTrajectory traj : trajs_per_timestep) {
+            if (ev.to_global(traj)) global_trajs.push_back(std::move(traj));
+        }
         all_trajs.push_back(global_trajs);
     } else {
         all_trajs.push_back(trajs_per_timestep);
     }
     trajs_per_timestep.clear();
     
-    return best_traj;
+    return finish();
 }
