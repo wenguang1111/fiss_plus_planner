@@ -189,6 +189,7 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 d["num_cost_evaluations"] = stats.num_cost_evaluations;
                 d["num_FOP_intervention"] = stats.num_FOP_intervention;
                 py::dict timing;
+                timing["sampling_ms"] = stats.timing.sampling_ms;
                 timing["generation_ms"] = stats.timing.generation_ms;
                 timing["transform_ms"] = stats.timing.transform_ms;
                 timing["constraint_ms"] = stats.timing.constraint_ms;

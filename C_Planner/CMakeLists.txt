@@ -63,9 +63,18 @@ set(EVALUATOR_SOURCES
     common/evaluator/trajectory_evaluator.cpp
 )
 
-# Source files for the main planner
+# Source files for the iterative sampling planners (CEM, MPPI)
+set(ITERATIVE_SAMPLING_SOURCES
+    common/sampling/gaussian_proposal.cpp
+    Iterative_Sampling_Planner.cpp
+    CEM_Planner.cpp
+    MPPI_Planner.cpp
+)
+
+# Source files for the main planner (FOP and the planners built on it)
 set(PLANNER_SOURCES
     Frenet_Planner.cpp
+    ${ITERATIVE_SAMPLING_SOURCES}
     ${GEOMETRY_SOURCES}
     ${COST_SOURCES}
     ${COLLISION_SOURCES}

@@ -40,6 +40,8 @@ from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
 from fiss_plus_planner.planners import FOP_cpp_wrapper as fop_cpp
 from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
+from fiss_plus_planner.planners.CEM_cpp_wrapper import CEM_CPP_Wrapper
+from fiss_plus_planner.planners.MPPI_cpp_wrapper import MPPI_CPP_Wrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
@@ -193,8 +195,11 @@ def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
 
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
-                            input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool
+                            input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
+                            sampler_cfg: dict = None
                             ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
+    """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}}."""
+    sampler_cfg = sampler_cfg or {}
     # Plan a global route
     global_planner = GlobalPlanner()
     try:
@@ -342,6 +347,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusCppWrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True
+    elif method == 'CEM_CPP':
+        planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        planner = CEM_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                  runtime_measurement, cem_cfg=sampler_cfg.get('CEM'))
+        use_cpp_planner = True
+    elif method == 'MPPI_CPP':
+        planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        planner = MPPI_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                   runtime_measurement, mppi_cfg=sampler_cfg.get('MPPI'))
+        use_cpp_planner = True
     elif method == 'Sparse_CPP':
         # Use C++ Sparse Planner with pybind11
         planner_settings = SparsePlannerSettings_CPP(num_width, num_speed, num_t, input_dir, file)
@@ -430,7 +445,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 ref_path_ahead_local = ref_path_ahead_local[cum_dist <= reference_path_lookahead_m]
 
         start_time = time.time()
-        if method in ('FOP_CPP', 'FISS+_CPP'):
+        if method in ('FOP_CPP', 'FISS+_CPP', 'CEM_CPP', 'MPPI_CPP'):
             best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state,
                                          desired_speed=desired_speed)
         else:
@@ -725,7 +740,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
         else:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist, best_trajs = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
-                number_threads, runtime_measurement, collect_data_for_ml)
+                number_threads, runtime_measurement, collect_data_for_ml,
+                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI')})
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

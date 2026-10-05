@@ -4,6 +4,7 @@
 // Per-stage processing time [ms]. Stage times are summed over worker threads (CPU
 // time); total_ms is the wall-clock time of one plan() call.
 struct TimingStats {
+    double sampling_ms = 0.0;    // proposing samples / updating the sampling distribution
     double generation_ms = 0.0;
     double transform_ms = 0.0;
     double constraint_ms = 0.0;
@@ -12,6 +13,7 @@ struct TimingStats {
     double total_ms = 0.0;
 
     TimingStats& operator+=(const TimingStats& other) {
+        sampling_ms += other.sampling_ms;
         generation_ms += other.generation_ms;
         transform_ms += other.transform_ms;
         constraint_ms += other.constraint_ms;

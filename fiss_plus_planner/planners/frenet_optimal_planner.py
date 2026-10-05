@@ -65,7 +65,8 @@ class Stats(object):
         stats.num_cost_evaluations = get("num_cost_evaluations", 0)
         timing = get("timing", None)
         if timing is not None:
-            keys = ("generation_ms", "transform_ms", "constraint_ms", "collision_ms", "cost_ms", "total_ms")
+            keys = ("sampling_ms", "generation_ms", "transform_ms", "constraint_ms", "collision_ms", "cost_ms",
+                    "total_ms")
             stats.timing_ms = {k: (timing[k] if isinstance(timing, dict) else getattr(timing, k)) for k in keys}
         return stats
         

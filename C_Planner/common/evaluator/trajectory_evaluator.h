@@ -25,20 +25,16 @@ struct PlanningContext {
     bool use_obstacle_cost = true;  // add J_D to the planning objective
 };
 
-// Continuous constraint violation V(tau): 0 <=> the corresponding hard check passes.
-// Each term is a mean over the N trajectory samples of a squared, dimensionless excess:
-//   speed:        max(0, (v_k - v_max) / v_max)^2
-//   acceleration: max(0, (|a_k| - a_max) / a_max)^2
-//   road:         (e_left / w)^2 + (e_right / w)^2, e = footprint beyond the road edge;
-//                 samples without road geometry count 1
-//   collision:    (depth_k / w)^2, depth_k = deepest SAT penetration at step k
-//   transform:    1 when the trajectory cannot be converted to Cartesian coordinates
+// Constraint violation V(tau): for each hard check, the share of the horizon from the
+// first violating sample on, (N - k_first) / N, and 0 if the check passes. A trajectory
+// that violates later is closer to feasible; V == 0 <=> feasible. Every check stops at
+// its first violation, so V is exact even with EvalMode::kEarlyExit.
 struct ConstraintViolation {
-    double speed = 0.0;
-    double acceleration = 0.0;
-    double road = 0.0;
-    double collision = 0.0;
-    double transform = 0.0;
+    double speed = 0.0;         // s_d above vehicle max speed
+    double acceleration = 0.0;  // |s_dd| above vehicle max acceleration
+    double road = 0.0;          // footprint beyond the road edge or outside the road profile
+    double collision = 0.0;     // ego polygon overlaps an obstacle polygon
+    double transform = 0.0;     // 1 when the trajectory has no Cartesian representation
 
     double total() const { return speed + acceleration + road + collision + transform; }
 };
@@ -59,11 +55,11 @@ struct EvaluationResult {
 bool ranks_before(const EvaluationResult& a, const EvaluationResult& b);
 
 enum class EvalMode {
-    // Stop at the first failed check, like a plain sampling planner. V only reflects
-    // the failed check and J is only computed for feasible trajectories.
+    // Stop at the first failed check (later checks are skipped); J only for feasible
+    // trajectories. Used by every planner.
     kEarlyExit,
-    // Run every check and compute V and J for every trajectory (CEM ranking,
-    // offline teacher data). Costs extra collision checks, which are counted.
+    // Run every check and compute J for every trajectory, e.g. for offline teacher data.
+    // Costs extra checks, which are counted.
     kFullViolation,
 };
 
@@ -98,10 +94,9 @@ public:
     const PlanningContext& context() const { return ctx_; }
 
 private:
-    void check_dynamics(const FrenetTrajectory& traj, bool stop_at_first,
+    void check_dynamics(const FrenetTrajectory& traj, bool early_exit,
                         ConstraintViolation& v) const;
-    void check_road(const FrenetTrajectory& traj, bool stop_at_first,
-                    ConstraintViolation& v) const;
+    double road_violation(const FrenetTrajectory& traj) const;
 
     const PlanningContext& ctx_;
     const CostFunction& cost_;

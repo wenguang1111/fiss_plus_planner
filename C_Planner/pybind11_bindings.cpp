@@ -2,9 +2,38 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "Frenet_Planner.h"
+#include "CEM_Planner.h"
+#include "MPPI_Planner.h"
 #include "common/scenario/frenet.h"
 
 namespace py = pybind11;
+
+namespace {
+
+// Planners built on Frenet_Planner take (settings, [own settings,] vehicle, obstacle arrays)
+template <typename Planner, typename... OwnSettings>
+Planner* make_planner(const SettingParameters& settings, const OwnSettings&... own,
+                      const VehicleParams& vehicle,
+                      py::array_t<double> obstacles_array, py::array_t<int> num_vertices_array,
+                      int num_time_steps, int num_obstacles, int max_vertices) {
+    return new Planner(settings, own..., vehicle,
+                       static_cast<double*>(obstacles_array.request().ptr),
+                       static_cast<int*>(num_vertices_array.request().ptr),
+                       num_time_steps, num_obstacles, max_vertices);
+}
+
+// plan() of a planner built on Frenet_Planner (same signature as FOP)
+template <typename Planner, typename PyClass>
+void def_plan(PyClass& cls) {
+    cls.def("plan", &Planner::plan,
+            py::arg("frenet_state"),
+            py::arg("max_target_speed"),
+            py::arg("time_step_now") = 0,
+            py::arg("num_threads") = 1,
+            py::arg("desired_speed") = -1.0);
+}
+
+}  // namespace
 
 PYBIND11_MODULE(frenet_planner_cpp, m) {
     m.doc() = "Frenet Optimal Planner C++ extension";
@@ -95,6 +124,7 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
     // Bind TimingStats struct
     py::class_<TimingStats>(m, "TimingStats")
         .def(py::init<>())
+        .def_readwrite("sampling_ms", &TimingStats::sampling_ms)
         .def_readwrite("generation_ms", &TimingStats::generation_ms)
         .def_readwrite("transform_ms", &TimingStats::transform_ms)
         .def_readwrite("constraint_ms", &TimingStats::constraint_ms)
@@ -283,4 +313,38 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("settings", &Frenet_Planner::settings)
         .def_readwrite("vehicle_params", &Frenet_Planner::vehicle_params)
         .def_readwrite("best_traj", &Frenet_Planner::best_traj);
+
+    // Iterative sampling planners: FOP backend, adaptive Gaussian sampler over (d, s_d, t)
+    py::class_<IterativeSamplingSettings>(m, "IterativeSamplingSettings")
+        .def(py::init<>())
+        .def_readwrite("num_iterations", &IterativeSamplingSettings::num_iterations)
+        .def_readwrite("population", &IterativeSamplingSettings::population)
+        .def_readwrite("init_std", &IterativeSamplingSettings::init_std)
+        .def_readwrite("seed", &IterativeSamplingSettings::seed);
+
+    py::class_<CEMSettings, IterativeSamplingSettings>(m, "CEMSettings")
+        .def(py::init<>())
+        .def_readwrite("elite_fraction", &CEMSettings::elite_fraction)
+        .def_readwrite("smoothing", &CEMSettings::smoothing);
+
+    py::class_<MPPISettings, IterativeSamplingSettings>(m, "MPPISettings")
+        .def(py::init<>())
+        .def_readwrite("temperature", &MPPISettings::temperature)
+        .def_readwrite("learning_rate", &MPPISettings::learning_rate);
+
+    py::class_<CEM_Planner, Frenet_Planner> cem(m, "CEMPlanner");
+    cem.def(py::init(&make_planner<CEM_Planner, CEMSettings>),
+            py::arg("settings"), py::arg("cem_settings"), py::arg("vehicle"),
+            py::arg("obstacles_array"), py::arg("num_vertices_array"),
+            py::arg("num_time_steps"), py::arg("num_obstacles"), py::arg("max_vertices"))
+        .def_readwrite("cem_settings", &CEM_Planner::cem_settings);
+    def_plan<CEM_Planner>(cem);
+
+    py::class_<MPPI_Planner, Frenet_Planner> mppi(m, "MPPIPlanner");
+    mppi.def(py::init(&make_planner<MPPI_Planner, MPPISettings>),
+             py::arg("settings"), py::arg("mppi_settings"), py::arg("vehicle"),
+             py::arg("obstacles_array"), py::arg("num_vertices_array"),
+             py::arg("num_time_steps"), py::arg("num_obstacles"), py::arg("max_vertices"))
+        .def_readwrite("mppi_settings", &MPPI_Planner::mppi_settings);
+    def_plan<MPPI_Planner>(mppi);
 }

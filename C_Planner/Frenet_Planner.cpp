@@ -265,42 +265,26 @@ FrenetTrajectory Frenet_Planner::best_traj_generation(
     last_fplist.clear();
     best_traj = FrenetTrajectory();
 
-    // Ensure num_threads is at least 1
-    if (num_threads <= 0) {
-        num_threads = std::thread::hardware_concurrency();
-        if (num_threads <= 0) num_threads = 1;
-    }
-
     // Handle edge case: no samples
     if (samples.empty()) {
         std::cerr << "empty samples" << std::endl;
         return FrenetTrajectory();
     }
 
-    int samples_per_thread = (samples.size() + num_threads - 1) / num_threads;
-
-    std::vector<std::vector<std::tuple<double, double, double>>> samples_per_thread_vec;
-    for (int t = 0; t < num_threads && t * samples_per_thread < (int)samples.size(); t++) {
-        int start_idx = t * samples_per_thread;
-        int end_idx = std::min(start_idx + samples_per_thread, (int)samples.size());
-
-        std::vector<std::tuple<double, double, double>> thread_samples(
-            samples.begin() + start_idx,
-            samples.begin() + end_idx
-        );
-        samples_per_thread_vec.push_back(thread_samples);
+    std::vector<SamplingParam> params;
+    params.reserve(samples.size());
+    for (const auto& sample : samples) {
+        params.emplace_back(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
     }
 
     // FOP evaluates complete trajectories, so J_D is part of its objective
     const PlanningContext context = make_context(
-        desired_speed >= 0.0 ? desired_speed : max_target_speed, time_step_now, true);
-    PlanResult plan_result = plan_multithread(samples_per_thread_vec, frenet_state, context);
-    last_fplist = plan_result.collision_free_paths;
+        resolve_desired_speed(max_target_speed, desired_speed), time_step_now, true);
+    last_fplist = evaluate_batch(frenet_state, params, context, num_threads).feasible;
 
     // Find minimum cost path
-    best_traj = FrenetTrajectory();
     best_traj.cost_final = std::numeric_limits<double>::infinity();
-    for (const auto& fp : plan_result.collision_free_paths) {
+    for (const auto& fp : last_fplist) {
         if (fp.cost_final < best_traj.cost_final) {
             best_traj = fp;
         }
@@ -323,42 +307,42 @@ std::vector<EvaluationResult> Frenet_Planner::evaluate_samples(
     bool full_violation,
     double desired_speed) {
     last_stats = PlanStats();
-    const PlanningContext context = make_context(
-        desired_speed >= 0.0 ? desired_speed : max_target_speed, time_step_now, true);
-    const TrajectoryEvaluator evaluator(context, cost_function);
-    const EvalMode mode = full_violation ? EvalMode::kFullViolation : EvalMode::kEarlyExit;
-
-    std::vector<EvaluationResult> results;
-    results.reserve(samples.size());
+    std::vector<SamplingParam> params;
+    params.reserve(samples.size());
     for (const auto& sample : samples) {
-        const SamplingParam z(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
-        FrenetTrajectory traj = evaluator.generate(frenet_state, z, last_stats);
-        results.push_back(evaluator.evaluate(traj, last_stats, mode));
+        params.emplace_back(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
     }
-    return results;
+    const PlanningContext context = make_context(
+        resolve_desired_speed(max_target_speed, desired_speed), time_step_now, true);
+    return evaluate_batch(frenet_state, params, context, 1,
+                          full_violation ? EvalMode::kFullViolation : EvalMode::kEarlyExit).results;
 }
 
-PlanResult Frenet_Planner::plan_multithread(
-    const std::vector<std::vector<std::tuple<double, double, double>>>& samples_per_thread_vec,
-    const FrenetState& frenet_state,
-    const PlanningContext& context) {
-    PlanResult result;
-    
-    if (samples_per_thread_vec.empty()) {
-        return result;
+BatchResult Frenet_Planner::evaluate_batch(const FrenetState& start,
+                                           const std::vector<SamplingParam>& samples,
+                                           const PlanningContext& context,
+                                           int num_threads,
+                                           EvalMode mode) {
+    if (num_threads <= 0) {
+        num_threads = std::max(1u, std::thread::hardware_concurrency());
     }
+    const int n = static_cast<int>(samples.size());
+    num_threads = std::max(1, std::min(num_threads, n));
+    const int chunk = (n + num_threads - 1) / num_threads;
 
-    const int num_threads = samples_per_thread_vec.size();
     const TrajectoryEvaluator evaluator(context, cost_function);
-    std::vector<std::vector<FrenetTrajectory>> thread_feasible_paths(num_threads);
-    std::vector<PlanStats> thread_stats(num_threads);  // Statistics for each thread
+    BatchResult batch;
+    batch.results.resize(n);
+    std::vector<std::vector<FrenetTrajectory>> thread_feasible(num_threads);
+    std::vector<PlanStats> thread_stats(num_threads);
 
     auto worker = [&](int t) {
-        for (const auto& sample : samples_per_thread_vec[t]) {
-            const SamplingParam z(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
-            FrenetTrajectory traj = evaluator.generate(frenet_state, z, thread_stats[t]);
-            if (evaluator.evaluate(traj, thread_stats[t]).feasible) {
-                thread_feasible_paths[t].push_back(std::move(traj));
+        const int end = std::min(n, (t + 1) * chunk);
+        for (int i = t * chunk; i < end; ++i) {
+            FrenetTrajectory traj = evaluator.generate(start, samples[i], thread_stats[t]);
+            batch.results[i] = evaluator.evaluate(traj, thread_stats[t], mode);
+            if (batch.results[i].feasible) {
+                thread_feasible[t].push_back(std::move(traj));
             }
         }
     };
@@ -375,20 +359,14 @@ PlanResult Frenet_Planner::plan_multithread(
         }
     }
 
-    // Merge all thread results, keeping the sample order
-    for (auto& paths : thread_feasible_paths) {
-        result.collision_free_paths.insert(result.collision_free_paths.end(),
-                                           std::make_move_iterator(paths.begin()),
-                                           std::make_move_iterator(paths.end()));
+    // Merge thread results, keeping the sample order
+    for (int t = 0; t < num_threads; t++) {
+        batch.feasible.insert(batch.feasible.end(),
+                              std::make_move_iterator(thread_feasible[t].begin()),
+                              std::make_move_iterator(thread_feasible[t].end()));
+        last_stats += thread_stats[t];
     }
-    
-    // Aggregate statistics from all threads
-    last_stats = PlanStats();  // Reset stats
-    for (const auto& stats : thread_stats) {
-        last_stats += stats;
-    }
-
-    return result;
+    return batch;
 }
 
 void Frenet_Planner::generate_frenet_frame(const double* centerline_pts, int num_points, int pts_dim) {

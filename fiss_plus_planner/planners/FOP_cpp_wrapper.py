@@ -120,7 +120,7 @@ class FOP_CPP_Wrapper(object):
             max_vertices = obs_array.shape[2]
             
             # Create C++ planner
-            self.cpp_planner = frenet_planner_cpp.FrenetPlanner(
+            self.cpp_planner = self._create_cpp_planner(
                 cpp_settings,
                 cpp_vehicle,
                 obs_array,
@@ -132,6 +132,10 @@ class FOP_CPP_Wrapper(object):
         except Exception as e:
             print(f"Warning: Failed to initialize C++ planner: {e}")
             self.cpp_planner = None
+
+    def _create_cpp_planner(self, cpp_settings, cpp_vehicle, *obstacle_args):
+        """C++ planner instance; planners built on the FOP backend override this."""
+        return frenet_planner_cpp.FrenetPlanner(cpp_settings, cpp_vehicle, *obstacle_args)
 
     def get_stats(self) -> Stats:
         """Get statistics from C++ planner and convert to Python Stats object"""

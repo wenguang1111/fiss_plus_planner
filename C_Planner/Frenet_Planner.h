@@ -14,6 +14,7 @@
 #include "common/evaluator/trajectory_evaluator.h"
 #include "common/scenario/obstacles.h"
 #include "common/scenario/road_profile.h"
+#include "common/scenario/search_space.h"
 #include "common/scenario/vehicle_params.h"
 
 struct SettingParameters {
@@ -50,16 +51,10 @@ struct SettingParameters {
           check_boundary(true) {}
 };
 
-// Admissible region of the sampling parameters z = (d, s_d, t), shared by all planners.
-struct SearchSpace {
-    double d_min, d_max;   // terminal lateral offset [m]
-    double v_min, v_max;   // terminal longitudinal speed [m/s]
-    double t_min, t_max;   // planning horizon [s]
-};
-
-// Result structure for plan_multithread
-struct PlanResult {
-    std::vector<FrenetTrajectory> collision_free_paths; // Feasible paths with their cost
+// Outcome of evaluating a batch of samples z = (d, s_d, t)
+struct BatchResult {
+    std::vector<EvaluationResult> results;   // one per sample, in sample order
+    std::vector<FrenetTrajectory> feasible;  // feasible trajectories with cost, in sample order
 };
 
 class Frenet_Planner {
@@ -84,7 +79,7 @@ public:
                    int n_time_steps,
                    int n_obstacles,
                    int max_verts);
-    ~Frenet_Planner();
+    virtual ~Frenet_Planner();  // base of FISS+, CEM and MPPI
     void recordObstacleArray();
     void recordTrajectory(const FrenetTrajectory& traj);
     
@@ -127,12 +122,6 @@ public:
         bool full_violation = true,
         double desired_speed = -1.0);
 
-    // Multithreaded planning function
-    PlanResult plan_multithread(
-        const std::vector<std::vector<std::tuple<double, double, double>>>& samples_per_thread_vec,
-        const FrenetState& frenet_state,
-        const PlanningContext& context);
-
     std::vector<FrenetTrajectory> getAllSuccessfulTrajectories() const {
         return last_fplist;
     }
@@ -151,6 +140,20 @@ public:
                           const std::vector<double>& lane_width,
                           const std::vector<double>& left_extent,
                           const std::vector<double>& right_extent);
+
+protected:
+    // Evaluates the samples with the shared evaluator on num_threads threads (contiguous
+    // chunks; num_threads <= 0 uses all cores). Counters and timings are added to last_stats.
+    BatchResult evaluate_batch(const FrenetState& start,
+                               const std::vector<SamplingParam>& samples,
+                               const PlanningContext& context,
+                               int num_threads,
+                               EvalMode mode = EvalMode::kEarlyExit);
+
+    // v_des of J_V: desired_speed when given (>= 0), otherwise max_target_speed
+    static double resolve_desired_speed(double max_target_speed, double desired_speed) {
+        return desired_speed >= 0.0 ? desired_speed : max_target_speed;
+    }
 };
 
 #endif // FRENET_PLANNER_H

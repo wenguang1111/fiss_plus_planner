@@ -10,6 +10,9 @@ C_Planner/
 ├── Frenet_Planner.h                  # Main planner class header
 ├── Frenet_Planner.cpp                # Main planner implementation
 ├── Fiss_Plus_Planner.h/cpp           # FISS+ search on top of the same backend
+├── Iterative_Sampling_Planner.h/cpp  # FOP with an iteratively refined Gaussian sampler
+├── CEM_Planner.h/cpp                 # cross-entropy update of that sampler
+├── MPPI_Planner.h/cpp                # MPPI-style update of that sampler
 └── common/
     ├── scenario/
     │   ├── frenet.h                  # FrenetState, FrenetTrajectory structs
@@ -21,6 +24,8 @@ C_Planner/
     │   └── cubic_spline.h/cpp        # CubicSpline1D, CubicSpline2D
     ├── cost/
     │   └── cost_function.h/cpp       # FISS+ Eq. (4) planning cost, Eq. (7)+(8) scenario cost
+    ├── sampling/
+    │   └── gaussian_proposal.h/cpp   # Diagonal Gaussian over the unit search space
     ├── evaluator/
     │   ├── plan_stats.h              # PlanStats / TimingStats counters
     │   └── trajectory_evaluator.h/cpp # Shared generate -> transform -> check -> cost backend
@@ -76,12 +81,27 @@ check and objective are identical:
 - `evaluate()`: `check_feasibility()` + planning objective; FOP adds J_D
 
 `EvaluationResult` holds the feasibility flag, the first failed check, the
-continuous constraint violation V and the cost terms. V is 0 exactly when every
-hard check passes; `ranks_before()` orders trajectories lexicographically by
-(feasible, V, J). `EvalMode::kEarlyExit` stops at the first failed check (normal
-planning); `EvalMode::kFullViolation` runs every check and computes V and J for
-all candidates (CEM ranking, teacher data). All counters and stage timings are
-incremented inside the evaluator (`PlanStats`).
+constraint violation V and the cost terms. Per check, V is the share of the
+horizon from the first violating sample on, (N - k_first) / N, so V is 0 exactly
+when every hard check passes and a trajectory that fails later counts as closer
+to feasible; `ranks_before()` orders trajectories lexicographically by
+(feasible, V, J). `EvalMode::kEarlyExit` (used by all planners) stops at the first
+failed check and the collision check at the first colliding step;
+`EvalMode::kFullViolation` runs every check and computes J for all candidates
+(teacher data). All counters and stage timings are incremented inside the
+evaluator (`PlanStats`).
+
+### Iterative sampling planners (CEM, MPPI)
+
+`Iterative_Sampling_Planner` replaces FOP's grid by a Gaussian proposal over
+(d, s_d, t) in unit coordinates of `search_space()`: `num_iterations` rounds of
+`population` samples, each evaluated by `evaluate_batch()` (the FOP backend,
+multi-threaded within a round), warm-started at the previous cycle's solution.
+It returns the best feasible trajectory of all rounds. `CEM_Planner` refits the
+proposal to the elite set ranked by (feasible, V, J); `MPPI_Planner` moves it
+towards the exp(-score / gamma)-weighted mean and covariance with learning rate
+eta. Settings: `CEMSettings`, `MPPISettings` (Python: `CEM` / `MPPI` sections of
+`cfgs/demo_config.yaml`, planners `CEM_CPP` / `MPPI_CPP`).
 
 ### FOP_CPP road-width profiles
 

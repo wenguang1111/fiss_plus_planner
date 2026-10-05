@@ -13,22 +13,18 @@ double ms_since(Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
-// Mean of max(0, (|x| - limit) / limit)^2; > 0 <=> some |x| exceeds the limit.
-// use_abs = false only penalizes positive excess, matching the speed check.
-double hinge_violation(const std::vector<double>& values, double limit, bool use_abs,
-                       bool stop_at_first) {
-    if (values.empty()) return 0.0;
-    const double scale = std::max(std::abs(limit), 1e-6);
-    double sum = 0.0;
-    for (double x : values) {
-        const double excess = (use_abs ? std::abs(x) : x) - limit;
-        if (excess > 0.0) {
-            const double normalized = excess / scale;
-            sum += normalized * normalized;
-            if (stop_at_first) break;
-        }
+// Share of the horizon from the first violating sample on, 0 if there is none.
+double violation_from(long first_violation, size_t n) {
+    if (first_violation < 0 || n == 0) return 0.0;
+    return static_cast<double>(n - static_cast<size_t>(first_violation)) / static_cast<double>(n);
+}
+
+// First sample whose value (or |value|) exceeds limit, -1 if none.
+long first_exceeding(const std::vector<double>& values, double limit, bool use_abs) {
+    for (size_t k = 0; k < values.size(); ++k) {
+        if ((use_abs ? std::abs(values[k]) : values[k]) > limit) return static_cast<long>(k);
     }
-    return sum / static_cast<double>(values.size());
+    return -1;
 }
 
 }  // namespace
@@ -124,47 +120,38 @@ bool TrajectoryEvaluator::to_global(FrenetTrajectory& fp) const {
     return true;
 }
 
-void TrajectoryEvaluator::check_dynamics(const FrenetTrajectory& traj, bool stop_at_first,
+void TrajectoryEvaluator::check_dynamics(const FrenetTrajectory& traj, bool early_exit,
                                          ConstraintViolation& v) const {
-    v.speed = hinge_violation(traj.s_d, ctx_.vehicle.max_speed, false, stop_at_first);
-    if (stop_at_first && v.speed > 0.0) return;
-    v.acceleration = hinge_violation(traj.s_dd, ctx_.vehicle.max_accel, true, stop_at_first);
+    v.speed = violation_from(first_exceeding(traj.s_d, ctx_.vehicle.max_speed, false), traj.s.size());
+    if (early_exit && v.speed > 0.0) return;
+    v.acceleration = violation_from(first_exceeding(traj.s_dd, ctx_.vehicle.max_accel, true), traj.s.size());
 }
 
-void TrajectoryEvaluator::check_road(const FrenetTrajectory& traj, bool stop_at_first,
-                                     ConstraintViolation& v) const {
+double TrajectoryEvaluator::road_violation(const FrenetTrajectory& traj) const {
     // Projects the rectangular footprint onto the local reference normal. This is a
     // local Frenet envelope, not an exact polygon containment test on curved roads or
-    // between discrete time steps. Incomplete horizons are rejected rather than
-    // checking only their prefix: every sample without geometry counts 1.
+    // between discrete time steps. Samples without road geometry (incomplete horizons,
+    // beyond the profile) count as violations.
     constexpr double kTol = 1e-6;
     const size_t n = traj.s.size();
     if (n == 0 || traj.d.size() != n) {
-        v.road = 1.0;
-        return;
+        return 1.0;
     }
-    const double w = std::max(ctx_.vehicle.w, 1e-6);
-    double sum = 0.0;
     for (size_t i = 0; i < n; ++i) {
         double width, left, right;
         if (i >= traj.yaw.size() || !ctx_.road->at(traj.s[i], width, left, right) ||
             !std::isfinite(traj.d[i]) || !std::isfinite(traj.yaw[i])) {
-            sum += 1.0;
-        } else {
-            const double delta_yaw = traj.yaw[i] - ctx_.spline->calc_yaw(traj.s[i]);
-            const double half_extent = 0.5 * (ctx_.vehicle.w * std::abs(std::cos(delta_yaw)) +
-                                              ctx_.vehicle.l * std::abs(std::sin(delta_yaw)));
-            if (!std::isfinite(half_extent)) {
-                sum += 1.0;
-            } else {
-                const double e_left = std::max(0.0, traj.d[i] + half_extent - left - kTol) / w;
-                const double e_right = std::max(0.0, -right - (traj.d[i] - half_extent) - kTol) / w;
-                sum += e_left * e_left + e_right * e_right;
-            }
+            return violation_from(static_cast<long>(i), n);
         }
-        if (stop_at_first && sum > 0.0) break;
+        const double delta_yaw = traj.yaw[i] - ctx_.spline->calc_yaw(traj.s[i]);
+        const double half_extent = 0.5 * (ctx_.vehicle.w * std::abs(std::cos(delta_yaw)) +
+                                          ctx_.vehicle.l * std::abs(std::sin(delta_yaw)));
+        if (!std::isfinite(half_extent) || traj.d[i] - half_extent < -right - kTol ||
+            traj.d[i] + half_extent > left + kTol) {
+            return violation_from(static_cast<long>(i), n);
+        }
     }
-    v.road = sum / static_cast<double>(n);
+    return 0.0;
 }
 
 EvaluationResult TrajectoryEvaluator::check_feasibility(FrenetTrajectory& traj, PlanStats& stats,
@@ -194,7 +181,7 @@ EvaluationResult TrajectoryEvaluator::check_feasibility(FrenetTrajectory& traj, 
     const bool dynamic_ok = result.violation.speed == 0.0 && result.violation.acceleration == 0.0;
     bool road_ok = true;
     if ((dynamic_ok || !early_exit) && ctx_.check_boundary && ctx_.road != nullptr && !ctx_.road->empty()) {
-        check_road(traj, early_exit, result.violation);
+        result.violation.road = road_violation(traj);
         road_ok = result.violation.road == 0.0;
     }
     stats.timing.constraint_ms += ms_since(t0);
@@ -216,11 +203,11 @@ EvaluationResult TrajectoryEvaluator::check_feasibility(FrenetTrajectory& traj, 
     if (ctx_.check_obstacle) {
         t0 = Clock::now();
         ++stats.num_collision_checks;
-        const TrajectoryCollision collision = check_trajectory_collision(
-            traj, ctx_.obstacles, ctx_.vehicle.l, ctx_.vehicle.w, ctx_.time_step_now, early_exit);
+        const int first_hit = first_collision_step(
+            traj, ctx_.obstacles, ctx_.vehicle.l, ctx_.vehicle.w, ctx_.time_step_now);
         stats.timing.collision_ms += ms_since(t0);
-        result.violation.collision = collision.violation;
-        if (collision.collided) {
+        result.violation.collision = violation_from(first_hit, traj.s.size());
+        if (first_hit >= 0) {
             reject(Rejection::kCollision);
         } else {
             ++stats.num_collision_free;
