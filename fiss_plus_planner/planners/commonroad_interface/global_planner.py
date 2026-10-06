@@ -1,4 +1,6 @@
 import numpy as np
+from shapely.geometry import LineString, Point
+from shapely.ops import unary_union
 
 from commonroad_route_planner.route_planner import RoutePlanner
 from commonroad_route_planner.utility.visualization import visualize_route
@@ -36,6 +38,50 @@ def _distance_to_polyline(points: np.ndarray, polyline: np.ndarray) -> np.ndarra
     t = np.clip(np.einsum('nmj,mj->nm', ap, ab) / denom, 0.0, 1.0)
     proj = a[None, :, :] + t[:, :, None] * ab[None, :, :]
     return np.linalg.norm(points[:, None, :] - proj, axis=2).min(axis=1)
+
+
+def _extent_inside(area, point: np.ndarray, direction: np.ndarray, max_length: float = 20.0) -> float:
+    """Length of the ray from `point` along `direction` until it first leaves `area`."""
+    ray = LineString([point, point + max_length * direction]).intersection(area)
+    for part in getattr(ray, 'geoms', [ray]):
+        if part.length > 0.0 and part.distance(Point(point)) < 1e-6:
+            return part.length
+    return 0.0
+
+
+def _merge_extents(lanelet, llnet, left: np.ndarray, right: np.ndarray):
+    """Left / right extents of `lanelet` widened by the lanes merging with it.
+
+    Lanelets sharing a successor with `lanelet` overlap it at the merge, and a vehicle coming from one
+    of them occupies both (BEL_Brussels-51 starts there). Each extent is the distance along the normal
+    of the centerline point that stays inside the union of the merging lanelets, kept where it exceeds
+    the roadway extent.
+    """
+    ids = {p for s in lanelet.successor for p in llnet.find_lanelet_by_id(s).predecessor} | {lanelet.lanelet_id}
+    if len(ids) == 1:
+        return left, right
+    area = unary_union([llnet.find_lanelet_by_id(i).polygon.shapely_object.buffer(1e-3) for i in ids])
+    center = lanelet.center_vertices
+    tangent = np.gradient(center, axis=0)
+    normal = np.column_stack((-tangent[:, 1], tangent[:, 0])) / np.linalg.norm(tangent, axis=1)[:, None]
+    left = np.maximum(left, [_extent_inside(area, p, n) for p, n in zip(center, normal)])
+    right = np.maximum(right, [_extent_inside(area, p, -n) for p, n in zip(center, normal)])
+    return left, right
+
+
+def extend_centerline(centerline: np.ndarray, length: float, step: float = 1.0) -> np.ndarray:
+    """Route centerline (x, y, yaw, width, left, right) continued straight past its end by `length` m.
+
+    The CommonRoad map ends where the scenario ends, so close to the route end every sampled trajectory
+    would run beyond the reference line and count as off-road. The extension keeps the last heading and
+    road profile, as if the road went on.
+    """
+    last = centerline[-1]
+    offsets = step * np.arange(1, int(np.ceil(length / step)) + 1)
+    extension = np.repeat(last[None, :], len(offsets), axis=0)
+    extension[:, 0] += offsets * np.cos(last[2])
+    extension[:, 1] += offsets * np.sin(last[2])
+    return np.vstack((centerline, extension))
 
 
 # Traffic-sign elements whose first additional value is a maximum speed [m/s]
@@ -133,14 +179,13 @@ class GlobalPlanner(object):
         # just the ego lane. Kept as two separate columns because a road is routinely asymmetric about
         # the lane the route follows (ESP_Barcelona has two lanes to the left and none to the right),
         # so a single symmetric half-width cannot describe where the vehicle may go.
-        left_extents = np.concatenate(
-            [_distance_to_polyline(lanelet.center_vertices, _outermost_boundaries(lanelet, llnet)[0])
-             for lanelet in global_plan.lanelets]
-            )[np.sort(unqiue_indices)]
-        right_extents = np.concatenate(
-            [_distance_to_polyline(lanelet.center_vertices, _outermost_boundaries(lanelet, llnet)[1])
-             for lanelet in global_plan.lanelets]
-            )[np.sort(unqiue_indices)]
+        # Lanes merging into a route lanelet widen it where they overlap (_merge_extents).
+        extents = [_merge_extents(lanelet, llnet,
+                                  _distance_to_polyline(lanelet.center_vertices, _outermost_boundaries(lanelet, llnet)[0]),
+                                  _distance_to_polyline(lanelet.center_vertices, _outermost_boundaries(lanelet, llnet)[1]))
+                   for lanelet in global_plan.lanelets]
+        left_extents = np.concatenate([left for left, _ in extents])[np.sort(unqiue_indices)]
+        right_extents = np.concatenate([right for _, right in extents])[np.sort(unqiue_indices)]
 
         global_plan.concat_centerline = np.hstack((
             concat_centerline, yaws[:, np.newaxis], widths[:, np.newaxis],

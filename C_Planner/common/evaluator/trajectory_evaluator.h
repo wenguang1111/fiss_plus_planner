@@ -29,6 +29,8 @@ struct PlanningContext {
     double v_des = 0.0;           // desired velocity of J_V [m/s]
     double t_max = 5.0;           // t_max of J_T, the largest sampled horizon [s]
     int time_step_now = 0;        // obstacle time step of trajectory sample 0
+    bool low_speed_mode = false;  // lateral motion d(s) instead of d(t), see SettingParameters
+    double low_speed_min_lateral_length = 5.0;  // [m]
     bool check_boundary = true;
     bool check_obstacle = true;
     bool use_obstacle_cost = true;  // add J_D to the planning objective
@@ -52,7 +54,7 @@ struct PlanningContext {
 // that violates later is closer to feasible; V == 0 <=> feasible. Every check stops at
 // its first violation, so V is exact even with EvalMode::kEarlyExit.
 struct ConstraintViolation {
-    double speed = 0.0;         // s_d above vehicle max speed
+    double speed = 0.0;         // s_d above vehicle max speed or reversing (s_d < 0)
     double acceleration = 0.0;  // |s_dd| above vehicle max acceleration
     double road = 0.0;          // footprint beyond the road edge or outside the road profile
     double clearance = 0.0;     // closer than the safe following distance to an obstacle ahead

@@ -34,6 +34,12 @@ struct SettingParameters {
     double max_t;                // max prediction time [s]
     int num_t;                  // time sampling number
 
+    // Low-speed lateral model (Werling's thesis Sec. 3.5.1, CommonRoad reactive planner):
+    // below low_speed_threshold the lateral motion is a quintic in the travelled arc length,
+    // d(s(t)), so the vehicle cannot move sideways without moving forward.
+    double low_speed_threshold;            // [m/s] start speed below which d(s) is used
+    double low_speed_min_lateral_length;   // [m] lower bound of the lateral arc length
+
     bool check_obstacle;        // True if check collision with obstacles
     bool check_boundary;        // True if check collision with road boundaries
 
@@ -62,6 +68,8 @@ struct SettingParameters {
           min_t(3.0),
           max_t(5.0),
           num_t(num_t_param),
+          low_speed_threshold(4.0),
+          low_speed_min_lateral_length(5.0),
           check_obstacle(true),
           check_boundary(true),
           check_clearance(true),

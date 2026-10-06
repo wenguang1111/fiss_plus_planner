@@ -13,6 +13,28 @@ double ms_since(Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
+// Longitudinal speed below which the vehicle counts as standing still [m/s]
+constexpr double kStandstillSpeed = 1e-3;
+// Reversing tolerance of the no-reversing constraint [m/s]
+constexpr double kReverseTolerance = 1e-2;
+// Arc-length step of the numerical reference curvature derivative k_r' [m]
+constexpr double kCurvatureStep = 0.1;
+
+// d' and d'' at the start: given directly, otherwise from the time derivatives (Werling
+// (A.7), (A.8)); 0 at standstill without that information (aligned with the reference).
+void start_arc_derivatives(const FrenetState& start, double& d_s, double& d_ss) {
+    if (std::isfinite(start.d_s)) {
+        d_s = start.d_s;
+        d_ss = std::isfinite(start.d_ss) ? start.d_ss : 0.0;
+    } else if (start.s_d > kStandstillSpeed) {
+        d_s = start.d_d / start.s_d;
+        d_ss = (start.d_dd - d_s * start.s_dd) / (start.s_d * start.s_d);
+    } else {
+        d_s = 0.0;
+        d_ss = 0.0;
+    }
+}
+
 // Share of the horizon from the first violating sample on, 0 if there is none.
 double violation_from(long first_violation, size_t n) {
     if (first_violation < 0 || n == 0) return 0.0;
@@ -41,19 +63,54 @@ FrenetTrajectory TrajectoryEvaluator::generate(const FrenetState& start, const S
     const double Ti = std::max(z.t, ctx_.dt);
 
     FrenetTrajectory fp;
-    QuinticPolynomial lat_qp(start.d, start.d_d, start.d_dd, z.d, 0.0, 0.0, Ti);
     QuarticPolynomial lon_qp(start.s, start.s_d, start.s_dd, z.s_d, 0.0, Ti);
-
     for (double t = 0.0; t < Ti; t += ctx_.dt) {
         fp.t.push_back(t);
-        fp.d.push_back(lat_qp.calc_point(t));
-        fp.d_d.push_back(lat_qp.calc_first_derivative(t));
-        fp.d_dd.push_back(lat_qp.calc_second_derivative(t));
-        fp.d_ddd.push_back(lat_qp.calc_third_derivative(t));
         fp.s.push_back(lon_qp.calc_point(t));
         fp.s_d.push_back(lon_qp.calc_first_derivative(t));
         fp.s_dd.push_back(lon_qp.calc_second_derivative(t));
         fp.s_ddd.push_back(lon_qp.calc_third_derivative(t));
+    }
+
+    double d_s, d_ss;
+    start_arc_derivatives(start, d_s, d_ss);
+    if (!ctx_.low_speed_mode) {
+        // High speed: lateral quintic over time, d' and d'' from Werling (A.7), (A.8);
+        // at standstill they keep their last value.
+        QuinticPolynomial lat_qp(start.d, start.d_d, start.d_dd, z.d, 0.0, 0.0, Ti);
+        for (size_t k = 0; k < fp.t.size(); ++k) {
+            const double t = fp.t[k];
+            const double sd = fp.s_d[k];
+            fp.d.push_back(lat_qp.calc_point(t));
+            fp.d_d.push_back(lat_qp.calc_first_derivative(t));
+            fp.d_dd.push_back(lat_qp.calc_second_derivative(t));
+            fp.d_ddd.push_back(lat_qp.calc_third_derivative(t));
+            if (sd > kStandstillSpeed) {
+                d_s = fp.d_d.back() / sd;
+                d_ss = (fp.d_dd.back() - d_s * fp.s_dd[k]) / (sd * sd);
+            }
+            fp.d_s.push_back(d_s);
+            fp.d_ss.push_back(d_ss);
+        }
+    } else {
+        // Low speed (Werling's thesis Sec. 3.5.1): lateral quintic over the travelled arc
+        // length sigma = s - s0, ending where the longitudinal trajectory ends, so lateral
+        // motion only happens with longitudinal motion. Time derivatives by the chain rule.
+        const double length = std::max(lon_qp.calc_point(Ti) - start.s, ctx_.low_speed_min_lateral_length);
+        QuinticPolynomial lat_qp(start.d, d_s, d_ss, z.d, 0.0, 0.0, length);
+        for (size_t k = 0; k < fp.t.size(); ++k) {
+            const double sigma = std::clamp(fp.s[k] - start.s, 0.0, length);
+            const double p1 = lat_qp.calc_first_derivative(sigma);
+            const double p2 = lat_qp.calc_second_derivative(sigma);
+            const double p3 = lat_qp.calc_third_derivative(sigma);
+            const double sd = fp.s_d[k], sdd = fp.s_dd[k], sddd = fp.s_ddd[k];
+            fp.d.push_back(lat_qp.calc_point(sigma));
+            fp.d_s.push_back(p1);
+            fp.d_ss.push_back(p2);
+            fp.d_d.push_back(p1 * sd);
+            fp.d_dd.push_back(p2 * sd * sd + p1 * sdd);
+            fp.d_ddd.push_back(p3 * sd * sd * sd + 3.0 * p2 * sd * sdd + p1 * sddd);
+        }
     }
 
     fp.is_generated = true;
@@ -83,34 +140,47 @@ bool TrajectoryEvaluator::to_global(FrenetTrajectory& fp) const {
         return false;
     }
 
-    const size_t n = std::min(fp.s.size(), fp.d.size());
+    // Heading and curvature from the Frenet state (Werling's thesis, Appendix A.1):
+    //   d' = (1 - k_r d) tan(dtheta)                                                  (A.3)
+    //   d'' = -(k_r' d + k_r d') tan(dtheta)
+    //         + (1 - k_r d) / cos^2(dtheta) * (k (1 - k_r d) / cos(dtheta) - k_r)     (A.5)
+    // solved for dtheta = theta - theta_r and k; well defined at standstill.
+    const double s_end = ctx_.spline->s.back();
+    const size_t n = std::min({fp.s.size(), fp.d.size(), fp.d_s.size(), fp.d_ss.size()});
     for (size_t i = 0; i < n; i++) {
         auto [ix, iy] = ctx_.spline->calc_position(fp.s[i]);
         // Stop adding points if position is invalid (beyond the reference line)
         if (std::isnan(ix) || std::isnan(iy)) {
             break;
         }
-        const double i_yaw = ctx_.spline->calc_yaw(fp.s[i]);
-        const double di = fp.d[i];
-        fp.x.push_back(ix + di * std::cos(i_yaw + M_PI / 2.0));
-        fp.y.push_back(iy + di * std::sin(i_yaw + M_PI / 2.0));
+        const double d = fp.d[i];
+        const double ref_yaw = ctx_.spline->calc_yaw(fp.s[i]);
+        const double k_r = ctx_.spline->calc_curvature(fp.s[i]);
+        const double s_lo = std::max(fp.s[i] - kCurvatureStep, 0.0);
+        const double s_hi = std::min(fp.s[i] + kCurvatureStep, s_end);
+        const double k_r_d = s_hi > s_lo
+            ? (ctx_.spline->calc_curvature(s_hi) - ctx_.spline->calc_curvature(s_lo)) / (s_hi - s_lo)
+            : 0.0;
+        const double one_kr_d = 1.0 - k_r * d;
+        if (!(one_kr_d > 0.0)) {
+            break;  // beyond the reference line's center of curvature
+        }
+        const double dtheta = std::atan(fp.d_s[i] / one_kr_d);
+        const double cos_t = std::cos(dtheta);
+        fp.x.push_back(ix + d * std::cos(ref_yaw + M_PI / 2.0));
+        fp.y.push_back(iy + d * std::sin(ref_yaw + M_PI / 2.0));
+        fp.yaw.push_back(ref_yaw + dtheta);
+        fp.c.push_back(((fp.d_ss[i] + (k_r_d * d + k_r * fp.d_s[i]) * std::tan(dtheta)) * cos_t * cos_t / one_kr_d + k_r)
+                       * cos_t / one_kr_d);
     }
     if (fp.x.size() < 2) {
         return false;
     }
 
     for (size_t i = 0; i + 1 < fp.x.size(); i++) {
-        const double dx = fp.x[i + 1] - fp.x[i];
-        const double dy = fp.y[i + 1] - fp.y[i];
-        fp.yaw.push_back(std::atan2(dy, dx));
-        fp.ds.push_back(std::sqrt(dx * dx + dy * dy));
+        fp.ds.push_back(std::hypot(fp.x[i + 1] - fp.x[i], fp.y[i + 1] - fp.y[i]));
     }
-    fp.yaw.push_back(fp.yaw.back());
-
     const double dt = ctx_.dt;
-    for (size_t i = 0; i + 1 < fp.yaw.size(); i++) {
-        fp.c.push_back((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i]);
-    }
     for (size_t i = 0; i + 1 < fp.c.size(); i++) {
         fp.c_d.push_back((fp.c[i + 1] - fp.c[i]) / dt);
     }
@@ -122,7 +192,13 @@ bool TrajectoryEvaluator::to_global(FrenetTrajectory& fp) const {
 
 void TrajectoryEvaluator::check_dynamics(const FrenetTrajectory& traj, bool early_exit,
                                          ConstraintViolation& v) const {
-    v.speed = violation_from(first_exceeding(traj.s_d, ctx_.vehicle.max_speed, false), traj.s.size());
+    // Speed: above the vehicle maximum or reversing (s_d < 0)
+    long first_speed = first_exceeding(traj.s_d, ctx_.vehicle.max_speed, false);
+    for (size_t k = 0; k < traj.s_d.size(); ++k) {
+        if (first_speed >= 0 && static_cast<long>(k) >= first_speed) break;
+        if (traj.s_d[k] < -kReverseTolerance) { first_speed = static_cast<long>(k); break; }
+    }
+    v.speed = violation_from(first_speed, traj.s.size());
     if (early_exit && v.speed > 0.0) return;
     v.acceleration = violation_from(first_exceeding(traj.s_dd, ctx_.vehicle.max_accel, true), traj.s.size());
 }

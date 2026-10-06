@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <limits>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "Fiss_Plus_Planner.h"
@@ -27,6 +28,8 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
         .def_readwrite("min_t", &FissPlusPlannerSettings::min_t)
         .def_readwrite("max_t", &FissPlusPlannerSettings::max_t)
         .def_readwrite("num_t", &FissPlusPlannerSettings::num_t)
+        .def_readwrite("low_speed_threshold", &FissPlusPlannerSettings::low_speed_threshold)
+        .def_readwrite("low_speed_min_lateral_length", &FissPlusPlannerSettings::low_speed_min_lateral_length)
         .def_readwrite("check_obstacle", &FissPlusPlannerSettings::check_obstacle)
         .def_readwrite("check_boundary", &FissPlusPlannerSettings::check_boundary)
         .def_readwrite("check_clearance", &FissPlusPlannerSettings::check_clearance)
@@ -120,6 +123,11 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 fs.d_d = frenet_state.attr("d_d").cast<double>();
                 fs.d_dd = frenet_state.attr("d_dd").cast<double>();
                 fs.d_ddd = frenet_state.attr("d_ddd").cast<double>();
+                // d', d'' w.r.t. arc length; None / missing: derived from the time derivatives
+                py::object d_s = py::getattr(frenet_state, "d_s", py::none());
+                py::object d_ss = py::getattr(frenet_state, "d_ss", py::none());
+                fs.d_s = d_s.is_none() ? std::numeric_limits<double>::quiet_NaN() : d_s.cast<double>();
+                fs.d_ss = d_ss.is_none() ? std::numeric_limits<double>::quiet_NaN() : d_ss.cast<double>();
                 
                 FrenetTrajectory traj = self.plan(fs, max_target_speed, time_step_now, desired_speed);
                 
@@ -133,6 +141,8 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 d["d_d"] = traj.d_d;
                 d["d_dd"] = traj.d_dd;
                 d["d_ddd"] = traj.d_ddd;
+                d["d_s"] = traj.d_s;
+                d["d_ss"] = traj.d_ss;
                 d["x"] = traj.x;
                 d["y"] = traj.y;
                 d["yaw"] = traj.yaw;
@@ -169,6 +179,8 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                     d["d_d"] = traj.d_d;
                     d["d_dd"] = traj.d_dd;
                     d["d_ddd"] = traj.d_ddd;
+                    d["d_s"] = traj.d_s;
+                    d["d_ss"] = traj.d_ss;
                     d["x"] = traj.x;
                     d["y"] = traj.y;
                     d["yaw"] = traj.yaw;

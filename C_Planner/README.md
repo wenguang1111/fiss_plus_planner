@@ -91,6 +91,21 @@ failed check and the collision check at the first colliding step;
 (teacher data). All counters and stage timings are incremented inside the
 evaluator (`PlanStats`).
 
+### Lateral motion model and Frenet -> Cartesian transform
+
+Below `low_speed_threshold` (start speed, default 4 m/s as in the CommonRoad
+reactive planner) the lateral motion is a quintic in the travelled arc length,
+d(s(t)) over sigma = s - s0 in [0, max(s(T) - s0, low_speed_min_lateral_length)]
+(Werling's thesis Sec. 3.5.1), so the vehicle cannot move sideways while standing.
+Above it the lateral motion is the usual quintic d(t). Every trajectory stores
+d' = dd/ds and d'' (`d_s`, `d_ss`; high speed via Werling (A.7)/(A.8), held at
+standstill), and `to_global()` computes heading and curvature from them with
+Werling's Appendix A.1, (A.3)/(A.5), instead of finite differences of x, y. This
+keeps heading and curvature defined at v = 0 (waiting is a feasible candidate:
+v_end = 0 is part of every sampling space). Trajectories with s_d < -0.01 m/s
+(reversing) are rejected by the dynamic constraint. `FrenetState` carries d', d''
+(`d_s`, `d_ss`, NaN if unknown) so they stay continuous across cycles at standstill.
+
 ### Safe following distance (clearance)
 
 All planners share a check between the constraint and the polygon collision check

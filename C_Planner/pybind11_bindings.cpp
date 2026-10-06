@@ -53,6 +53,8 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("min_t", &SettingParameters::min_t)
         .def_readwrite("max_t", &SettingParameters::max_t)
         .def_readwrite("num_t", &SettingParameters::num_t)
+        .def_readwrite("low_speed_threshold", &SettingParameters::low_speed_threshold)
+        .def_readwrite("low_speed_min_lateral_length", &SettingParameters::low_speed_min_lateral_length)
         .def_readwrite("check_obstacle", &SettingParameters::check_obstacle)
         .def_readwrite("check_boundary", &SettingParameters::check_boundary)
         .def_readwrite("check_clearance", &SettingParameters::check_clearance)
@@ -88,7 +90,9 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("d", &FrenetState::d)
         .def_readwrite("d_d", &FrenetState::d_d)
         .def_readwrite("d_dd", &FrenetState::d_dd)
-        .def_readwrite("d_ddd", &FrenetState::d_ddd);
+        .def_readwrite("d_ddd", &FrenetState::d_ddd)
+        .def_readwrite("d_s", &FrenetState::d_s)
+        .def_readwrite("d_ss", &FrenetState::d_ss);
 
     // Bind SamplingParam struct
     py::class_<SamplingParam>(m, "SamplingParam")
@@ -117,6 +121,8 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("d_d", &FrenetTrajectory::d_d)
         .def_readwrite("d_dd", &FrenetTrajectory::d_dd)
         .def_readwrite("d_ddd", &FrenetTrajectory::d_ddd)
+        .def_readwrite("d_s", &FrenetTrajectory::d_s)
+        .def_readwrite("d_ss", &FrenetTrajectory::d_ss)
         // World frame coordinates
         .def_readwrite("x", &FrenetTrajectory::x)
         .def_readwrite("y", &FrenetTrajectory::y)

@@ -118,6 +118,8 @@ PlanningContext Frenet_Planner::make_context(const FrenetState& start, double v_
     ctx.v_des = v_des;
     ctx.t_max = settings.max_t;
     ctx.time_step_now = time_step_now;
+    ctx.low_speed_mode = start.s_d < settings.low_speed_threshold;
+    ctx.low_speed_min_lateral_length = settings.low_speed_min_lateral_length;
     ctx.check_boundary = settings.check_boundary;
     ctx.check_obstacle = settings.check_obstacle;
     ctx.use_obstacle_cost = use_obstacle_cost;

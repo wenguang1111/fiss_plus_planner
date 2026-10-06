@@ -47,6 +47,8 @@ class Stats(object):
         self.num_cost_evaluations = 0
         self.num_rejected_clearance = 0
         self.num_clearance_fallbacks = 0
+        self.standstill_time = 0.0       # [s] executed time with |v| < 0.01 m/s
+        self.rear_end_failure = False    # planning failed while a follower drives into the ego (rear_end_threat)
         self.timing_ms = {}              # per-stage time, summed over cycles
         self.final_cost_terms = {}       # Eq. (7)+(8) terms of the executed trajectory
 
@@ -124,6 +126,11 @@ class FrenetOptimalPlannerSettings(object):
         self.min_t = 3.0                    # min prediction time [m]
         self.max_t = 5.0                   # max prediction time [m]
         self.num_t = num_t                  # time sampling number
+
+        # Low-speed lateral model (C++ planners): below low_speed_threshold the lateral motion is
+        # a quintic in the travelled arc length d(s) (Werling's thesis Sec. 3.5.1)
+        self.low_speed_threshold = 4.0             # [m/s] (CommonRoad reactive planner default)
+        self.low_speed_min_lateral_length = 5.0    # [m] lower bound of the lateral arc length
 
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries

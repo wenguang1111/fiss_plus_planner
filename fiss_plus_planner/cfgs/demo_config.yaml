@@ -32,6 +32,13 @@ SAFETY:
   clearance_recovery_time: 3.0   # [s] time to restore a gap below the target
   clearance_fallback: True       # plan without it if no candidate keeps the gap
 
+# Lateral motion model of the C++ planners: below low_speed_threshold the lateral motion is a
+# quintic in the travelled arc length d(s) (Werling's thesis Sec. 3.5.1, as in the CommonRoad
+# reactive planner), so the vehicle can stop, wait and start again without moving sideways.
+MOTION_MODEL:
+  low_speed_threshold: 4.0           # [m/s] start speed below which d(s) is used
+  low_speed_min_lateral_length: 5.0  # [m] lower bound of the lateral arc length
+
 # Iterative sampling planners (FOP backend, Gaussian sampler over d, v, T). Trajectories per
 # planning cycle = num_iterations * population; N_*_SAMPLE above are not used by them.
 CEM:

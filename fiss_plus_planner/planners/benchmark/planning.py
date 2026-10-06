@@ -14,6 +14,7 @@ from matplotlib.patches import Polygon as MplPolygon
 import pandas as pd
 from matplotlib import font_manager
 from shapely import affinity
+from shapely.geometry import Polygon as ShapelyPolygon
 
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.common.solution import VehicleType
@@ -30,7 +31,7 @@ from commonroad_dc.feasibility.vehicle_dynamics import VehicleParameterMapping
 
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, State, FrenetTrajectory
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
-from fiss_plus_planner.planners.commonroad_interface.global_planner import GlobalPlanner
+from fiss_plus_planner.planners.commonroad_interface.global_planner import GlobalPlanner, extend_centerline
 from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSettings
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
@@ -163,11 +164,11 @@ def prepare_obstacles_polygons_time_series(
 DEFAULT_SPEED_LIMIT = 14.0
 
 
-def apply_safety_settings(planner_settings, safety_cfg: dict = None):
-    """Overrides the safe-following-distance settings (C++ planners) with the SAFETY config."""
-    for name, value in (safety_cfg or {}).items():
+def apply_settings(planner_settings, section_cfg: dict = None):
+    """Overrides planner settings with a config section (SAFETY, MOTION_MODEL)."""
+    for name, value in (section_cfg or {}).items():
         if not hasattr(planner_settings, name):
-            raise KeyError(f"unknown SAFETY setting: {name}")
+            raise KeyError(f"unknown planner setting: {name}")
         setattr(planner_settings, name, value)
 
 
@@ -177,6 +178,36 @@ def route_lanelet_index(position, global_plan, lanelet_network):
     route_ids = [lanelet.lanelet_id for lanelet in global_plan.lanelets]
     indices = [route_ids.index(i) for i in ids if i in route_ids]
     return max(indices) if indices else None
+
+
+def rear_end_threat(obstacles_array: np.ndarray, obstacles_num_vertices: np.ndarray, time_step: int,
+                    state: InitialState, vehicle: Vehicle, horizon_steps: int) -> bool:
+    """True when a vehicle now behind the ego in its lane drives into the ego footprint within
+    `horizon_steps`, even if the ego stands still.
+
+    The recorded traffic does not react to the ego, so such a follower makes every candidate
+    infeasible; the ego cannot avoid it by braking (nuPlan's at-fault collision metric likewise does
+    not count rear collisions into a stopped or slower ego against the ego). Used to label planning
+    failures caused by a follower.
+    """
+    heading = np.array([np.cos(state.orientation), np.sin(state.orientation)])
+    normal = np.array([-heading[1], heading[0]])
+    corners = [(vehicle.l / 2, vehicle.w / 2), (vehicle.l / 2, -vehicle.w / 2),
+               (-vehicle.l / 2, -vehicle.w / 2), (-vehicle.l / 2, vehicle.w / 2)]
+    ego = ShapelyPolygon([state.position + a * heading + b * normal for a, b in corners])
+    last_step = min(time_step + horizon_steps, obstacles_num_vertices.shape[0] - 1)
+    for j in range(obstacles_num_vertices.shape[1]):
+        n = obstacles_num_vertices[time_step, j]
+        if n == 0:
+            continue
+        rel = obstacles_array[time_step, j, :n].mean(axis=0) - state.position
+        if rel @ heading > -vehicle.l / 2 or abs(rel @ normal) > vehicle.w:
+            continue  # not behind the ego in its lane
+        for k in range(time_step + 1, last_step + 1):
+            n = obstacles_num_vertices[k, j]
+            if n > 0 and ShapelyPolygon(obstacles_array[k, j, :n]).intersects(ego):
+                return True
+    return False
 
 
 def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
@@ -204,10 +235,10 @@ def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
-                            sampler_cfg: dict = None, safety_cfg: dict = None
+                            sampler_cfg: dict = None, safety_cfg: dict = None, motion_model_cfg: dict = None
                             ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
     """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}}.
-    safety_cfg: safe-following-distance settings of the C++ planners (SAFETY config)."""
+    safety_cfg / motion_model_cfg: SAFETY / MOTION_MODEL config sections of the C++ planners."""
     sampler_cfg = sampler_cfg or {}
     # Plan a global route
     global_planner = GlobalPlanner()
@@ -348,25 +379,29 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
-        apply_safety_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, motion_model_cfg)
         planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True  # Check if C++ planner was successfully initialized
         # planner.recordObstaclesForDebug("python_obstacle.csv")
     elif method == 'FISS+_CPP':
         # Use C++ FISS+ Planner with pybind11
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
-        apply_safety_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, motion_model_cfg)
         planner = FissPlusCppWrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True
     elif method == 'CEM_CPP':
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
-        apply_safety_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, motion_model_cfg)
         planner = CEM_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                   runtime_measurement, cem_cfg=sampler_cfg.get('CEM'))
         use_cpp_planner = True
     elif method == 'MPPI_CPP':
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
-        apply_safety_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, motion_model_cfg)
         planner = MPPI_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                    runtime_measurement, mppi_cfg=sampler_cfg.get('MPPI'))
         use_cpp_planner = True
@@ -379,7 +414,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
 
+    # The map ends with the scenario: continue the reference straight beyond the route end, so the
+    # trajectories near the end do not run off the reference line; the run stops at the route end.
+    num_route_pts = len(ego_lane_pts)
+    ego_lane_pts = extend_centerline(ego_lane_pts, vehicle.max_speed * planner_settings.max_t)
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
+    route_end_s = csp_ego.s[num_route_pts - 1]
 
     # Initial state
     initial_state = planning_problem.initial_state
@@ -498,6 +538,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             print(f"Planning failed at time step {i}")
             stats.time_step_have_to_break = i
+            stats.rear_end_failure = rear_end_threat(
+                obstacles_array, obstacles_num_vertices, i, inital_state, vehicle,
+                int(round(planner.settings.max_t / planner.settings.tick_t)))
             break
         processing_time = (end_time - start_time)
         stats.runtime_history.append(processing_time)
@@ -556,17 +599,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 stats.success = True
                 goal_reached = True
                 break
-            elif np.hypot(next_state.position[0] - ref_ego_lane_pts[-1, 0], next_state.position[1] - ref_ego_lane_pts[-1, 1]) <= 3.0:
+            elif current_frenet_state.s >= route_end_s - 3.0:
                 print("Reaching End of the Map, Stopping, Goal Not Reached")
                 goal_reached = True
                 stats.success = True
                 break
         
-        #break when the speed is close to zero, this is a simple model with out standstill feature.
+        # Standstill is allowed (the C++ planners switch to the low-speed lateral model d(s)
+        # and can wait or start again); only the time spent standing is recorded.
         if abs(next_state.velocity) < 0.01:
-            goal_reached = True
-            stats.success = False
-            break
+            stats.standstill_time += dt
 
         if show_animation:  # pragma: no cover
             plt.cla()
@@ -754,7 +796,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist, best_trajs = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
                 number_threads, runtime_measurement, collect_data_for_ml,
-                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI')}, safety_cfg=cfg.get('SAFETY'))
+                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI')}, safety_cfg=cfg.get('SAFETY'),
+                motion_model_cfg=cfg.get('MOTION_MODEL'))
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

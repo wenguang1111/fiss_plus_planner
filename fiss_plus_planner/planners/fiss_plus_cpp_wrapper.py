@@ -14,7 +14,7 @@ from fiss_plus_planner.planners.common.geometry.cubic_spline import CubicSpline2
 from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from fiss_plus_planner.planners.common.scenario.obstacle_frenet import obstacle_frenet_bounds
-from fiss_plus_planner.planners.FOP_cpp_wrapper import CLEARANCE_SETTINGS
+from fiss_plus_planner.planners.FOP_cpp_wrapper import CLEARANCE_SETTINGS, MOTION_MODEL_SETTINGS
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
@@ -95,7 +95,7 @@ class FissPlusCppWrapper(object):
             cpp_settings.max_t = self.settings.max_t
             cpp_settings.check_obstacle = self.settings.check_obstacle
             cpp_settings.check_boundary = self.settings.check_boundary
-            for name in CLEARANCE_SETTINGS:
+            for name in CLEARANCE_SETTINGS + MOTION_MODEL_SETTINGS:
                 setattr(cpp_settings, name, getattr(self.settings, name))
             
             # FISS+ specific settings
@@ -159,6 +159,8 @@ class FissPlusCppWrapper(object):
         fp.d_d = list(d["d_d"])
         fp.d_dd = list(d["d_dd"])
         fp.d_ddd = list(d["d_ddd"])
+        fp.d_s = list(d["d_s"])
+        fp.d_ss = list(d["d_ss"])
         fp.x = list(d["x"])
         fp.y = list(d["y"])
         fp.yaw = list(d["yaw"])

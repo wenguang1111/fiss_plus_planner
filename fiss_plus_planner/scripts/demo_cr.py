@@ -41,7 +41,8 @@ def append_measurement_to_csv(csv_path, file, measurement):
             f'{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},{measurement.num_FOP_intervention},{intervention_percent},{measurement.success},'
             f'{measurement.num_rejected_dynamic},{measurement.num_rejected_offroad},{measurement.num_rejected_collision},'
             f'{measurement.last_cycle_num_rejected_dynamic},{measurement.last_cycle_num_rejected_offroad},{measurement.last_cycle_num_rejected_collision},'
-            + ','.join(str(terms.get(k, '')) for k in FINAL_COST_TERMS) + '\n'
+            + ','.join(str(terms.get(k, '')) for k in FINAL_COST_TERMS)
+            + f',{getattr(measurement, "standstill_time", 0.0)},{getattr(measurement, "rear_end_failure", False)}\n'
         )
 
 
@@ -92,7 +93,7 @@ if __name__ == '__main__':
                     'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
                     'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
                     'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision,'
-                    'J_ter,J_V,J_A,J_J,J_LC,J_D,J_run\n'
+                    'J_ter,J_V,J_A,J_J,J_LC,J_D,J_run,standstill_time,rear_end_failure\n'
                 )
 
     scenario_files = cfg['FILES'] or sorted(

@@ -16,7 +16,8 @@ class State(object):
 class FrenetState(object):
     def __init__(self, t: float = 0.0,
                        s: float = 0.0, s_d: float = 0.0, s_dd: float = 0.0, s_ddd: float = 0.0,
-                       d: float = 0.0, d_d: float = 0.0, d_dd: float = 0.0, d_ddd: float = 0.0):
+                       d: float = 0.0, d_d: float = 0.0, d_dd: float = 0.0, d_ddd: float = 0.0,
+                       d_s: float = None, d_ss: float = None):
         self.t = t
         self.s = s
         self.s_d = s_d
@@ -26,6 +27,10 @@ class FrenetState(object):
         self.d_d = d_d
         self.d_dd = d_dd
         self.d_ddd = d_ddd
+        # d' = dd/ds and d'' w.r.t. arc length (Werling's thesis, Appendix A.1); defined at
+        # standstill, where d_d / s_d is 0/0. None: derived from the time derivatives.
+        self.d_s = d_s
+        self.d_ss = d_ss
     
     def __str__(self):
         return f'FrenetState with d={self.d:.2f}, s_d={self.s_d:.2f}, t={self.t:.2f}'
@@ -100,6 +105,11 @@ class FrenetState(object):
         self.d_d = state.v * np.sin(delta_yaw)
         self.d_dd = 0.0
         self.d_ddd = 0.0
+        # Werling (A.3): d' = (1 - k_r d) tan(theta - theta_r), from the heading, so it is also
+        # known at standstill; d'' needs the ego curvature, which is not available here.
+        k_r = polyline[prev_wp_id, 3] if polyline.shape[1] > 3 else 0.0
+        self.d_s = (1.0 - k_r * self.d) * np.tan(delta_yaw)
+        self.d_ss = 0.0
         
         return state
 
@@ -149,6 +159,8 @@ class FrenetTrajectory(object):
         self.d_d = []
         self.d_dd = []
         self.d_ddd = []
+        self.d_s = []       # d' w.r.t. arc length (C++ planners)
+        self.d_ss = []      # d'' w.r.t. arc length (C++ planners)
         
         self.x = []
         self.y = []
@@ -208,7 +220,9 @@ class FrenetTrajectory(object):
 
         return FrenetState(self.t[t], 
                            self.s[t], self.s_d[t], self.s_dd[t], self.s_ddd[t],
-                           self.d[t], self.d_d[t], self.d_dd[t], self.d_ddd[t])
+                           self.d[t], self.d_d[t], self.d_dd[t], self.d_ddd[t],
+                           self.d_s[t] if len(self.d_s) > t else None,
+                           self.d_ss[t] if len(self.d_ss) > t else None)
 
     def forward_t_steps(self, steps: int):
         
@@ -227,6 +241,8 @@ class FrenetTrajectory(object):
         new_traj.d_d = new_traj.d_d[steps:]
         new_traj.d_dd = new_traj.d_dd[steps:]
         new_traj.d_ddd = new_traj.d_ddd[steps:]
+        new_traj.d_s = new_traj.d_s[steps:]
+        new_traj.d_ss = new_traj.d_ss[steps:]
         
         new_traj.x = new_traj.x[steps:]
         new_traj.y = new_traj.y[steps:]

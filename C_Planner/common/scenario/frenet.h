@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cmath>
+#include <limits>
 
 struct SamplingParam {
     double d;     // lateral offset [m]
@@ -51,6 +52,8 @@ struct FrenetTrajectory {
     std::vector<double> d_d;    // lateral velocity [m/s]
     std::vector<double> d_dd;   // lateral acceleration [m/ss]
     std::vector<double> d_ddd;  // lateral jerk [m/sss]
+    std::vector<double> d_s;    // d' = dd/ds, lateral slope w.r.t. arc length
+    std::vector<double> d_ss;   // d'' = d^2d/ds^2
     
     // World frame coordinates
     std::vector<double> x;      // x position [m]
@@ -98,6 +101,10 @@ struct FrenetState {
     double d_d = 0.0;       // lateral velocity [m/s]
     double d_dd = 0.0;      // lateral acceleration [m/ss]
     double d_ddd = 0.0;     // lateral jerk [m/sss]
+    // d' and d'' w.r.t. arc length (Werling's thesis, Appendix A.1). They stay defined at
+    // standstill, where d_d / s_d is 0/0; NaN if unknown (then derived from d_d, d_dd).
+    double d_s = std::numeric_limits<double>::quiet_NaN();
+    double d_ss = std::numeric_limits<double>::quiet_NaN();
     
     // Default constructor
     FrenetState() = default;

@@ -48,6 +48,8 @@ except Exception as e:
     CPP_MODULE_AVAILABLE = False
 
 # Safe-following-distance settings copied from the Python settings to the C++ planners
+# Low-speed lateral model settings copied from the Python settings to the C++ planners
+MOTION_MODEL_SETTINGS = ("low_speed_threshold", "low_speed_min_lateral_length")
 CLEARANCE_SETTINGS = ("check_clearance", "clearance_time_gap", "clearance_min_gap",
                       "clearance_lateral_margin", "clearance_grace_time", "clearance_recovery_time",
                       "clearance_fallback")
@@ -96,7 +98,7 @@ class FOP_CPP_Wrapper(object):
             cpp_settings.max_t = self.settings.max_t
             cpp_settings.check_obstacle = self.settings.check_obstacle
             cpp_settings.check_boundary = self.settings.check_boundary
-            for name in CLEARANCE_SETTINGS:
+            for name in CLEARANCE_SETTINGS + MOTION_MODEL_SETTINGS:
                 setattr(cpp_settings, name, getattr(self.settings, name))
             
             # Create C++ VehicleParams
@@ -304,6 +306,9 @@ class FOP_CPP_Wrapper(object):
                 cpp_state.d_d = frenet_state.d_d
                 cpp_state.d_dd = frenet_state.d_dd
                 cpp_state.d_ddd = frenet_state.d_ddd
+                for name in ("d_s", "d_ss"):
+                    value = getattr(frenet_state, name, None)
+                    setattr(cpp_state, name, float('nan') if value is None else value)
                 
                 cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads,
                                                  -1.0 if desired_speed is None else desired_speed)
@@ -319,6 +324,8 @@ class FOP_CPP_Wrapper(object):
                     py_traj.d_d = list(cpp_traj.d_d)
                     py_traj.d_dd = list(cpp_traj.d_dd)
                     py_traj.d_ddd = list(cpp_traj.d_ddd)
+                    py_traj.d_s = list(cpp_traj.d_s)
+                    py_traj.d_ss = list(cpp_traj.d_ss)
                     py_traj.x = list(cpp_traj.x)
                     py_traj.y = list(cpp_traj.y)
                     py_traj.yaw = list(cpp_traj.yaw)
@@ -346,6 +353,8 @@ class FOP_CPP_Wrapper(object):
                             fp.d_d = list(cpp_fp.d_d)
                             fp.d_dd = list(cpp_fp.d_dd)
                             fp.d_ddd = list(cpp_fp.d_ddd)
+                            fp.d_s = list(cpp_fp.d_s)
+                            fp.d_ss = list(cpp_fp.d_ss)
                             fp.x = list(cpp_fp.x)
                             fp.y = list(cpp_fp.y)
                             fp.yaw = list(cpp_fp.yaw)
@@ -381,6 +390,9 @@ class FOP_CPP_Wrapper(object):
                 cpp_state.d_d = frenet_state.d_d
                 cpp_state.d_dd = frenet_state.d_dd
                 cpp_state.d_ddd = frenet_state.d_ddd
+                for name in ("d_s", "d_ss"):
+                    value = getattr(frenet_state, name, None)
+                    setattr(cpp_state, name, float('nan') if value is None else value)
 
                 cpp_samples = []
                 for sample in sampling_parameters:
@@ -405,6 +417,8 @@ class FOP_CPP_Wrapper(object):
                     py_traj.d_d = list(cpp_traj.d_d)
                     py_traj.d_dd = list(cpp_traj.d_dd)
                     py_traj.d_ddd = list(cpp_traj.d_ddd)
+                    py_traj.d_s = list(cpp_traj.d_s)
+                    py_traj.d_ss = list(cpp_traj.d_ss)
                     py_traj.x = list(cpp_traj.x)
                     py_traj.y = list(cpp_traj.y)
                     py_traj.yaw = list(cpp_traj.yaw)
@@ -432,6 +446,8 @@ class FOP_CPP_Wrapper(object):
                             fp.d_d = list(cpp_fp.d_d)
                             fp.d_dd = list(cpp_fp.d_dd)
                             fp.d_ddd = list(cpp_fp.d_ddd)
+                            fp.d_s = list(cpp_fp.d_s)
+                            fp.d_ss = list(cpp_fp.d_ss)
                             fp.x = list(cpp_fp.x)
                             fp.y = list(cpp_fp.y)
                             fp.yaw = list(cpp_fp.yaw)
