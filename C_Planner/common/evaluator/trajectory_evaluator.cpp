@@ -154,6 +154,49 @@ double TrajectoryEvaluator::road_violation(const FrenetTrajectory& traj) const {
     return 0.0;
 }
 
+double TrajectoryEvaluator::clearance_violation(const FrenetTrajectory& traj) const {
+    // Obstacles ahead in the ego path: lateral extent overlapping the ego's lateral
+    // interval (plus margin) at the same time step, rear beyond the ego center. The gap
+    // from the ego front to the obstacle rear must reach the target min_gap + time_gap * v.
+    // Where the baseline gap (ego driving on at its current speed) is smaller, the
+    // requirement starts at the baseline gap and reaches the target within
+    // clearance_recovery_time after the obstacle is first met (step k0). It grows with the
+    // square of the elapsed share of that time, like the distance gained by braking.
+    const ObstacleFrenetBounds& bounds = *ctx_.obstacle_frenet;
+    const size_t n = traj.s.size();
+    const int first_step = static_cast<int>(std::ceil(ctx_.clearance_grace_time / ctx_.dt - 1e-9));
+    const double half_width = 0.5 * ctx_.vehicle.w + ctx_.clearance_lateral_margin;
+    const double half_length = 0.5 * ctx_.vehicle.l;
+
+    for (size_t k = static_cast<size_t>(std::max(first_step, 0)); k < n; ++k) {
+        const int t_idx = ctx_.time_step_now + static_cast<int>(k);
+        if (t_idx >= bounds.num_time_steps) break;
+        const double s = traj.s[k];
+        const double d = traj.d[k];
+        const double target = ctx_.clearance_min_gap + ctx_.clearance_time_gap * std::max(traj.s_d[k], 0.0);
+        for (int j = 0; j < bounds.num_obstacles; ++j) {
+            const double* b = bounds.at(t_idx, j);  // s_min, s_max, l_min, l_max
+            if (std::isnan(b[0]) || b[1] <= s) continue;                       // absent or behind
+            if (b[3] < d - half_width || b[2] > d + half_width) continue;      // not in the path
+            double required = target;
+            if (j < static_cast<int>(ctx_.clearance_baseline.size())) {
+                const ClearanceBaseline& base = ctx_.clearance_baseline[j];
+                const double coast_gap = k < base.gap.size() ? base.gap[k] : std::nan("");
+                if (base.k0 >= 0 && !std::isnan(coast_gap) && coast_gap < target) {
+                    const double progress = ctx_.clearance_recovery_time > 0.0
+                        ? std::min(1.0, (static_cast<int>(k) - base.k0) * ctx_.dt / ctx_.clearance_recovery_time)
+                        : 1.0;
+                    required = coast_gap + (target - coast_gap) * progress * progress;
+                }
+            }
+            if (b[0] - (s + half_length) < required) {
+                return violation_from(static_cast<long>(k), n);
+            }
+        }
+    }
+    return 0.0;
+}
+
 EvaluationResult TrajectoryEvaluator::check_feasibility(FrenetTrajectory& traj, PlanStats& stats,
                                                         EvalMode mode) const {
     const bool early_exit = (mode == EvalMode::kEarlyExit);
@@ -199,7 +242,20 @@ EvaluationResult TrajectoryEvaluator::check_feasibility(FrenetTrajectory& traj, 
         return result;
     }
 
-    // Step 3: polygon collision check
+    // Step 3: safe following distance (cheap interval test before the polygon check)
+    if (ctx_.check_clearance && ctx_.obstacle_frenet != nullptr && !ctx_.obstacle_frenet->empty()) {
+        t0 = Clock::now();
+        ++stats.num_clearance_checks;
+        result.violation.clearance = clearance_violation(traj);
+        stats.timing.collision_ms += ms_since(t0);
+        if (result.violation.clearance > 0.0) {
+            ++stats.num_rejected_clearance;
+            reject(Rejection::kClearance);
+            if (early_exit) return result;
+        }
+    }
+
+    // Step 4: polygon collision check
     if (ctx_.check_obstacle) {
         t0 = Clock::now();
         ++stats.num_collision_checks;

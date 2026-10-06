@@ -347,32 +347,8 @@ FrenetTrajectory* Fiss_Plus_Planner::refine_solution(const FrenetTrajectory& tra
     return nullptr;
 }
 
-FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
-                                          double max_target_speed,
-                                          int time_step_now,
-                                          double desired_speed) {
-    auto t_start = std::chrono::high_resolution_clock::now();
-    
-    // Reset values for each planning cycle
-    last_stats = PlanStats();
-    fiss_settings.highest_speed = max_target_speed;
-    settings.highest_speed = max_target_speed;  // Also update base class settings
-    start_state = frenet_state;
-    clear_queues();
-    best_traj = FrenetTrajectory();
-    trajs_per_timestep.clear();
-    context = make_context(desired_speed >= 0.0 ? desired_speed : max_target_speed, time_step_now, false);
-    auto finish = [&]() {
-        last_stats.timing.total_ms =
-            std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_start).count();
-        return best_traj;
-    };
-    
-    // Sample all end states in 3D, inside the search space shared with FOP
-    SearchSpace space;
-    if (!search_space(frenet_state.s, space)) {
-        return finish();
-    }
+bool Fiss_Plus_Planner::search_and_refine(const SearchSpace& space,
+                                          std::chrono::high_resolution_clock::time_point t_start) {
     trajs_3d = sample_end_frenet_states(space);
     sizes = {static_cast<int>(trajs_3d.size()),
              static_cast<int>(trajs_3d[0].size()),
@@ -443,6 +419,42 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
                 best_traj = *refined_traj;
             }
         }
+    }
+    
+    return best_traj_found;
+}
+
+FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
+                                          double max_target_speed,
+                                          int time_step_now,
+                                          double desired_speed) {
+    auto t_start = std::chrono::high_resolution_clock::now();
+    
+    // Reset values for each planning cycle
+    last_stats = PlanStats();
+    fiss_settings.highest_speed = max_target_speed;
+    settings.highest_speed = max_target_speed;  // Also update base class settings
+    start_state = frenet_state;
+    clear_queues();
+    best_traj = FrenetTrajectory();
+    trajs_per_timestep.clear();
+    context = make_context(frenet_state, resolve_desired_speed(max_target_speed, desired_speed),
+                           time_step_now, false);
+    auto finish = [&]() {
+        last_stats.timing.total_ms =
+            std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t_start).count();
+        return best_traj;
+    };
+    
+    // Sample all end states in 3D, inside the search space shared with FOP
+    SearchSpace space;
+    if (!search_space(frenet_state.s, space)) {
+        return finish();
+    }
+    bool found = search_and_refine(space, t_start);
+    if (!found && fall_back_without_clearance(context)) {
+        clear_queues();
+        found = search_and_refine(space, t_start);
     }
     
     // Store trajectories for visualization

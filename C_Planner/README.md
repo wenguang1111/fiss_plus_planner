@@ -91,6 +91,23 @@ failed check and the collision check at the first colliding step;
 (teacher data). All counters and stage timings are incremented inside the
 evaluator (`PlanStats`).
 
+### Safe following distance (clearance)
+
+All planners share a check between the constraint and the polygon collision check
+(`check_clearance` and the `clearance_*` fields of `SettingParameters`, `SAFETY`
+section of `cfgs/demo_config.yaml`). Python projects every obstacle polygon onto
+the reference line once per frame (`planners/common/scenario/obstacle_frenet.py`)
+and passes (s_min, s_max, l_min, l_max) per time step via
+`set_obstacle_frenet_bounds()`. An obstacle is ahead in the path of a candidate at
+step k if its lateral extent overlaps the ego's (plus `clearance_lateral_margin`)
+and its rear is beyond the ego center; from `clearance_grace_time` on, the gap
+from the ego front to its rear must reach `clearance_min_gap + clearance_time_gap * v_k`.
+If the gap the ego would keep at its current speed is smaller (recorded traffic
+often follows at 1.5-2 s), the requirement starts at that gap and grows to the
+target within `clearance_recovery_time`, quadratically in time. If no candidate
+satisfies it, the cycle is re-planned without it (`clearance_fallback`,
+counted in `num_clearance_fallbacks`).
+
 ### Iterative sampling planners (CEM, MPPI)
 
 `Iterative_Sampling_Planner` replaces FOP's grid by a Gaussian proposal over

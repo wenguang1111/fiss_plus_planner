@@ -12,6 +12,7 @@
 #include "common/cost/cost_function.h"
 #include "common/evaluator/plan_stats.h"
 #include "common/evaluator/trajectory_evaluator.h"
+#include "common/scenario/obstacle_frenet.h"
 #include "common/scenario/obstacles.h"
 #include "common/scenario/road_profile.h"
 #include "common/scenario/search_space.h"
@@ -36,6 +37,20 @@ struct SettingParameters {
     bool check_obstacle;        // True if check collision with obstacles
     bool check_boundary;        // True if check collision with road boundaries
 
+    // Safe following distance to obstacles ahead in the ego path (needs
+    // set_obstacle_frenet_bounds): from clearance_grace_time on, every trajectory step
+    // keeps gap >= clearance_min_gap + clearance_time_gap * v, gap measured from the ego
+    // front to the obstacle's rear along the reference line.
+    bool check_clearance;
+    double clearance_time_gap;        // [s]
+    double clearance_min_gap;         // [m]
+    double clearance_lateral_margin;  // [m] added on each ego side for the in-path test
+    double clearance_grace_time;      // [s] start of the horizon without the requirement
+    double clearance_recovery_time;   // [s] a gap below the target is restored within this time
+                                      // (requirement grows from the gap kept at the current
+                                      // speed to the target, quadratically in time)
+    bool clearance_fallback;          // if no candidate keeps the gap, plan without it
+
     // Constructor with default values matching Python implementation
     SettingParameters(int num_width_param = 5, int num_speed_param = 5, int num_t_param = 5) 
         : tick_t(0.1),
@@ -48,7 +63,14 @@ struct SettingParameters {
           max_t(5.0),
           num_t(num_t_param),
           check_obstacle(true),
-          check_boundary(true) {}
+          check_boundary(true),
+          check_clearance(true),
+          clearance_time_gap(2.0),
+          clearance_min_gap(3.0),
+          clearance_lateral_margin(0.2),
+          clearance_grace_time(1.0),
+          clearance_recovery_time(3.0),
+          clearance_fallback(true) {}
 };
 
 // Outcome of evaluating a batch of samples z = (d, s_d, t)
@@ -65,6 +87,7 @@ public:
     CubicSpline2D* cubic_spline;
     RoadProfile road_profile;
     ObstacleView obstacles;
+    ObstacleFrenetBounds obstacle_frenet;
     FrenetTrajectory best_traj;
     std::vector<std::vector<FrenetTrajectory>> all_trajs;
     std::vector<FrenetTrajectory> last_fplist;
@@ -90,9 +113,10 @@ public:
     // Generate the sampling grid (d, s_d, t) inside search_space(current_s)
     std::vector<std::tuple<double, double, double>> get_samples(double current_s = 0.0);
     
-    // The planning problem of one cycle. Every planner evaluates its candidates with
-    // a TrajectoryEvaluator built from this context.
-    PlanningContext make_context(double v_des, int time_step_now, bool use_obstacle_cost) const;
+    // The planning problem of one cycle starting at `start`. Every planner evaluates its
+    // candidates with a TrajectoryEvaluator built from this context.
+    PlanningContext make_context(const FrenetState& start, double v_des, int time_step_now,
+                                 bool use_obstacle_cost) const;
 
     // Main planning function - simplified interface.
     // max_target_speed: upper bound of the sampled terminal speed. desired_speed: v_des of
@@ -141,7 +165,16 @@ public:
                           const std::vector<double>& left_extent,
                           const std::vector<double>& right_extent);
 
+    // Obstacle extents in the current Frenet frame, (num_time_steps x num_obstacles x 4)
+    // values (s_min, s_max, l_min, l_max), NaN where absent; cleared with a new frame.
+    void set_obstacle_frenet_bounds(const double* bounds, int num_time_steps, int num_obstacles);
+
 protected:
+    // Baseline of the safe-distance requirement: for every obstacle, the first step at which
+    // it is ahead in the path of the ego vehicle driving on at its current speed and lateral
+    // offset, and the gap at that step. Independent of the candidate trajectories.
+    std::vector<ClearanceBaseline> clearance_baseline(const FrenetState& start, int time_step_now) const;
+
     // Evaluates the samples with the shared evaluator on num_threads threads (contiguous
     // chunks; num_threads <= 0 uses all cores). Counters and timings are added to last_stats.
     BatchResult evaluate_batch(const FrenetState& start,
@@ -154,6 +187,10 @@ protected:
     static double resolve_desired_speed(double max_target_speed, double desired_speed) {
         return desired_speed >= 0.0 ? desired_speed : max_target_speed;
     }
+
+    // True if a cycle without any feasible trajectory may be re-planned without the
+    // clearance requirement; switches it off in context and counts the fallback.
+    bool fall_back_without_clearance(PlanningContext& context);
 };
 
 #endif // FRENET_PLANNER_H

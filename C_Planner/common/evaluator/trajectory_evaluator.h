@@ -5,9 +5,18 @@
 #include "../cost/cost_function.h"
 #include "../geometry/cubic_spline.h"
 #include "../scenario/frenet.h"
+#include "../scenario/obstacle_frenet.h"
 #include "../scenario/obstacles.h"
 #include "../scenario/road_profile.h"
 #include "../scenario/vehicle_params.h"
+
+// Gap to an obstacle ahead in the ego path if the ego vehicle drove on at its current
+// speed and lateral offset (see Frenet_Planner::clearance_baseline).
+struct ClearanceBaseline {
+    int k0 = -1;              // first step the obstacle is ahead in that path; -1: never
+    std::vector<double> gap;  // gap from the ego front to the obstacle rear per step [m],
+                              // clamped at 0; NaN where the obstacle is not in that path
+};
 
 // Everything that defines one planning problem. All planners evaluating the same
 // cycle build the same context, so they share generator, checks and objective.
@@ -23,6 +32,19 @@ struct PlanningContext {
     bool check_boundary = true;
     bool check_obstacle = true;
     bool use_obstacle_cost = true;  // add J_D to the planning objective
+
+    // Safe following distance to obstacles ahead in the ego path, see SettingParameters
+    const ObstacleFrenetBounds* obstacle_frenet = nullptr;
+    bool check_clearance = false;
+    double clearance_time_gap = 2.0;
+    double clearance_min_gap = 3.0;
+    double clearance_lateral_margin = 0.2;
+    double clearance_grace_time = 1.0;
+    // Where the baseline gap is below the target, the requirement grows from the baseline
+    // gap to the target within clearance_recovery_time after step k0, quadratically in
+    // the elapsed time (the distance gained by braking grows with t^2).
+    double clearance_recovery_time = 3.0;
+    std::vector<ClearanceBaseline> clearance_baseline;  // one per obstacle
 };
 
 // Constraint violation V(tau): for each hard check, the share of the horizon from the
@@ -33,14 +55,15 @@ struct ConstraintViolation {
     double speed = 0.0;         // s_d above vehicle max speed
     double acceleration = 0.0;  // |s_dd| above vehicle max acceleration
     double road = 0.0;          // footprint beyond the road edge or outside the road profile
+    double clearance = 0.0;     // closer than the safe following distance to an obstacle ahead
     double collision = 0.0;     // ego polygon overlaps an obstacle polygon
     double transform = 0.0;     // 1 when the trajectory has no Cartesian representation
 
-    double total() const { return speed + acceleration + road + collision + transform; }
+    double total() const { return speed + acceleration + road + clearance + collision + transform; }
 };
 
 // First check a trajectory failed, in pipeline order.
-enum class Rejection { kNone, kTransform, kDynamic, kOffroad, kCollision };
+enum class Rejection { kNone, kTransform, kDynamic, kOffroad, kClearance, kCollision };
 
 struct EvaluationResult {
     bool feasible = false;
@@ -97,6 +120,7 @@ private:
     void check_dynamics(const FrenetTrajectory& traj, bool early_exit,
                         ConstraintViolation& v) const;
     double road_violation(const FrenetTrajectory& traj) const;
+    double clearance_violation(const FrenetTrajectory& traj) const;
 
     const PlanningContext& ctx_;
     const CostFunction& cost_;

@@ -163,6 +163,14 @@ def prepare_obstacles_polygons_time_series(
 DEFAULT_SPEED_LIMIT = 14.0
 
 
+def apply_safety_settings(planner_settings, safety_cfg: dict = None):
+    """Overrides the safe-following-distance settings (C++ planners) with the SAFETY config."""
+    for name, value in (safety_cfg or {}).items():
+        if not hasattr(planner_settings, name):
+            raise KeyError(f"unknown SAFETY setting: {name}")
+        setattr(planner_settings, name, value)
+
+
 def route_lanelet_index(position, global_plan, lanelet_network):
     """Index of the furthest route lanelet containing `position`, None when off the route."""
     ids = lanelet_network.find_lanelet_by_position([np.asarray(position, dtype=float)])[0]
@@ -196,9 +204,10 @@ def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
-                            sampler_cfg: dict = None
+                            sampler_cfg: dict = None, safety_cfg: dict = None
                             ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
-    """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}}."""
+    """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}}.
+    safety_cfg: safe-following-distance settings of the C++ planners (SAFETY config)."""
     sampler_cfg = sampler_cfg or {}
     # Plan a global route
     global_planner = GlobalPlanner()
@@ -339,21 +348,25 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        apply_safety_settings(planner_settings, safety_cfg)
         planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True  # Check if C++ planner was successfully initialized
         # planner.recordObstaclesForDebug("python_obstacle.csv")
     elif method == 'FISS+_CPP':
         # Use C++ FISS+ Planner with pybind11
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
+        apply_safety_settings(planner_settings, safety_cfg)
         planner = FissPlusCppWrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True
     elif method == 'CEM_CPP':
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        apply_safety_settings(planner_settings, safety_cfg)
         planner = CEM_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                   runtime_measurement, cem_cfg=sampler_cfg.get('CEM'))
         use_cpp_planner = True
     elif method == 'MPPI_CPP':
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        apply_safety_settings(planner_settings, safety_cfg)
         planner = MPPI_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                    runtime_measurement, mppi_cfg=sampler_cfg.get('MPPI'))
         use_cpp_planner = True
@@ -741,7 +754,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist, best_trajs = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
                 number_threads, runtime_measurement, collect_data_for_ml,
-                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI')})
+                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI')}, safety_cfg=cfg.get('SAFETY'))
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

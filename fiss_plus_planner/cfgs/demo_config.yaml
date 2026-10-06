@@ -18,6 +18,20 @@ Runtime_Measurement: False # keep it False if you need Save GIF
 Collect_Data_For_ML: True # Save valid FOP_CPP cycles via planners/benchmark/planning.py
 SHOW_SAMPLED_TRAJECTORIES: False # visualize the sampled trajectories in the animation, set it to False, it show only the selected best trajectory of each time step
 
+# Safe following distance of the C++ planners (FOP_CPP, FISS+_CPP, CEM_CPP, MPPI_CPP): from
+# clearance_grace_time on, every trajectory step keeps gap >= clearance_min_gap +
+# clearance_time_gap * v to obstacles ahead in the ego path (gap: ego front to obstacle rear).
+# If the gap is already smaller when an obstacle is first met, the requirement grows from
+# that gap to the target within clearance_recovery_time.
+SAFETY:
+  check_clearance: True
+  clearance_time_gap: 2.0        # [s]
+  clearance_min_gap: 3.0         # [m]
+  clearance_lateral_margin: 0.2  # [m] added on each ego side for the in-path test
+  clearance_grace_time: 1.0      # [s] start of the horizon without the requirement
+  clearance_recovery_time: 3.0   # [s] time to restore a gap below the target
+  clearance_fallback: True       # plan without it if no candidate keeps the gap
+
 # Iterative sampling planners (FOP backend, Gaussian sampler over d, v, T). Trajectories per
 # planning cycle = num_iterations * population; N_*_SAMPLE above are not used by them.
 CEM:

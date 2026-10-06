@@ -45,6 +45,8 @@ class Stats(object):
         # Filled only by the C++ planners (shared TrajectoryEvaluator)
         self.num_constraint_checks = 0
         self.num_cost_evaluations = 0
+        self.num_rejected_clearance = 0
+        self.num_clearance_fallbacks = 0
         self.timing_ms = {}              # per-stage time, summed over cycles
         self.final_cost_terms = {}       # Eq. (7)+(8) terms of the executed trajectory
 
@@ -63,6 +65,8 @@ class Stats(object):
         stats.num_FOP_intervention = get("num_FOP_intervention", 0)
         stats.num_constraint_checks = get("num_constraint_checks", 0)
         stats.num_cost_evaluations = get("num_cost_evaluations", 0)
+        stats.num_rejected_clearance = get("num_rejected_clearance", 0)
+        stats.num_clearance_fallbacks = get("num_clearance_fallbacks", 0)
         timing = get("timing", None)
         if timing is not None:
             keys = ("sampling_ms", "generation_ms", "transform_ms", "constraint_ms", "collision_ms", "cost_ms",
@@ -81,6 +85,8 @@ class Stats(object):
         self.num_FOP_intervention += other.num_FOP_intervention
         self.num_constraint_checks += getattr(other, 'num_constraint_checks', 0)
         self.num_cost_evaluations += getattr(other, 'num_cost_evaluations', 0)
+        self.num_rejected_clearance += getattr(other, 'num_rejected_clearance', 0)
+        self.num_clearance_fallbacks += getattr(other, 'num_clearance_fallbacks', 0)
         for k, v in getattr(other, 'timing_ms', {}).items():
             self.timing_ms[k] = self.timing_ms.get(k, 0.0) + v
         return self
@@ -95,6 +101,7 @@ class Stats(object):
         self.num_rejected_collision /= value
         self.num_constraint_checks /= value
         self.num_cost_evaluations /= value
+        self.num_rejected_clearance /= value
         self.timing_ms = {k: v / value for k, v in self.timing_ms.items()}
         self.average_runtime /= value
         if len(self.best_traj_costs) > 0:
@@ -120,6 +127,16 @@ class FrenetOptimalPlannerSettings(object):
 
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries
+
+        # Safe following distance to obstacles ahead in the ego path (C++ planners only):
+        # from clearance_grace_time on, gap >= clearance_min_gap + clearance_time_gap * v
+        self.check_clearance = True
+        self.clearance_time_gap = 2.0       # [s]
+        self.clearance_min_gap = 3.0        # [m] ego front to obstacle rear
+        self.clearance_lateral_margin = 0.2 # [m] added on each ego side for the in-path test
+        self.clearance_grace_time = 1.0     # [s] start of the horizon without the requirement
+        self.clearance_recovery_time = 3.0  # [s] a gap below the target is restored within this time
+        self.clearance_fallback = True      # plan without it if no candidate keeps the gap
 
 class FrenetOptimalPlanner(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 

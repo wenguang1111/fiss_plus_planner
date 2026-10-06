@@ -39,6 +39,11 @@ protected:
                                  const std::vector<EvaluationResult>& results) const = 0;
 
 private:
+    // num_iterations rounds of sampling and proposal updates; keeps the best feasible
+    // trajectory in best_traj and all feasible ones in last_fplist.
+    void run_iterations(const FrenetState& frenet_state, const SearchSpace& space,
+                        const PlanningContext& context, int num_threads);
+
     SamplingParam prev_best_;
     bool has_prev_best_ = false;
 };

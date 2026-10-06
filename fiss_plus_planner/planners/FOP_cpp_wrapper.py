@@ -14,6 +14,7 @@ from fiss_plus_planner.planners.common.cost.cost_function import CostFunction
 from fiss_plus_planner.planners.common.geometry.cubic_spline import CubicSpline2D
 from fiss_plus_planner.planners.common.geometry.polynomial import QuarticPolynomial, QuinticPolynomial
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
+from fiss_plus_planner.planners.common.scenario.obstacle_frenet import obstacle_frenet_bounds
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
@@ -45,6 +46,12 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     CPP_MODULE_AVAILABLE = False
+
+# Safe-following-distance settings copied from the Python settings to the C++ planners
+CLEARANCE_SETTINGS = ("check_clearance", "clearance_time_gap", "clearance_min_gap",
+                      "clearance_lateral_margin", "clearance_grace_time", "clearance_recovery_time",
+                      "clearance_fallback")
+
 
 class FOP_CPP_Wrapper(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
@@ -89,6 +96,8 @@ class FOP_CPP_Wrapper(object):
             cpp_settings.max_t = self.settings.max_t
             cpp_settings.check_obstacle = self.settings.check_obstacle
             cpp_settings.check_boundary = self.settings.check_boundary
+            for name in CLEARANCE_SETTINGS:
+                setattr(cpp_settings, name, getattr(self.settings, name))
             
             # Create C++ VehicleParams
             cpp_vehicle = frenet_planner_cpp.VehicleParams()
@@ -467,5 +476,8 @@ class FOP_CPP_Wrapper(object):
                 # Use the spline's own s knots. Do not smooth away narrow sections
                 # or silently continue without geometry if profile setup fails.
                 self.cpp_planner.set_road_profile(self.cubic_spline.s, widths, left, right)
+            if self.obstacles_array is not None and self.obstacles_num_vertices is not None:
+                self.cpp_planner.set_obstacle_frenet_bounds(obstacle_frenet_bounds(
+                    self.cubic_spline, self._cpp_obs_array, self._cpp_num_verts_array))
         #-----------CPP end-------------------------------------------
         return self.cubic_spline, np.column_stack((ref_xy, ref_yaw, ref_rk))

@@ -8,7 +8,7 @@ struct TimingStats {
     double generation_ms = 0.0;
     double transform_ms = 0.0;
     double constraint_ms = 0.0;
-    double collision_ms = 0.0;
+    double collision_ms = 0.0;   // safe-distance and polygon collision checks
     double cost_ms = 0.0;
     double total_ms = 0.0;
 
@@ -35,6 +35,9 @@ struct PlanStats {
     int num_constraint_passed = 0;
     int num_rejected_dynamic = 0;    // over max speed or max acceleration
     int num_rejected_offroad = 0;    // left the drivable roadway
+    int num_clearance_checks = 0;
+    int num_rejected_clearance = 0;  // closer than the safe following distance
+    int num_clearance_fallbacks = 0; // cycles re-planned without the clearance requirement
     int num_collision_checks = 0;
     int num_collision_free = 0;
     int num_cost_evaluations = 0;
@@ -53,6 +56,9 @@ struct PlanStats {
         num_constraint_passed += other.num_constraint_passed;
         num_rejected_dynamic += other.num_rejected_dynamic;
         num_rejected_offroad += other.num_rejected_offroad;
+        num_clearance_checks += other.num_clearance_checks;
+        num_rejected_clearance += other.num_rejected_clearance;
+        num_clearance_fallbacks += other.num_clearance_fallbacks;
         num_collision_checks += other.num_collision_checks;
         num_collision_free += other.num_collision_free;
         num_cost_evaluations += other.num_cost_evaluations;

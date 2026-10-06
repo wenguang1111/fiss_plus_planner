@@ -29,6 +29,13 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
         .def_readwrite("num_t", &FissPlusPlannerSettings::num_t)
         .def_readwrite("check_obstacle", &FissPlusPlannerSettings::check_obstacle)
         .def_readwrite("check_boundary", &FissPlusPlannerSettings::check_boundary)
+        .def_readwrite("check_clearance", &FissPlusPlannerSettings::check_clearance)
+        .def_readwrite("clearance_time_gap", &FissPlusPlannerSettings::clearance_time_gap)
+        .def_readwrite("clearance_min_gap", &FissPlusPlannerSettings::clearance_min_gap)
+        .def_readwrite("clearance_lateral_margin", &FissPlusPlannerSettings::clearance_lateral_margin)
+        .def_readwrite("clearance_grace_time", &FissPlusPlannerSettings::clearance_grace_time)
+        .def_readwrite("clearance_recovery_time", &FissPlusPlannerSettings::clearance_recovery_time)
+        .def_readwrite("clearance_fallback", &FissPlusPlannerSettings::clearance_fallback)
         .def_readwrite("refine_trajectory", &FissPlusPlannerSettings::refine_trajectory)
         .def_readwrite("max_refine_iters", &FissPlusPlannerSettings::max_refine_iters)
         .def_readwrite("has_time_limit", &FissPlusPlannerSettings::has_time_limit)
@@ -87,6 +94,16 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
              py::arg("centerline_pts"))
         .def("set_road_profile", &Fiss_Plus_Planner::set_road_profile,
              py::arg("s"), py::arg("lane_width"), py::arg("left_extent"), py::arg("right_extent"))
+        .def("set_obstacle_frenet_bounds",
+             [](Fiss_Plus_Planner& self, py::array_t<double, py::array::c_style | py::array::forcecast> bounds) {
+                auto buf = bounds.request();
+                if (buf.ndim != 3 || buf.shape[2] != 4) {
+                    throw py::value_error("bounds must have shape (num_time_steps, num_obstacles, 4)");
+                }
+                self.set_obstacle_frenet_bounds(static_cast<const double*>(buf.ptr),
+                                                static_cast<int>(buf.shape[0]), static_cast<int>(buf.shape[1]));
+             },
+             py::arg("bounds"))
         .def("plan",
              [](Fiss_Plus_Planner& self,
                 py::object frenet_state,
@@ -183,6 +200,9 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
                 d["num_constraint_passed"] = stats.num_constraint_passed;
                 d["num_rejected_dynamic"] = stats.num_rejected_dynamic;
                 d["num_rejected_offroad"] = stats.num_rejected_offroad;
+                d["num_clearance_checks"] = stats.num_clearance_checks;
+                d["num_rejected_clearance"] = stats.num_rejected_clearance;
+                d["num_clearance_fallbacks"] = stats.num_clearance_fallbacks;
                 d["num_collision_checks"] = stats.num_collision_checks;
                 d["num_collision_free"] = stats.num_collision_free;
                 d["num_rejected_collision"] = stats.num_rejected_collision();

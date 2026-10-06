@@ -107,7 +107,7 @@ std::vector<std::tuple<double, double, double>> Frenet_Planner::get_samples(doub
     return samples;
 }
 
-PlanningContext Frenet_Planner::make_context(double v_des, int time_step_now,
+PlanningContext Frenet_Planner::make_context(const FrenetState& start, double v_des, int time_step_now,
                                              bool use_obstacle_cost) const {
     PlanningContext ctx;
     ctx.spline = cubic_spline;
@@ -121,7 +121,52 @@ PlanningContext Frenet_Planner::make_context(double v_des, int time_step_now,
     ctx.check_boundary = settings.check_boundary;
     ctx.check_obstacle = settings.check_obstacle;
     ctx.use_obstacle_cost = use_obstacle_cost;
+    ctx.obstacle_frenet = &obstacle_frenet;
+    ctx.check_clearance = settings.check_clearance && !obstacle_frenet.empty();
+    ctx.clearance_time_gap = settings.clearance_time_gap;
+    ctx.clearance_min_gap = settings.clearance_min_gap;
+    ctx.clearance_lateral_margin = settings.clearance_lateral_margin;
+    ctx.clearance_grace_time = settings.clearance_grace_time;
+    ctx.clearance_recovery_time = settings.clearance_recovery_time;
+    if (ctx.check_clearance) {
+        ctx.clearance_baseline = clearance_baseline(start, time_step_now);
+    }
     return ctx;
+}
+
+std::vector<ClearanceBaseline> Frenet_Planner::clearance_baseline(const FrenetState& start,
+                                                                  int time_step_now) const {
+    const ObstacleFrenetBounds& bounds = obstacle_frenet;
+    std::vector<ClearanceBaseline> baseline(bounds.num_obstacles);
+    const double dt = settings.tick_t;
+    const int horizon = static_cast<int>(std::ceil(settings.max_t / dt));
+    const double half_width = 0.5 * vehicle_params.w + settings.clearance_lateral_margin;
+    const double speed = std::max(start.s_d, 0.0);
+
+    for (int j = 0; j < bounds.num_obstacles; ++j) {
+        ClearanceBaseline& base = baseline[j];
+        base.gap.assign(horizon + 1, std::numeric_limits<double>::quiet_NaN());
+        for (int k = 0; k <= horizon && time_step_now + k < bounds.num_time_steps; ++k) {
+            const double* b = bounds.at(time_step_now + k, j);  // s_min, s_max, l_min, l_max
+            const double ego_s = start.s + speed * k * dt;
+            if (std::isnan(b[0]) || b[1] <= ego_s ||
+                b[3] < start.d - half_width || b[2] > start.d + half_width) {
+                continue;
+            }
+            if (base.k0 < 0) base.k0 = k;
+            base.gap[k] = std::max(0.0, b[0] - (ego_s + 0.5 * vehicle_params.l));
+        }
+    }
+    return baseline;
+}
+
+bool Frenet_Planner::fall_back_without_clearance(PlanningContext& context) {
+    if (!context.check_clearance || !settings.clearance_fallback) {
+        return false;
+    }
+    context.check_clearance = false;
+    ++last_stats.num_clearance_fallbacks;
+    return true;
 }
 
 void Frenet_Planner::recordTrajectory(const FrenetTrajectory& traj)
@@ -278,9 +323,12 @@ FrenetTrajectory Frenet_Planner::best_traj_generation(
     }
 
     // FOP evaluates complete trajectories, so J_D is part of its objective
-    const PlanningContext context = make_context(
-        resolve_desired_speed(max_target_speed, desired_speed), time_step_now, true);
+    PlanningContext context = make_context(
+        frenet_state, resolve_desired_speed(max_target_speed, desired_speed), time_step_now, true);
     last_fplist = evaluate_batch(frenet_state, params, context, num_threads).feasible;
+    if (last_fplist.empty() && fall_back_without_clearance(context)) {
+        last_fplist = evaluate_batch(frenet_state, params, context, num_threads).feasible;
+    }
 
     // Find minimum cost path
     best_traj.cost_final = std::numeric_limits<double>::infinity();
@@ -313,7 +361,7 @@ std::vector<EvaluationResult> Frenet_Planner::evaluate_samples(
         params.emplace_back(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
     }
     const PlanningContext context = make_context(
-        resolve_desired_speed(max_target_speed, desired_speed), time_step_now, true);
+        frenet_state, resolve_desired_speed(max_target_speed, desired_speed), time_step_now, true);
     return evaluate_batch(frenet_state, params, context, 1,
                           full_violation ? EvalMode::kFullViolation : EvalMode::kEarlyExit).results;
 }
@@ -390,6 +438,17 @@ void Frenet_Planner::generate_frenet_frame(const double* centerline_pts, int num
     cubic_spline = new CubicSpline2D(x_coords, y_coords);
     // A profile belongs to one reference frame; never reuse it for a new route.
     road_profile.clear();
+    obstacle_frenet = ObstacleFrenetBounds();
+}
+
+void Frenet_Planner::set_obstacle_frenet_bounds(const double* bounds, int num_time_steps, int num_obstacles) {
+    if (bounds == nullptr || num_time_steps <= 0 || num_obstacles <= 0) {
+        obstacle_frenet = ObstacleFrenetBounds();
+        return;
+    }
+    obstacle_frenet.num_time_steps = num_time_steps;
+    obstacle_frenet.num_obstacles = num_obstacles;
+    obstacle_frenet.data.assign(bounds, bounds + 4L * num_time_steps * num_obstacles);
 }
 
 void Frenet_Planner::set_road_profile(const std::vector<double>& s,

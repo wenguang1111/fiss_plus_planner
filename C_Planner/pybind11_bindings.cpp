@@ -54,7 +54,14 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("max_t", &SettingParameters::max_t)
         .def_readwrite("num_t", &SettingParameters::num_t)
         .def_readwrite("check_obstacle", &SettingParameters::check_obstacle)
-        .def_readwrite("check_boundary", &SettingParameters::check_boundary);
+        .def_readwrite("check_boundary", &SettingParameters::check_boundary)
+        .def_readwrite("check_clearance", &SettingParameters::check_clearance)
+        .def_readwrite("clearance_time_gap", &SettingParameters::clearance_time_gap)
+        .def_readwrite("clearance_min_gap", &SettingParameters::clearance_min_gap)
+        .def_readwrite("clearance_lateral_margin", &SettingParameters::clearance_lateral_margin)
+        .def_readwrite("clearance_grace_time", &SettingParameters::clearance_grace_time)
+        .def_readwrite("clearance_recovery_time", &SettingParameters::clearance_recovery_time)
+        .def_readwrite("clearance_fallback", &SettingParameters::clearance_fallback);
 
     // Bind VehicleParams struct
     py::class_<VehicleParams>(m, "VehicleParams")
@@ -143,6 +150,9 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("num_constraint_passed", &PlanStats::num_constraint_passed)
         .def_readwrite("num_rejected_dynamic", &PlanStats::num_rejected_dynamic)
         .def_readwrite("num_rejected_offroad", &PlanStats::num_rejected_offroad)
+        .def_readwrite("num_clearance_checks", &PlanStats::num_clearance_checks)
+        .def_readwrite("num_rejected_clearance", &PlanStats::num_rejected_clearance)
+        .def_readwrite("num_clearance_fallbacks", &PlanStats::num_clearance_fallbacks)
         .def_readwrite("num_collision_checks", &PlanStats::num_collision_checks)
         .def_readwrite("num_collision_free", &PlanStats::num_collision_free)
         .def_property_readonly("num_rejected_collision", &PlanStats::num_rejected_collision)
@@ -167,6 +177,7 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("speed", &ConstraintViolation::speed)
         .def_readwrite("acceleration", &ConstraintViolation::acceleration)
         .def_readwrite("road", &ConstraintViolation::road)
+        .def_readwrite("clearance", &ConstraintViolation::clearance)
         .def_readwrite("collision", &ConstraintViolation::collision)
         .def_readwrite("transform", &ConstraintViolation::transform)
         .def("total", &ConstraintViolation::total);
@@ -176,6 +187,7 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .value("TRANSFORM", Rejection::kTransform)
         .value("DYNAMIC", Rejection::kDynamic)
         .value("OFFROAD", Rejection::kOffroad)
+        .value("CLEARANCE", Rejection::kClearance)
         .value("COLLISION", Rejection::kCollision);
 
     py::class_<EvaluationResult>(m, "EvaluationResult")
@@ -264,6 +276,16 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("centerline_pts"))
         .def("set_road_profile", &Frenet_Planner::set_road_profile,
              py::arg("s"), py::arg("lane_width"), py::arg("left_extent"), py::arg("right_extent"))
+        .def("set_obstacle_frenet_bounds",
+             [](Frenet_Planner& self, py::array_t<double, py::array::c_style | py::array::forcecast> bounds) {
+                auto buf = bounds.request();
+                if (buf.ndim != 3 || buf.shape[2] != 4) {
+                    throw py::value_error("bounds must have shape (num_time_steps, num_obstacles, 4)");
+                }
+                self.set_obstacle_frenet_bounds(static_cast<const double*>(buf.ptr),
+                                                static_cast<int>(buf.shape[0]), static_cast<int>(buf.shape[1]));
+             },
+             py::arg("bounds"))
         .def("plan",
              [](Frenet_Planner& self,
                 const FrenetState& frenet_state,

@@ -4,6 +4,7 @@
 #include "Frenet_Planner.h"
 #include <queue>
 #include <array>
+#include <chrono>
 #include <functional>
 
 // Settings for FISS+ planner, extends base SettingParameters
@@ -116,6 +117,11 @@ public:
     
 private:
     TrajectoryEvaluator evaluator() const { return TrajectoryEvaluator(context, cost_function); }
+
+    // Coarse search on the grid of `space` and refinement; true if a feasible trajectory
+    // was found (stored in best_traj).
+    bool search_and_refine(const SearchSpace& space,
+                           std::chrono::high_resolution_clock::time_point t_start);
 
     // Fills traj from its end state and returns its cost (Eq. 4 without J_D)
     double generate_from_end_state(FrenetTrajectory& traj);
