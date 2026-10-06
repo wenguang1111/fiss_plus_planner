@@ -18,7 +18,7 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
-from CVAE_efficient_sampling.CVAE_original import CVAE_Efficient
+from CVAE_efficient_sampling.CVAE import CVAE_Efficient
 class SparsePlannerSettings_CPP(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
