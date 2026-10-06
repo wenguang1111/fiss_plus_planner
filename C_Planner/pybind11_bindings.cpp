@@ -312,7 +312,11 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def("get_stats", &Frenet_Planner::get_stats)
         .def_readwrite("settings", &Frenet_Planner::settings)
         .def_readwrite("vehicle_params", &Frenet_Planner::vehicle_params)
-        .def_readwrite("best_traj", &Frenet_Planner::best_traj);
+        .def_readwrite("best_traj", &Frenet_Planner::best_traj)
+        .def_property("cost_weights",
+             [](const Frenet_Planner& self) { return self.cost_function.weights; },
+             [](Frenet_Planner& self, const CostWeights& w) { self.cost_function.weights = w; },
+             "Weights of the planning objective (the scenario cost uses its own CostWeights)");
 
     // Iterative sampling planners: FOP backend, adaptive Gaussian sampler over (d, s_d, t)
     py::class_<IterativeSamplingSettings>(m, "IterativeSamplingSettings")
