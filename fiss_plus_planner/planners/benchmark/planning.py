@@ -2,6 +2,8 @@ import os
 import signal
 import time
 import csv
+import json
+import subprocess
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -46,9 +48,7 @@ from fiss_plus_planner.planners.MPPI_cpp_wrapper import MPPI_CPP_Wrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
-from fiss_plus_planner.planners.common.utils import configure_numba_threads, transform_points_to_ego, \
-    transform_points_from_ego, transform_obstacles_array_to_ego
-from fiss_plus_planner.planners.common.geometry.math_utils import unifyAngleRange
+from fiss_plus_planner.planners.common.utils import configure_numba_threads, transform_points_to_ego
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
@@ -395,8 +395,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
         apply_settings(planner_settings, safety_cfg)
         apply_settings(planner_settings, motion_model_cfg)
+        cem_cfg = dict(sampler_cfg.get('CEM') or {})
+        if collect_data_for_ml:  # every candidate with full constraint labels, see save_cem_data
+            cem_cfg['record_candidates'] = True
         planner = CEM_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
-                                  runtime_measurement, cem_cfg=sampler_cfg.get('CEM'))
+                                  runtime_measurement, cem_cfg=cem_cfg)
         use_cpp_planner = True
     elif method == 'MPPI_CPP':
         planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
@@ -445,8 +448,11 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     next_state = initial_state
     best_trajs_all_time_steps = []
 
-    # Plan in an ego-centered frame (ego at origin, yaw=0): only for FOP_CPP while collecting ML data.
-    ego_centered_fop_cpp = (method == 'FOP_CPP' and collect_data_for_ml)
+    # ML data (Collect_Data_For_ML): the planner works in the global frame (CEM keeps its warm
+    # start); planned and reference paths are stored in the ego frame of each cycle (ego at the
+    # origin, yaw 0), a rigid transform of the global result.
+    collect_ml_data = collect_data_for_ml and method in ('FOP_CPP', 'CEM_CPP')
+    cem_cycles = []  # CEM_CPP: context and candidate records of every planned cycle
     all_trajs_accumulated = []
     reference_path_lookahead_m = ScenarioDrawer.VIEW_SIZE_DEFAULT / 2.0
     optimal_path_x_local_list = []
@@ -479,24 +485,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         # v_des is not forced to brake hard; J_V pulls it back to v_des.
         max_speed = max(desired_speed, current_frenet_state.s_d)
 
-        if ego_centered_fop_cpp:
-            ego_pos = np.asarray(next_state.position, dtype=float)
-            ego_yaw = float(next_state.orientation)
-            ego_lane_pts_local_xy = transform_points_to_ego(ego_lane_pts[:, :2], ego_pos, ego_yaw)
-            obstacles_array_local = transform_obstacles_array_to_ego(obstacles_array, ego_pos, ego_yaw)
-            planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array_local,
-                                       obstacles_num_vertices, number_threads, runtime_measurement)
-            _, ref_ego_lane_pts_local = planner.generate_frenet_frame(ego_lane_pts_local_xy)
-
-            # Slice to the section ahead of ego (nearest point onward), capped at reference_path_lookahead_m.
-            ref_local_xy = ref_ego_lane_pts_local[:, :2]
-            start_idx = int(np.argmin(np.linalg.norm(ref_local_xy, axis=1)))
-            ref_path_ahead_local = ref_local_xy[start_idx:]
-            if len(ref_path_ahead_local) > 1:
-                seg_dists = np.linalg.norm(np.diff(ref_path_ahead_local, axis=0), axis=1)
-                cum_dist = np.concatenate([[0.0], np.cumsum(seg_dists)])
-                ref_path_ahead_local = ref_path_ahead_local[cum_dist <= reference_path_lookahead_m]
-
         start_time = time.time()
         if method in ('FOP_CPP', 'FISS+_CPP', 'CEM_CPP', 'MPPI_CPP'):
             best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state,
@@ -505,23 +493,21 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
 
-        if ego_centered_fop_cpp and best_traj_ego is not None:
-            # Keep the ego-centered (pre-back-transform) path for the ML dataset.
-            optimal_path_x_local = list(best_traj_ego.x)
-            optimal_path_y_local = list(best_traj_ego.y)
-
-            global_xy = transform_points_from_ego(
-                np.column_stack([best_traj_ego.x, best_traj_ego.y]), ego_pos, ego_yaw)
-            best_traj_ego.x = global_xy[:, 0].tolist()
-            best_traj_ego.y = global_xy[:, 1].tolist()
-            best_traj_ego.yaw = [unifyAngleRange(yaw + ego_yaw) for yaw in best_traj_ego.yaw]
-            if planner.all_trajs:
-                for fp in planner.all_trajs[-1]:
-                    fp_xy = transform_points_from_ego(
-                        np.column_stack([fp.x, fp.y]), ego_pos, ego_yaw)
-                    fp.x = fp_xy[:, 0].tolist()
-                    fp.y = fp_xy[:, 1].tolist()
-                    fp.yaw = [unifyAngleRange(yaw + ego_yaw) for yaw in fp.yaw]
+        if collect_ml_data:
+            ego_pos, ego_yaw = np.asarray(inital_state.position, dtype=float), float(inital_state.orientation)
+            global_coordination_state_list.append(inital_state)
+            if method == 'CEM_CPP':
+                cem_cycles.append(cem_cycle_record(planner, i, current_frenet_state, inital_state,
+                                                   desired_speed, max_speed, best_traj_ego))
+            if best_traj_ego is not None and len(best_traj_ego.x) >= 2:
+                path_local = transform_points_to_ego(np.column_stack([best_traj_ego.x, best_traj_ego.y]),
+                                                     ego_pos, ego_yaw)
+                ref_local = reference_ahead_local(ref_ego_lane_pts[:, :2], ego_pos, ego_yaw,
+                                                  reference_path_lookahead_m)
+                optimal_path_x_local_list.append(path_local[:, 0].tolist())
+                optimal_path_y_local_list.append(path_local[:, 1].tolist())
+                ref_path_x_local_list.append(ref_local[:, 0].tolist())
+                ref_path_y_local_list.append(ref_local[:, 1].tolist())
 
         if planner.all_trajs:
             all_trajs_accumulated.append(planner.all_trajs[-1])
@@ -579,13 +565,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         state_list.append(next_state)
         time_list.append(end_time - start_time)
 
-        if ego_centered_fop_cpp:
-            global_coordination_state_list.append(inital_state)
-            optimal_path_x_local_list.append(optimal_path_x_local)
-            optimal_path_y_local_list.append(optimal_path_y_local)
-            ref_path_x_local_list.append(ref_path_ahead_local[:, 0].tolist())
-            ref_path_y_local_list.append(ref_path_ahead_local[:, 1].tolist())
-
         # break when goal is reached
         if goal_position_available:
             if goal_region.is_reached(next_state):
@@ -638,8 +617,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.success = True
             goal_reached = True
 
-    if collect_data_for_ml and method == 'FOP_CPP' and optimal_path_x_local_list:
+    if collect_ml_data and global_coordination_state_list:
         scenario_name = os.path.splitext(file)[0]
+        if method == 'CEM_CPP':
+            save_cem_data(os.path.join(output_dir, "cem_data"), scenario_name, cem_cycles, stats, planner)
         drawer = ScenarioDrawer(
             scenario_name=scenario_name,
             scenario_dir=input_dir,
@@ -659,7 +640,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             global_coordination_state_list,
             output_dir,
             planner.settings.highest_speed,
-        )    
+            save_paths=(method == 'FOP_CPP'),
+        )
     # construct the final frenet trajectory and calculate the final cost
     final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list, global_state_list)
     dt = planner.settings.tick_t
@@ -774,6 +756,10 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     number_threads = cfg['Num_Threads_For_CollisionChecker']
     runtime_measurement = cfg.get('Runtime_Measurement')
     collect_data_for_ml = cfg.get('Collect_Data_For_ML')
+    if collect_data_for_ml and method == 'CEM_CPP' and not getattr(fop_cpp.frenet_planner_cpp, "DATA_COLLECTION", False):
+        # Checked here, outside the "not feasible" handler below, so a wrong build cannot pass silently
+        raise ImportError("Collect_Data_For_ML with CEM_CPP needs C_Planner/build compiled with "
+                          "-DENABLE_DATA_COLLECTION=ON")
     configure_numba_threads(number_threads)
 
     vehicle_type = VehicleType.VW_VANAGON  # FORD_ESCORT, BMW_320i, VW_VANAGON
@@ -1037,13 +1023,105 @@ def save_data(scenario_name: str, optimal_path_x_list: list, optimal_path_y_list
     print(f"Saved {len(optimal_path_x_list)} time steps for scenario {scenario_name}")
 
 
+def reference_ahead_local(ref_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: float, lookahead: float) -> np.ndarray:
+    """Reference path in the ego frame from the point nearest to the ego onward, up to `lookahead` m."""
+    ref_local = transform_points_to_ego(ref_xy, ego_pos, ego_yaw)
+    ahead = ref_local[int(np.argmin(np.linalg.norm(ref_local, axis=1))):]
+    if len(ahead) > 1:
+        dist = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(ahead, axis=0), axis=1))])
+        ahead = ahead[dist <= lookahead]
+    return ahead
+
+
+def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: InitialState,
+                     v_des: float, max_speed: float, best: FrenetTrajectory) -> dict:
+    """Context of one CEM cycle with its candidates and proposals (CVAE training data)."""
+    rec = planner.cpp_planner.get_cycle_record()
+    found = best is not None and len(best.x) >= 2
+    context = {
+        "time_step": time_step,
+        **{k: getattr(frenet_state, k) for k in ("s", "s_d", "s_dd", "d", "d_d", "d_dd")},
+        "d_s": np.nan if frenet_state.d_s is None else frenet_state.d_s,
+        "x": state.position[0], "y": state.position[1], "yaw": state.orientation,
+        "v": state.velocity, "a": state.acceleration,
+        "v_des": v_des, "v_max_sample": max_speed, **rec["space"],
+        "best_d": best.sampling_param.d if found else np.nan,
+        "best_v": best.sampling_param.s_d if found else np.nan,
+        "best_T": best.sampling_param.t if found else np.nan,
+        "best_J": best.cost_final if found else np.nan,
+        "clearance_fallback": int(np.any(rec["candidates"]["pass"] == 1)),
+    }
+    tables = {name: pd.DataFrame(rec[name]) for name in ("candidates", "proposals")}
+    for table in tables.values():
+        table.insert(0, "time_step", time_step)
+    return {"context": context, **tables}
+
+
+# Integer columns of the CEM tables; every other column is stored as float32
+CEM_INT_COLUMNS = {"time_step": "int16", "pass": "int8", "iteration": "int8", "index": "int16",
+                   "rank": "int16", "feasible": "int8", "rejection": "int8"}
+
+
+def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, planner) -> None:
+    """CEM training data of one scenario in root/<scenario>/: contexts.parquet (one row per
+    planning cycle), candidates.parquet (every candidate of every iteration: all violation
+    components and J terms), proposals.parquet (Gaussian proposal of every iteration) and
+    scenario.json. root/dataset_info.json documents the columns and the planner setup."""
+    out = os.path.join(root, scenario_name)
+    os.makedirs(out, exist_ok=True)
+    pd.DataFrame([c["context"] for c in cycles]).to_parquet(os.path.join(out, "contexts.parquet"), index=False)
+    for name in ("candidates", "proposals"):
+        table = pd.concat([c[name] for c in cycles], ignore_index=True)
+        table = table.astype({col: CEM_INT_COLUMNS.get(col, "float32") for col in table.columns})
+        table.to_parquet(os.path.join(out, f"{name}.parquet"), index=False, compression="zstd")
+    with open(os.path.join(out, "scenario.json"), "w") as fh:
+        json.dump({"success": bool(stats.success), "rear_end_failure": bool(stats.rear_end_failure),
+                   "cycles": len(cycles), "failed_at_time_step": stats.time_step_have_to_break if not stats.success else None},
+                  fh, indent=1)
+    try:
+        with open(os.path.join(root, "dataset_info.json"), "x") as fh:  # first scenario writes it
+            json.dump(cem_dataset_info(planner), fh, indent=1)
+    except FileExistsError:
+        pass
+
+
+def cem_dataset_info(planner) -> dict:
+    """Planner setup and column documentation of the CEM training data."""
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    git = lambda *args: subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
+    weights = planner.cpp_planner.cost_weights
+    return {
+        "git_commit": git("rev-parse", "HEAD"),
+        "git_dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
+        "planner_settings": {k: v for k, v in vars(planner.settings).items() if isinstance(v, (bool, int, float, str))},
+        "cem_settings": planner.cem_cfg,
+        "cost_weights": {k: getattr(weights, k) for k in dir(weights) if k.startswith("w_")},
+        "vehicle": {k: getattr(planner.vehicle, k) for k in ("l", "w", "max_speed", "max_accel")},
+        "rejection_codes": {0: "none", 1: "transform", 2: "dynamic", 3: "offroad", 4: "clearance", 5: "collision"},
+        "notes": [
+            "candidates: one row per sample; d, v, T = terminal lateral offset, terminal speed, horizon.",
+            "pass 1 = re-plan without the clearance requirement (only when pass 0 found nothing feasible).",
+            "rank: rank in its iteration by (feasible, V, J) of the early-exit view, as used by CEM; "
+            "elites are rank < round(elite_fraction * population).",
+            "V_*: share of the horizon from the first violation on, (N - k) / N, every check run "
+            "(kFullViolation); feasible / rejection as in a normal run.",
+            "J_*: weighted cost terms, NaN without a Cartesian trajectory.",
+            "proposals: mean / std of the diagonal Gaussian each iteration was drawn from, in unit "
+            "coordinates of the search space (contexts d_min..T_max); samples are clipped to [0, 1]; "
+            "index 0 of iteration 0 is the proposal mean itself.",
+        ],
+    }
+
+
 def collect_data(drawer: ScenarioDrawer, scenario_name: str,
                  optimal_path_x_list: list, optimal_path_y_list: list,
                  ref_path_x_list: list, ref_path_y_list: list,
                  global_coordination_state_list: list, output_dir: str,
-                 highest_speed: float):
-    save_data(scenario_name, optimal_path_x_list, optimal_path_y_list,
-              ref_path_x_list, ref_path_y_list, str(output_dir))
+                 highest_speed: float, save_paths: bool = True):
+    """Images of every cycle, the planned paths (save_paths) and the completion marker."""
+    if save_paths:
+        save_data(scenario_name, optimal_path_x_list, optimal_path_y_list,
+                  ref_path_x_list, ref_path_y_list, str(output_dir))
 
     # Save images for all time steps
     if drawer.save_dir is not None:

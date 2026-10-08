@@ -88,6 +88,11 @@ enum class EvalMode {
     kFullViolation,
 };
 
+// The result kEarlyExit returns for the same trajectory, derived from a kFullViolation
+// result: only the first failed check (pipeline order) keeps its violation and J is kept
+// for feasible trajectories only. Ranking these gives the planners' normal decisions.
+EvaluationResult early_exit_view(EvaluationResult full);
+
 // The single trajectory backend used by every planner: generation, Cartesian
 // transform, dynamic/road constraints, polygon collision check and cost.
 class TrajectoryEvaluator {

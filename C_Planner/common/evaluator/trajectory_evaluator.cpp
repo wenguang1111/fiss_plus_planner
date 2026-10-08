@@ -57,6 +57,23 @@ bool ranks_before(const EvaluationResult& a, const EvaluationResult& b) {
     return a.cost.total() < b.cost.total();
 }
 
+EvaluationResult early_exit_view(EvaluationResult full) {
+    ConstraintViolation& v = full.violation;
+    bool failed = false;
+    for (double* component : {&v.transform, &v.speed, &v.acceleration, &v.road, &v.clearance, &v.collision}) {
+        if (failed) {
+            *component = 0.0;
+        } else if (*component > 0.0) {
+            failed = true;
+        }
+    }
+    if (!full.feasible) {
+        full.has_cost = false;
+        full.cost = CostBreakdown();
+    }
+    return full;
+}
+
 FrenetTrajectory TrajectoryEvaluator::generate(const FrenetState& start, const SamplingParam& z,
                                                PlanStats& stats) const {
     const auto t0 = Clock::now();

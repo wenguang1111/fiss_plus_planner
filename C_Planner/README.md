@@ -135,6 +135,20 @@ towards the exp(-score / gamma)-weighted mean and covariance with learning rate
 eta. Settings: `CEMSettings`, `MPPISettings` (Python: `CEM` / `MPPI` sections of
 `cfgs/demo_config.yaml`, planners `CEM_CPP` / `MPPI_CPP`).
 
+### Training data of the iterative samplers (`ENABLE_DATA_COLLECTION`)
+
+Built with `cmake .. -DENABLE_DATA_COLLECTION=ON` (default OFF, which compiles the
+code below out, so runtime measurements are unaffected), `record_candidates` in
+`IterativeSamplingSettings` keeps every candidate of a cycle in `last_record`
+(Python: `get_cycle_record()`): z = (d, s_d, t), its rank in the iteration, and the
+evaluation with every check run (`EvalMode::kFullViolation`: all violation
+components, J for every trajectory), plus the Gaussian proposal of every iteration.
+The planner itself ranks `early_exit_view()` of these results, which is exactly the
+result of `kEarlyExit`, so a recording run takes the same decisions as a normal one.
+In Python, `Collect_Data_For_ML` with `PLANNER: CEM_CPP` switches it on and
+`planning.save_cem_data` writes one folder per scenario (contexts, candidates,
+proposals; see `dataset_info.json`).
+
 ### FOP_CPP road-width profiles
 
 The Python FOP wrapper passes CommonRoad geometry once per reference frame using

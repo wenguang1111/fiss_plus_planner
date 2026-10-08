@@ -50,6 +50,9 @@ if __name__ == '__main__':
     repo_dir = os.getcwd()
     parser = argparse.ArgumentParser(description='Demo')
     parser.add_argument('--cfg_file', type=str, default=os.path.join(repo_dir, 'cfgs/demo_config.yaml'), help='specify the config file for the demo')
+    # Parallel runs: process k of n handles every n-th scenario, starting at the k-th
+    parser.add_argument('--shard', type=int, default=0, help='index of this process among --num_shards')
+    parser.add_argument('--num_shards', type=int, default=1, help='number of parallel processes')
     args = parser.parse_args()
     
     with open(args.cfg_file, 'r') as file:
@@ -84,7 +87,8 @@ if __name__ == '__main__':
 
     if save_measurments:
         os.makedirs(measurement_dir, exist_ok=True)
-        csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + '.csv')
+        shard_suffix = f'_shard{args.shard}' if args.num_shards > 1 else ''
+        csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + shard_suffix + '.csv')
         if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
             with open(csv_path, 'a', newline='') as csv_file:
                 csv_file.write(
@@ -101,7 +105,7 @@ if __name__ == '__main__':
         if name.lower().endswith('.xml')
         and os.path.isfile(os.path.join(input_dir, name))
     )
-    for file in scenario_files:
+    for file in scenario_files[args.shard::args.num_shards]:
         if file in exsited_files:
             print(f"Skipping completed scenario: {file}")
             continue

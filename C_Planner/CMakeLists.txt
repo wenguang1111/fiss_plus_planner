@@ -36,6 +36,14 @@ if (USE_RECORDER)
   	Recorder4Cpp/recorder.cpp)
 endif()
 
+# Recording of every CEM/MPPI candidate with full constraint labels (CVAE training data,
+# Collect_Data_For_ML). OFF compiles it out, so runtime measurements are unaffected.
+option(ENABLE_DATA_COLLECTION "Record iterative sampling candidates for training data" OFF)
+if (ENABLE_DATA_COLLECTION)
+  MESSAGE(STATUS "ENABLE_DATA_COLLECTION=ON")
+  add_definitions(-DENABLE_DATA_COLLECTION)
+endif()
+
 # Source files for the common geometry module
 set(GEOMETRY_SOURCES
     common/geometry/polynomial.cpp

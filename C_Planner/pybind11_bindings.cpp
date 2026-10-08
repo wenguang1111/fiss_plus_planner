@@ -1,6 +1,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include <limits>
+#include <string>
 #include "Frenet_Planner.h"
 #include "CEM_Planner.h"
 #include "MPPI_Planner.h"
@@ -22,6 +24,77 @@ Planner* make_planner(const SettingParameters& settings, const OwnSettings&... o
                        num_time_steps, num_obstacles, max_vertices);
 }
 
+#ifdef ENABLE_DATA_COLLECTION
+// Column of `rows` mapped by `get`, as a numpy array
+template <typename T, typename Row, typename Get>
+py::array_t<T> column(const std::vector<Row>& rows, Get get) {
+    py::array_t<T> out(static_cast<py::ssize_t>(rows.size()));
+    T* data = out.mutable_data();
+    for (size_t i = 0; i < rows.size(); ++i) {
+        data[i] = static_cast<T>(get(rows[i]));
+    }
+    return out;
+}
+
+// CycleRecord as {"candidates": {...}, "proposals": {...}, "space": {...}} of numpy columns.
+// J is NaN for trajectories without a Cartesian representation (no cost).
+py::dict cycle_record_columns(const CycleRecord& rec) {
+    using C = CandidateRecord;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    auto cost = [nan](double CostBreakdown::*term) {
+        return [term, nan](const C& c) { return c.result.has_cost ? c.result.cost.*term : nan; };
+    };
+    const auto& cs = rec.candidates;
+    py::dict candidates;
+    candidates["pass"] = column<int>(cs, [](const C& c) { return c.pass; });
+    candidates["iteration"] = column<int>(cs, [](const C& c) { return c.iteration; });
+    candidates["index"] = column<int>(cs, [](const C& c) { return c.index; });
+    candidates["rank"] = column<int>(cs, [](const C& c) { return c.rank; });
+    candidates["d"] = column<double>(cs, [](const C& c) { return c.z.d; });
+    candidates["v"] = column<double>(cs, [](const C& c) { return c.z.s_d; });
+    candidates["T"] = column<double>(cs, [](const C& c) { return c.z.t; });
+    candidates["feasible"] = column<int>(cs, [](const C& c) { return c.result.feasible; });
+    candidates["rejection"] = column<int>(cs, [](const C& c) { return static_cast<int>(c.result.rejection); });
+    candidates["V_speed"] = column<double>(cs, [](const C& c) { return c.result.violation.speed; });
+    candidates["V_acceleration"] = column<double>(cs, [](const C& c) { return c.result.violation.acceleration; });
+    candidates["V_road"] = column<double>(cs, [](const C& c) { return c.result.violation.road; });
+    candidates["V_clearance"] = column<double>(cs, [](const C& c) { return c.result.violation.clearance; });
+    candidates["V_collision"] = column<double>(cs, [](const C& c) { return c.result.violation.collision; });
+    candidates["V_transform"] = column<double>(cs, [](const C& c) { return c.result.violation.transform; });
+    candidates["V_total"] = column<double>(cs, [](const C& c) { return c.result.violation.total(); });
+    candidates["J_total"] = column<double>(cs, [nan](const C& c) { return c.result.has_cost ? c.result.cost.total() : nan; });
+    candidates["J_time"] = column<double>(cs, cost(&CostBreakdown::time));
+    candidates["J_velocity"] = column<double>(cs, cost(&CostBreakdown::velocity));
+    candidates["J_acceleration"] = column<double>(cs, cost(&CostBreakdown::acceleration));
+    candidates["J_jerk"] = column<double>(cs, cost(&CostBreakdown::jerk));
+    candidates["J_lane_center"] = column<double>(cs, cost(&CostBreakdown::lane_center));
+    candidates["J_obstacle"] = column<double>(cs, cost(&CostBreakdown::obstacle));
+
+    using P = ProposalRecord;
+    const auto& ps = rec.proposals;
+    py::dict proposals;
+    proposals["pass"] = column<int>(ps, [](const P& p) { return p.pass; });
+    proposals["iteration"] = column<int>(ps, [](const P& p) { return p.iteration; });
+    const char* dims[] = {"d", "v", "T"};
+    for (int k = 0; k < 3; ++k) {
+        proposals[py::str(std::string("mean_") + dims[k])] = column<double>(ps, [k](const P& p) { return p.proposal.mean[k]; });
+        proposals[py::str(std::string("std_") + dims[k])] = column<double>(ps, [k](const P& p) { return p.proposal.stddev[k]; });
+    }
+
+    const SearchSpace& sp = rec.space;
+    py::dict space;
+    space["d_min"] = sp.d_min; space["d_max"] = sp.d_max;
+    space["v_min"] = sp.v_min; space["v_max"] = sp.v_max;
+    space["T_min"] = sp.t_min; space["T_max"] = sp.t_max;
+
+    py::dict out;
+    out["candidates"] = candidates;
+    out["proposals"] = proposals;
+    out["space"] = space;
+    return out;
+}
+#endif
+
 // plan() of a planner built on Frenet_Planner (same signature as FOP)
 template <typename Planner, typename PyClass>
 void def_plan(PyClass& cls) {
@@ -31,12 +104,21 @@ void def_plan(PyClass& cls) {
             py::arg("time_step_now") = 0,
             py::arg("num_threads") = 1,
             py::arg("desired_speed") = -1.0);
+#ifdef ENABLE_DATA_COLLECTION
+    cls.def("get_cycle_record", [](const Planner& self) { return cycle_record_columns(self.last_record); },
+            "Candidates, proposals and search space of the last cycle as numpy columns");
+#endif
 }
 
 }  // namespace
 
 PYBIND11_MODULE(frenet_planner_cpp, m) {
     m.doc() = "Frenet Optimal Planner C++ extension";
+#ifdef ENABLE_DATA_COLLECTION
+    m.attr("DATA_COLLECTION") = true;
+#else
+    m.attr("DATA_COLLECTION") = false;  // built without ENABLE_DATA_COLLECTION
+#endif
 
     // Bind SettingParameters struct
     py::class_<SettingParameters>(m, "SettingParameters")
@@ -352,7 +434,11 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("num_iterations", &IterativeSamplingSettings::num_iterations)
         .def_readwrite("population", &IterativeSamplingSettings::population)
         .def_readwrite("init_std", &IterativeSamplingSettings::init_std)
-        .def_readwrite("seed", &IterativeSamplingSettings::seed);
+        .def_readwrite("seed", &IterativeSamplingSettings::seed)
+#ifdef ENABLE_DATA_COLLECTION
+        .def_readwrite("record_candidates", &IterativeSamplingSettings::record_candidates)
+#endif
+        ;
 
     py::class_<CEMSettings, IterativeSamplingSettings>(m, "CEMSettings")
         .def(py::init<>())
