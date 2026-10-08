@@ -185,7 +185,7 @@ class FissPlusCppWrapper(object):
                     py_traj = self._dict_to_frenet_trajectory(cpp_traj_dict)
                     self.best_traj = py_traj
 
-                    if self.doing_runtime_measurement:
+                    if not self.doing_runtime_measurement:  # as FOP_CPP_Wrapper: keep all candidates only when not timing
                         py_fplist = []
                         cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()  # Returns list of dicts
                         for cpp_fp_dict in cpp_fplist:
