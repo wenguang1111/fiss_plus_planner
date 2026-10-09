@@ -51,8 +51,8 @@ option is missing, the collection stops with an `ImportError` that says so.
 ## 2. Configure `fiss_plus_planner/cfgs/demo_config.yaml`
 
 ```yaml
-OUTPUT_DIR: "data/output/cem_train_R8x250/"   # a new, empty folder per data set
-MEASUREMENTS_DIR: "data/measurements/10k"
+OUTPUT_DIR: "data/output/cem_train_R8x250_v2/"   # a new, empty folder per data set
+MEASUREMENTS_DIR: "data/measurements/10k_v2"     # new folder too: the shard CSVs are appended to
 INPUT_DIR: "data/10k/Train"                   # data/10k/Verification for the validation set
 PLANNER: "CEM_CPP"
 SAVE_GIF: False
@@ -70,7 +70,7 @@ data again.
 
 Run from `fiss_plus_planner/`, in tmux. `--shard k --num_shards n` lets process k handle every
 n-th scenario (sorted by name). The command below starts 22 processes, one per CPU core, which
-takes about 1 h for the 6832 Train scenarios:
+takes about 2 h for the 6832 Train scenarios:
 
 ```bash
 tmux new -s collect
@@ -89,9 +89,9 @@ those scenarios.
 Progress and errors:
 
 ```bash
-ls data/output/cem_train_R8x250/completed | wc -l          # finished scenarios
-tail data/output/cem_train_R8x250/collection_errors.log    # scenarios that raised an exception
-du -sh data/output/cem_train_R8x250                        # about 15 MB per scenario
+ls data/output/cem_train_R8x250_v2/completed | wc -l          # finished scenarios (6808 expected)
+tail data/output/cem_train_R8x250_v2/collection_errors.log    # scenarios that raised an exception
+du -sh data/output/cem_train_R8x250_v2                        # about 15 MB per scenario
 ```
 
 ## 4. Output
@@ -104,6 +104,10 @@ du -sh data/output/cem_train_R8x250                        # about 15 MB per sce
   - `candidates.parquet`: one row per candidate (2000 per cycle, 4000 if the clearance fallback
     ran). It holds pass, iteration, index, rank, d, v, T, feasible, rejection, V_* (share of the
     horizon from the first violation on; every check is run) and J_total with its six terms.
+  - `conditions.parquet`: the route's reference path per cycle, in the ego frame of that cycle (ego
+    at the origin, x forward, y left, as the BEV image). It runs from the point nearest to the ego
+    up to 43.75 m ahead (half the BEV view), with points every 0.1 m (`ref_x`, `ref_y`). This is
+    the format of the FOP path data and of the world-model CVAE (CVAE_trajectory_planning).
   - `proposals.parquet`: mean and std of the Gaussian each CEM iteration was drawn from, in unit
     coordinates of the sampling bounds. It is needed for importance weights at training time.
   - `scenario.json`: success, rear_end_failure, cycles and failed_at_time_step.

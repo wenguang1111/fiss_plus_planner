@@ -1,8 +1,8 @@
 #Important parameter relevant to runtime：
 #   self.min_t = 3.0 #check the code in fiss_plus_planner/planners/frenet_optimal_planner.py      
 #   self.max_t = 5.0  
-OUTPUT_DIR: "data/output/cem_train_R8x250/"
-MEASUREMENTS_DIR: "data/measurements/10k"
+OUTPUT_DIR: "data/output/cem_train_R8x250_v2/"
+MEASUREMENTS_DIR: "data/measurements/10k_v2"
 # INPUT_DIR: "data/demo/selected_scenarios/Test" # the directory where the scenario files are located, it should contain the xml files of the scenarios to be tested, you can specify the scenario files to be tested by editing the FILES parameter below, if FILES is empty, it will run all the scenario files under this directory
 INPUT_DIR: "data/10k/Train"
 FILES: [] # empty by default if you want to run all the scenario files under the input directory

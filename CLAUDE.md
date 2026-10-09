@@ -68,17 +68,30 @@ changing planner, cost or training code.
   - Recording evaluates every check (kFullViolation) but ranks the early-exit view, so its
     decisions are bitwise identical to a normal run.
   - Guide: README.md "Collecting CVAE training data with CEM".
-- **Output** in `data/output/cem_train_R8x250/`:
-  - `cem_data/<scenario>/{contexts,candidates,proposals}.parquet`, `scenario.json`;
+- **Output** in `OUTPUT_DIR` (v2: `data/output/cem_train_R8x250_v2/`):
+  - `cem_data/<scenario>/{contexts,candidates,proposals,conditions}.parquet`, `scenario.json`;
   - `imgs/<scenario>/<t>.png`;
   - `dataset_info.json`.
-- **State (complete, 2026-10-09):** 6808 of 6832 scenarios. The other 24 fail before planning
+- **Reference path** (`conditions.parquet`, added for v2, for the planned route condition of the
+  CVAE): per cycle, in the ego frame. It runs from the nearest reference point up to 43.75 m ahead
+  (VIEW_SIZE_DEFAULT / 2), with points every 0.1 m (`ref_x`, `ref_y`, float32).
+  - This is the same format as the FOP path data and as Giovanni's world-model CVAE
+    (github.com/giovannilucente/CVAE_trajectory_planning). That CVAE resamples every 2 m and uses
+    20 points (40 m) as deltas.
+  - The user chose 43.75 m (not longer).
+- **Collections:**
+  - **v1** (2026-10-08/09) had no reference paths. It was moved off this PC (Train.zip).
+  - **v2** is a full recollection with reference paths, planned with the same code. The CEM data
+    should be byte-identical to v1, which also checks the suspected hardware fault.
+  - v2 uses OUTPUT_DIR `cem_train_R8x250_v2` and MEASUREMENTS_DIR `data/measurements/10k_v2`.
+  - A full run takes about 2 h with 22 shards (v1: 1 h 55 min; the rerun of 150 scenarios: 5 min).
+- **v1 state (complete, 2026-10-09):** 6808 of 6832 scenarios. The other 24 fail before planning
   (18 without a global route, 6 without an ego trajectory) and have no data.
   - The missing ones were recollected with `cfgs/rerun_missing.yaml` (not committed).
   - An integrity scan of all PNG and parquet files was clean.
   - **Possible SSD/RAM fault on the collection PC:** 3 files had changed on disk without being
     rewritten; they were recollected. Verify with sha256 after every copy.
-- **Statistics:** 86.1 % success; 945 failures (419 rear-end, 316 failing at cycle 0);
+- **v1 statistics:** 86.1 % success; 945 failures (419 rear-end, 316 failing at cycle 0);
   519,001 cycles; 826 M feasible candidates; 54 GB cem_data plus 5.2 GB images. The cache
   (cem_cache.py) is 48 GB, built in 73 s with nothing skipped.
 - **Splits:**
@@ -118,13 +131,27 @@ changing planner, cost or training code.
 - **Open issue:** the 2-epoch smoke test collapsed to almost one point per scene (sample spread
   0.03 vs target 0.61, posterior collapse with `--beta_end 1.0`).
   - The pipeline itself works: the sample mean follows the scene.
-  - Watch `spread` in `test_cost_cvae.py`; try `--beta_end 0.1` or `--model hcvae`.
+  - `generation_check.py` runs after every epoch (`--gen_check_cycles` 300, K 16) and writes
+    gen_in_bounds, gen_best_cost, gen_mean_dist, gen_spread and target_spread to `log.tsv`.
+  - First remedy: `--beta_end 0.1`. Then free bits (Kingma 2016), cyclical annealing (Fu 2019),
+    then MMD / InfoVAE.
+  - The user decided against SIGReg.
+  - Both models already clamp logvar to [-10, 10].
 - **Not done yet:** the CVAE-FOP planner (sampling with CostAwareCVAE, dense-FOP fallback when
   no sample is feasible). It needs:
   - clipping of the samples to the search space;
   - the 3-frame history padded as [0, 0, 1] at t = 1 (the old sparse planners use [0, 1, 1]).
 
   Planned evaluation metrics: best cost@K, feasible ratio, fallback rate, regret vs dense FOP.
+- **Planned: route condition (`--nav`)**, taken from Giovanni's world-model CVAE.
+  - The BEV images do not show the route, so at intersections the CVAE cannot see which branch is
+    planned.
+  - Add a navigation tokenizer (MLP + position embedding over the resampled reference path:
+    2 m, 20 points, deltas). Add cross-attention to these tokens in the encoder and decoder, and
+    condition the prior on them.
+  - Compare image-only vs image + route.
+  - Needs the v2 data (`conditions.parquet`) in the cache (`ref_path.bin`). The inference interface
+    gets `generate_samples(frames, k, ref_path=...)`, computed with the same `reference_ahead_local`.
 - **Later ideas** (user wants them after V1): use feasible / V labels for the CVAE. Independent
   CEM restarts and a curvature constraint are not planned.
 
@@ -139,9 +166,9 @@ candidates.
 
 ```bash
 cd fiss_plus_planner/data/output
-tar --exclude='*.gif' -cf - cem_train_R8x250/cem_data cem_train_R8x250/imgs cem_train_R8x250/completed \
-  | zstd -T0 -3 -o cem_train_R8x250.tar.zst
-sha256sum cem_train_R8x250.tar.zst > cem_train_R8x250.tar.zst.sha256
+tar --exclude='*.gif' -cf - cem_train_R8x250_v2/cem_data cem_train_R8x250_v2/imgs cem_train_R8x250_v2/completed \
+  | zstd -T0 -3 -o cem_train_R8x250_v2.tar.zst
+sha256sum cem_train_R8x250_v2.tar.zst > cem_train_R8x250_v2.tar.zst.sha256
 ```
 
 The submodule branch `cost-aware` must be pushed before the main repo (`Experiment`), which
@@ -164,8 +191,8 @@ The last line downloads the attnCVAE backbone on a login node; compute nodes may
 run interactively or as a small CPU job):
 
 ```bash
-cd $SCRATCH && sha256sum -c cem_train_R8x250.tar.zst.sha256 && zstd -dc cem_train_R8x250.tar.zst | tar -xf -
-python <repo>/CVAE_efficient_sampling/cem_cache.py --data $SCRATCH/cem_train_R8x250 --out $SCRATCH/cem_train_cache --workers 16
+cd $SCRATCH && sha256sum -c cem_train_R8x250_v2.tar.zst.sha256 && zstd -dc cem_train_R8x250_v2.tar.zst | tar -xf -
+python <repo>/CVAE_efficient_sampling/cem_cache.py --data $SCRATCH/cem_train_R8x250_v2 --out $SCRATCH/cem_train_cache --workers 16
 ```
 
 Check `meta.json` of the cache: `skipped` should be empty, about 6800 scenarios.

@@ -497,14 +497,13 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if collect_ml_data:
             ego_pos, ego_yaw = np.asarray(inital_state.position, dtype=float), float(inital_state.orientation)
             global_coordination_state_list.append(inital_state)
+            ref_local = reference_ahead_local(ref_ego_lane_pts[:, :2], ego_pos, ego_yaw, reference_path_lookahead_m)
             if method == 'CEM_CPP':
                 cem_cycles.append(cem_cycle_record(planner, i, current_frenet_state, inital_state,
-                                                   desired_speed, max_speed, best_traj_ego))
+                                                   desired_speed, max_speed, best_traj_ego, ref_local))
             if best_traj_ego is not None and len(best_traj_ego.x) >= 2:
                 path_local = transform_points_to_ego(np.column_stack([best_traj_ego.x, best_traj_ego.y]),
                                                      ego_pos, ego_yaw)
-                ref_local = reference_ahead_local(ref_ego_lane_pts[:, :2], ego_pos, ego_yaw,
-                                                  reference_path_lookahead_m)
                 optimal_path_x_local_list.append(path_local[:, 0].tolist())
                 optimal_path_y_local_list.append(path_local[:, 1].tolist())
                 ref_path_x_local_list.append(ref_local[:, 0].tolist())
@@ -1039,8 +1038,9 @@ def reference_ahead_local(ref_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: floa
 
 
 def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: InitialState,
-                     v_des: float, max_speed: float, best: FrenetTrajectory) -> dict:
-    """Context of one CEM cycle with its candidates and proposals (CVAE training data)."""
+                     v_des: float, max_speed: float, best: FrenetTrajectory, ref_local: np.ndarray) -> dict:
+    """Context of one CEM cycle with its candidates and proposals (CVAE training data); ref_local is
+    the reference path ahead in the ego frame (reference_ahead_local)."""
     rec = planner.cpp_planner.get_cycle_record()
     found = best is not None and len(best.x) >= 2
     context = {
@@ -1059,7 +1059,9 @@ def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: 
     tables = {name: pd.DataFrame(rec[name]) for name in ("candidates", "proposals")}
     for table in tables.values():
         table.insert(0, "time_step", time_step)
-    return {"context": context, **tables}
+    reference = {"time_step": time_step, "ref_x": ref_local[:, 0].astype(np.float32),
+                 "ref_y": ref_local[:, 1].astype(np.float32)}
+    return {"context": context, "reference": reference, **tables}
 
 
 # Integer columns of the CEM tables; every other column is stored as float32
@@ -1069,12 +1071,16 @@ CEM_INT_COLUMNS = {"time_step": "int16", "pass": "int8", "iteration": "int8", "i
 
 def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, planner) -> None:
     """CEM training data of one scenario in root/<scenario>/: contexts.parquet (one row per
-    planning cycle), candidates.parquet (every candidate of every iteration: all violation
+    planning cycle), conditions.parquet (reference path ahead in the ego frame per cycle),
+    candidates.parquet (every candidate of every iteration: all violation
     components and J terms), proposals.parquet (Gaussian proposal of every iteration) and
     scenario.json. root/dataset_info.json documents the columns and the planner setup."""
     out = os.path.join(root, scenario_name)
     os.makedirs(out, exist_ok=True)
     pd.DataFrame([c["context"] for c in cycles]).to_parquet(os.path.join(out, "contexts.parquet"), index=False)
+    # reference path ahead in the ego frame, the format of the FOP path data (save_data)
+    pd.DataFrame([c["reference"] for c in cycles]).to_parquet(os.path.join(out, "conditions.parquet"), index=False,
+                                                              compression="zstd")
     for name in ("candidates", "proposals"):
         table = pd.concat([c[name] for c in cycles], ignore_index=True)
         table = table.astype({col: CEM_INT_COLUMNS.get(col, "float32") for col in table.columns})
@@ -1114,6 +1120,10 @@ def cem_dataset_info(planner) -> dict:
             "proposals: mean / std of the diagonal Gaussian each iteration was drawn from, in unit "
             "coordinates of the search space (contexts d_min..T_max); samples are clipped to [0, 1]; "
             "index 0 of iteration 0 is the proposal mean itself.",
+            "conditions: per cycle the route's reference path in the ego frame of that cycle (ego at the "
+            "origin, x forward, y left, as the BEV image), from its point nearest to the ego up to "
+            "ScenarioDrawer.VIEW_SIZE_DEFAULT / 2 = 43.75 m ahead, points every 0.1 m (ref_x, ref_y); the "
+            "format of the FOP path data and of the world-model CVAE (CVAE_trajectory_planning).",
         ],
     }
 
