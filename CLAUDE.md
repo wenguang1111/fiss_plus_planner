@@ -77,7 +77,12 @@ changing planner, cost or training code.
   - 3 were corrupted on disk after writing, so their .done markers were removed.
   - **Possible SSD/RAM fault on the collection PC:** files changed without being rewritten.
     Verify data with sha256 sums before use.
-  - To do: rerun with `--num_shards 21`, then rebuild the cache.
+  - Rerun of the missing ones: `cfgs/rerun_missing.yaml` (FILES = the 150 scenarios without a
+    .done marker; not committed). Run with
+    `demo_cr.py --cfg_file cfgs/rerun_missing.yaml --shard k --num_shards 15`.
+    Its first attempt failed at import, which is fixed in CVAE.py. POL_Poznan-11 is already
+    regenerated.
+  - Then: integrity scan of all PNG and parquet files, package (see below), rebuild the cache.
 - **Statistics:** 86 % success; 930 failures (414 rear-end, about 200 failing at cycle 0, 311
   failing later); 510k cycles; 1.1 B candidates; 53 GB plus 5 GB images.
 - **Splits:**
@@ -102,10 +107,11 @@ changing planner, cost or training code.
   - `cem_cache.py`: one-time memory-mapped cache, about 47 GB.
   - `cem_dataset.py`.
   - `train_cost_cvae.py`: checkpoints, SIGUSR1/SIGTERM and `--max_hours` stop, resumes with the
-    same command.
+    same command. Exit code 3 = stopped and must be resumed; 0 = complete.
   - `test_cost_cvae.py`: held-out check against uniform and marginal samplers.
   - `CVAE.py: CostAwareCVAE`: inference, frames -> [d, v, T].
-  - `slurm_train.sh`.
+  - `slurm_train.sh`: one sbatch is enough; it resubmits itself on exit code 3 (at most
+    MAX_RESUBMIT = 5).
   - Steps: CVAE_efficient_sampling/README.md.
 - **Models:**
   - attnCVAE (default; ResNet18, one latent level, 11.3 M params; the model the sparse planners
@@ -126,15 +132,80 @@ changing planner, cost or training code.
 - **Later ideas** (user wants them after V1): use feasible / V labels for the CVAE. Independent
   CEM restarts and a curvature constraint are not planned.
 
-## Next steps (HPC)
+## Running on the HPC (runbook)
 
-1. Push the submodule branch `cost-aware`, then the main repo (`Experiment`).
-2. On the HPC:
-   - clone with submodules and check out `cost-aware`;
-   - set up the env;
-   - pre-download the ResNet18 weights;
-   - copy the cache and check its sha256.
-3. Smoke test: `train_cost_cvae.py --limit_scenarios 300 --epochs 2 --draws_per_cycle 4`, then
-   `test_cost_cvae.py`.
-4. Full training via `sbatch slurm_train.sh`; compare tau and beta_end, checking `spread` and
-   `best_cost@K`.
+The CVAE is trained on an HPC with A40 / A100 GPUs and Slurm, with jobs of at most 24 h. The data
+are collected on the local PC. Paths below are examples.
+
+**0. On the local PC: package the data.** Do this after the rerun and a clean integrity scan.
+The raw data are needed for later V / feasibility training; the cache keeps only feasible
+candidates.
+
+```bash
+cd fiss_plus_planner/data/output
+tar --exclude='*.gif' -cf - cem_train_R8x250/cem_data cem_train_R8x250/imgs cem_train_R8x250/completed \
+  | zstd -T0 -3 -o cem_train_R8x250.tar.zst
+sha256sum cem_train_R8x250.tar.zst > cem_train_R8x250.tar.zst.sha256
+```
+
+The submodule branch `cost-aware` must be pushed before the main repo (`Experiment`), which
+points to it. The user pushes.
+
+**1. Code and environment** (once):
+
+```bash
+git clone --recurse-submodules <fiss_plus_planner repo> && cd fiss_plus_planner && git checkout Experiment
+git submodule update --init && git -C CVAE_efficient_sampling checkout cost-aware
+conda create -n cvae python=3.10 && conda activate cvae
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128   # CUDA 12.x build
+pip install numpy pandas pyarrow scikit-learn pillow matplotlib tqdm
+python -c "from torchvision.models import resnet18, ResNet18_Weights; resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)"
+```
+
+The last line downloads the attnCVAE backbone on a login node; compute nodes may have no internet.
+
+**2. Data and cache** (once; the cache build needs about 1 min with 16 CPU workers, and can
+run interactively or as a small CPU job):
+
+```bash
+cd $SCRATCH && sha256sum -c cem_train_R8x250.tar.zst.sha256 && zstd -dc cem_train_R8x250.tar.zst | tar -xf -
+python <repo>/CVAE_efficient_sampling/cem_cache.py --data $SCRATCH/cem_train_R8x250 --out $SCRATCH/cem_train_cache --workers 16
+```
+
+Check `meta.json` of the cache: `skipped` should be empty, about 6800 scenarios.
+
+**3. Configure `CVAE_efficient_sampling/slurm_train.sh`** (once): in the block "adjust to the
+cluster", set the partition / account lines if required, `CACHE=$SCRATCH/cem_train_cache`,
+`RUN`, `CONDA_ENV=cvae`, and `module load` if needed.
+
+**4. Smoke test** (about 5 min), then check the result:
+
+```bash
+cd <repo>/CVAE_efficient_sampling
+RUN=$HOME/runs/smoke sbatch slurm_train.sh --limit_scenarios 300 --epochs 2 --draws_per_cycle 4
+python test_cost_cvae.py --run $HOME/runs/smoke --cycles 300 --k 16     # on a GPU node / interactive job
+```
+
+Expected: the cvae row has a clearly smaller `mean_dist` than uniform / marginal, and
+`in_bounds` around 0.9.
+
+**5. Full trainings**, one run directory per setting:
+
+```bash
+RUN=$HOME/runs/attn_tau0.5_beta1.0  sbatch slurm_train.sh
+RUN=$HOME/runs/attn_tau0.5_beta0.1  sbatch slurm_train.sh --beta_end 0.1
+RUN=$HOME/runs/attn_tau0.25_beta0.1 sbatch slurm_train.sh --tau 0.25 --beta_end 0.1
+squeue -u $USER;  tail -f cost_cvae_<jobid>.log;  column -t $RUN/log.tsv
+```
+
+About 7 min/epoch, so 20 epochs is about 2.5 h; a single job usually finishes. If not, the job
+resubmits itself.
+
+**6. Evaluate each run:** `python test_cost_cvae.py --run $RUN --cycles 2000 --k 16`.
+- Compare `best_cost@K` and `mean_dist`.
+- Compare `spread` with the target spread; a much smaller spread means posterior collapse.
+- Report the settings (tau, beta_end, model, draws_per_cycle) with the numbers.
+- Record the chosen setting in this file.
+
+**After the CVAE training:** build the CVAE-FOP planner (see "Not done yet" above) and evaluate
+it in closed loop on data/10k/Test.
