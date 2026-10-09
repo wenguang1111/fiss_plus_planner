@@ -2,6 +2,7 @@ import os
 import signal
 import time
 import csv
+import fcntl
 import json
 import subprocess
 
@@ -953,74 +954,78 @@ def save_data(scenario_name: str, optimal_path_x_list: list, optimal_path_y_list
     reference path (conditions.parquet) for one scenario. All coordinates here are
     already in the ego frame (ego at origin, yaw=0) at the time step they were planned."""
     os.makedirs(output_dir, exist_ok=True)
+    # The parquet files are shared by every scenario: parallel processes (demo_cr.py --num_shards)
+    # take turns on the read-append-write below.
+    with open(os.path.join(output_dir, 'paths.lock'), 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
 
-    samples_path = os.path.join(output_dir, 'sampled_vars.parquet')
-    conditions_path = os.path.join(output_dir, 'conditions.parquet')
+        samples_path = os.path.join(output_dir, 'sampled_vars.parquet')
+        conditions_path = os.path.join(output_dir, 'conditions.parquet')
 
-    # Check if scenario already exists in the parquet files
-    if os.path.exists(samples_path):
-        df_samples_existing = pd.read_parquet(samples_path)
-        if scenario_name in df_samples_existing['scenario'].values:
-            print(f"Scenario {scenario_name} already exists in data, skipping...")
-            return
-    else:
-        df_samples_existing = None
+        # Check if scenario already exists in the parquet files
+        if os.path.exists(samples_path):
+            df_samples_existing = pd.read_parquet(samples_path)
+            if scenario_name in df_samples_existing['scenario'].values:
+                print(f"Scenario {scenario_name} already exists in data, skipping...")
+                return
+        else:
+            df_samples_existing = None
 
-    if os.path.exists(conditions_path):
-        df_conditions_existing = pd.read_parquet(conditions_path)
-    else:
-        df_conditions_existing = None
+        if os.path.exists(conditions_path):
+            df_conditions_existing = pd.read_parquet(conditions_path)
+        else:
+            df_conditions_existing = None
 
-    # Build sampled_vars data: the ego-centered optimal path returned by the planner.
-    sampled_vars = {
-        "scenario": [],
-        "time_step": [],
-        "x": [],
-        "y": [],
-        "path_length": [],
-    }
+        # Build sampled_vars data: the ego-centered optimal path returned by the planner.
+        sampled_vars = {
+            "scenario": [],
+            "time_step": [],
+            "x": [],
+            "y": [],
+            "path_length": [],
+        }
 
-    # Build conditions data: the ego-centered reference path ahead of the vehicle.
-    conditions = {
-        "scenario": [],
-        "time_step": [],
-        "ref_x": [],
-        "ref_y": [],
-        "ref_path_length": [],
-    }
+        # Build conditions data: the ego-centered reference path ahead of the vehicle.
+        conditions = {
+            "scenario": [],
+            "time_step": [],
+            "ref_x": [],
+            "ref_y": [],
+            "ref_path_length": [],
+        }
 
-    for time_step, (path_x, path_y, ref_x, ref_y) in enumerate(
-            zip(optimal_path_x_list, optimal_path_y_list, ref_path_x_list, ref_path_y_list)):
-        sampled_vars["scenario"].append(scenario_name)
-        sampled_vars["time_step"].append(time_step)
-        sampled_vars["x"].append(path_x)
-        sampled_vars["y"].append(path_y)
-        sampled_vars["path_length"].append(len(path_x))
+        for time_step, (path_x, path_y, ref_x, ref_y) in enumerate(
+                zip(optimal_path_x_list, optimal_path_y_list, ref_path_x_list, ref_path_y_list)):
+            sampled_vars["scenario"].append(scenario_name)
+            sampled_vars["time_step"].append(time_step)
+            sampled_vars["x"].append(path_x)
+            sampled_vars["y"].append(path_y)
+            sampled_vars["path_length"].append(len(path_x))
 
-        conditions["scenario"].append(scenario_name)
-        conditions["time_step"].append(time_step)
-        conditions["ref_x"].append(ref_x)
-        conditions["ref_y"].append(ref_y)
-        conditions["ref_path_length"].append(len(ref_x))
+            conditions["scenario"].append(scenario_name)
+            conditions["time_step"].append(time_step)
+            conditions["ref_x"].append(ref_x)
+            conditions["ref_y"].append(ref_y)
+            conditions["ref_path_length"].append(len(ref_x))
 
-    df_samples_new = pd.DataFrame(sampled_vars)
-    df_conditions_new = pd.DataFrame(conditions)
+        df_samples_new = pd.DataFrame(sampled_vars)
+        df_conditions_new = pd.DataFrame(conditions)
 
-    # Append to existing data if available
-    if df_samples_existing is not None:
-        df_samples = pd.concat([df_samples_existing, df_samples_new], ignore_index=True)
-    else:
-        df_samples = df_samples_new
+        # Append to existing data if available
+        if df_samples_existing is not None:
+            df_samples = pd.concat([df_samples_existing, df_samples_new], ignore_index=True)
+        else:
+            df_samples = df_samples_new
 
-    if df_conditions_existing is not None:
-        df_conditions = pd.concat([df_conditions_existing, df_conditions_new], ignore_index=True)
-    else:
-        df_conditions = df_conditions_new
+        if df_conditions_existing is not None:
+            df_conditions = pd.concat([df_conditions_existing, df_conditions_new], ignore_index=True)
+        else:
+            df_conditions = df_conditions_new
 
-    df_samples.to_parquet(samples_path, index=False)
-    df_conditions.to_parquet(conditions_path, index=False)
+        df_samples.to_parquet(samples_path, index=False)
+        df_conditions.to_parquet(conditions_path, index=False)
 
-    print(f"Saved {len(optimal_path_x_list)} time steps for scenario {scenario_name}")
+        print(f"Saved {len(optimal_path_x_list)} time steps for scenario {scenario_name}")
 
 
 def reference_ahead_local(ref_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: float, lookahead: float) -> np.ndarray:
