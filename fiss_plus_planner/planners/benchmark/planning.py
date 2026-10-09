@@ -498,12 +498,13 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             ego_pos, ego_yaw = np.asarray(inital_state.position, dtype=float), float(inital_state.orientation)
             global_coordination_state_list.append(inital_state)
             ref_local = reference_ahead_local(ref_ego_lane_pts[:, :2], ego_pos, ego_yaw, reference_path_lookahead_m)
+            found = best_traj_ego is not None and len(best_traj_ego.x) >= 2
+            path_local = transform_points_to_ego(np.column_stack([best_traj_ego.x, best_traj_ego.y]),
+                                                 ego_pos, ego_yaw) if found else np.zeros((0, 2))
             if method == 'CEM_CPP':
                 cem_cycles.append(cem_cycle_record(planner, i, current_frenet_state, inital_state,
-                                                   desired_speed, max_speed, best_traj_ego, ref_local))
-            if best_traj_ego is not None and len(best_traj_ego.x) >= 2:
-                path_local = transform_points_to_ego(np.column_stack([best_traj_ego.x, best_traj_ego.y]),
-                                                     ego_pos, ego_yaw)
+                                                   desired_speed, max_speed, best_traj_ego, ref_local, path_local))
+            if found:
                 optimal_path_x_local_list.append(path_local[:, 0].tolist())
                 optimal_path_y_local_list.append(path_local[:, 1].tolist())
                 ref_path_x_local_list.append(ref_local[:, 0].tolist())
@@ -620,7 +621,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     if collect_ml_data and global_coordination_state_list:
         scenario_name = os.path.splitext(file)[0]
         if method == 'CEM_CPP':
-            save_cem_data(os.path.join(output_dir, "cem_data"), scenario_name, cem_cycles, stats, planner)
+            save_cem_data(os.path.join(output_dir, "cem_data"), scenario_name, cem_cycles, stats, planner,
+                          ego_lane_pts[:, :2])
         drawer = ScenarioDrawer(
             scenario_name=scenario_name,
             scenario_dir=input_dir,
@@ -1038,15 +1040,17 @@ def reference_ahead_local(ref_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: floa
 
 
 def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: InitialState,
-                     v_des: float, max_speed: float, best: FrenetTrajectory, ref_local: np.ndarray) -> dict:
+                     v_des: float, max_speed: float, best: FrenetTrajectory, ref_local: np.ndarray,
+                     best_local: np.ndarray) -> dict:
     """Context of one CEM cycle with its candidates and proposals (CVAE training data); ref_local is
-    the reference path ahead in the ego frame (reference_ahead_local)."""
+    the reference path ahead and best_local the executed plan's points, both in the ego frame."""
     rec = planner.cpp_planner.get_cycle_record()
     found = best is not None and len(best.x) >= 2
     context = {
         "time_step": time_step,
         **{k: getattr(frenet_state, k) for k in ("s", "s_d", "s_dd", "d", "d_d", "d_dd")},
         "d_s": np.nan if frenet_state.d_s is None else frenet_state.d_s,
+        "d_ss": np.nan if frenet_state.d_ss is None else frenet_state.d_ss,
         "x": state.position[0], "y": state.position[1], "yaw": state.orientation,
         "v": state.velocity, "a": state.acceleration,
         "v_des": v_des, "v_max_sample": max_speed, **rec["space"],
@@ -1061,18 +1065,25 @@ def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: 
         table.insert(0, "time_step", time_step)
     reference = {"time_step": time_step, "ref_x": ref_local[:, 0].astype(np.float32),
                  "ref_y": ref_local[:, 1].astype(np.float32)}
-    return {"context": context, "reference": reference, **tables}
+    best_trajectory = {"time_step": time_step, "x": best_local[:, 0].astype(np.float32),
+                       "y": best_local[:, 1].astype(np.float32)}
+    return {"context": context, "reference": reference, "best_trajectory": best_trajectory, **tables}
 
 
-# Integer columns of the CEM tables; every other column is stored as float32
-CEM_INT_COLUMNS = {"time_step": "int16", "pass": "int8", "iteration": "int8", "index": "int16",
-                   "rank": "int16", "feasible": "int8", "rejection": "int8"}
+# Column types of the CEM tables; every other column is stored as float32. The samples (d, v, T)
+# stay float64, the planner's precision, so their trajectories are rebuilt bit for bit.
+CEM_COLUMN_TYPES = {"time_step": "int16", "pass": "int8", "iteration": "int8", "index": "int16",
+                    "rank": "int16", "feasible": "int8", "rejection": "int8",
+                    "d": "float64", "v": "float64", "T": "float64"}
 
 
-def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, planner) -> None:
+def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, planner,
+                  reference_line: np.ndarray) -> None:
     """CEM training data of one scenario in root/<scenario>/: contexts.parquet (one row per
     planning cycle), conditions.parquet (reference path ahead in the ego frame per cycle),
-    candidates.parquet (every candidate of every iteration: all violation
+    best_trajectory.parquet (executed plan per cycle, ego frame), reference_line.parquet (the
+    planner's reference line, global frame; with contexts it rebuilds any candidate, see
+    scripts/cem_trajectories.py), candidates.parquet (every candidate of every iteration: all violation
     components and J terms), proposals.parquet (Gaussian proposal of every iteration) and
     scenario.json. root/dataset_info.json documents the columns and the planner setup."""
     out = os.path.join(root, scenario_name)
@@ -1081,9 +1092,13 @@ def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, pla
     # reference path ahead in the ego frame, the format of the FOP path data (save_data)
     pd.DataFrame([c["reference"] for c in cycles]).to_parquet(os.path.join(out, "conditions.parquet"), index=False,
                                                               compression="zstd")
+    pd.DataFrame([c["best_trajectory"] for c in cycles]).to_parquet(os.path.join(out, "best_trajectory.parquet"),
+                                                                    index=False, compression="zstd")
+    pd.DataFrame(np.asarray(reference_line, dtype=np.float64), columns=["x", "y"]).to_parquet(
+        os.path.join(out, "reference_line.parquet"), index=False)
     for name in ("candidates", "proposals"):
         table = pd.concat([c[name] for c in cycles], ignore_index=True)
-        table = table.astype({col: CEM_INT_COLUMNS.get(col, "float32") for col in table.columns})
+        table = table.astype({col: CEM_COLUMN_TYPES.get(col, "float32") for col in table.columns})
         table.to_parquet(os.path.join(out, f"{name}.parquet"), index=False, compression="zstd")
     with open(os.path.join(out, "scenario.json"), "w") as fh:
         json.dump({"success": bool(stats.success), "rear_end_failure": bool(stats.rear_end_failure),
@@ -1124,6 +1139,12 @@ def cem_dataset_info(planner) -> dict:
             "origin, x forward, y left, as the BEV image), from its point nearest to the ego up to "
             "ScenarioDrawer.VIEW_SIZE_DEFAULT / 2 = 43.75 m ahead, points every 0.1 m (ref_x, ref_y); the "
             "format of the FOP path data and of the world-model CVAE (CVAE_trajectory_planning).",
+            "best_trajectory: per cycle the executed plan (best candidate) in the ego frame of that cycle, "
+            "points every tick_t from t = 0 (x, y; empty when the cycle found no trajectory).",
+            "reference_line: the points the planner's reference spline was built from (global frame, "
+            "route centerline extended past its end). With the start state of contexts (s, s_d, s_dd, d, "
+            "d_d, d_dd, d_s, d_ss) and a candidate's (d, v, T), FrenetPlanner.generate_trajectory "
+            "rebuilds that candidate's trajectory exactly (scripts/cem_trajectories.py).",
         ],
     }
 

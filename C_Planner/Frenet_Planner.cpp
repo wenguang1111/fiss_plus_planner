@@ -368,6 +368,16 @@ std::vector<EvaluationResult> Frenet_Planner::evaluate_samples(
                           full_violation ? EvalMode::kFullViolation : EvalMode::kEarlyExit).results;
 }
 
+FrenetTrajectory Frenet_Planner::generate_trajectory(const FrenetState& frenet_state, double d, double s_d,
+                                                     double t, int time_step_now) const {
+    const PlanningContext context = make_context(frenet_state, settings.highest_speed, time_step_now, false);
+    const TrajectoryEvaluator evaluator(context, cost_function);
+    PlanStats stats;
+    FrenetTrajectory traj = evaluator.generate(frenet_state, SamplingParam(d, s_d, t), stats);
+    evaluator.to_global(traj);
+    return traj;
+}
+
 BatchResult Frenet_Planner::evaluate_batch(const FrenetState& start,
                                            const std::vector<SamplingParam>& samples,
                                            const PlanningContext& context,

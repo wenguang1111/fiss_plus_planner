@@ -108,6 +108,16 @@ du -sh data/output/cem_train_R8x250_v2                        # about 15 MB per 
     at the origin, x forward, y left, as the BEV image). It runs from the point nearest to the ego
     up to 43.75 m ahead (half the BEV view), with points every 0.1 m (`ref_x`, `ref_y`). This is
     the format of the FOP path data and of the world-model CVAE (CVAE_trajectory_planning).
+  - `best_trajectory.parquet`: the executed plan (best candidate) per cycle, as points in the ego
+    frame (`x`, `y`, every 0.1 s).
+  - `reference_line.parquet`: the points the planner's reference spline was built from (global
+    frame).
+  - Trajectories of other candidates are not stored. `scripts/cem_trajectories.py` rebuilds any
+    candidate exactly from the start state in `contexts.parquet` (including `d_s`, `d_ss`), the
+    reference line and its (d, v, T), using the planner's own generator
+    (`FrenetPlanner.generate_trajectory`). The samples (d, v, T) are stored as float64 for this
+    reason: rebuilt trajectories are bit for bit those the planner evaluated. Check the rebuild with
+    `python scripts/cem_trajectories.py --data <OUTPUT_DIR> --verify`.
   - `proposals.parquet`: mean and std of the Gaussian each CEM iteration was drawn from, in unit
     coordinates of the sampling bounds. It is needed for importance weights at training time.
   - `scenario.json`: success, rear_end_failure, cycles and failed_at_time_step.

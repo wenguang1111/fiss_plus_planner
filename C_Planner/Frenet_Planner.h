@@ -144,6 +144,12 @@ public:
         int num_threads = 1,
         double desired_speed = -1.0);
 
+    // Trajectory of sample z = (d, s_d, t) from frenet_state with the shared generator and
+    // Frenet -> Cartesian transform, without any check (also for infeasible samples), e.g. to
+    // rebuild stored candidates exactly.
+    FrenetTrajectory generate_trajectory(const FrenetState& frenet_state, double d, double s_d, double t,
+                                         int time_step_now = 0) const;
+
     // Evaluates every sample with the shared evaluator (single thread) and returns
     // one result per sample, e.g. for offline teacher data or violation analysis.
     std::vector<EvaluationResult> evaluate_samples(

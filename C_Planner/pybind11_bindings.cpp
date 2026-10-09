@@ -418,6 +418,9 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("frenet_state"), py::arg("samples"), py::arg("max_target_speed"),
              py::arg("time_step_now") = 0, py::arg("full_violation") = true,
              py::arg("desired_speed") = -1.0)
+        .def("generate_trajectory", &Frenet_Planner::generate_trajectory,
+             py::arg("frenet_state"), py::arg("d"), py::arg("s_d"), py::arg("t"), py::arg("time_step_now") = 0,
+             "Trajectory of one sample without checks (also infeasible ones), e.g. to rebuild stored candidates")
         .def("getAllSuccessfulTrajectories", &Frenet_Planner::getAllSuccessfulTrajectories)
         .def("get_stats", &Frenet_Planner::get_stats)
         .def_readwrite("settings", &Frenet_Planner::settings)

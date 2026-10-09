@@ -69,7 +69,8 @@ changing planner, cost or training code.
     decisions are bitwise identical to a normal run.
   - Guide: README.md "Collecting CVAE training data with CEM".
 - **Output** in `OUTPUT_DIR` (v2: `data/output/cem_train_R8x250_v2/`):
-  - `cem_data/<scenario>/{contexts,candidates,proposals,conditions}.parquet`, `scenario.json`;
+  - `cem_data/<scenario>/{contexts,candidates,proposals,conditions,best_trajectory,reference_line}.parquet`,
+    `scenario.json`;
   - `imgs/<scenario>/<t>.png`;
   - `dataset_info.json`.
 - **Reference path** (`conditions.parquet`, added for v2, for the planned route condition of the
@@ -79,9 +80,23 @@ changing planner, cost or training code.
     (github.com/giovannilucente/CVAE_trajectory_planning). That CVAE resamples every 2 m and uses
     20 points (40 m) as deltas.
   - The user chose 43.75 m (not longer).
+- **Candidate trajectories (option A, user's choice):** not stored; storing all of them would be
+  320 GB to 1 TB.
+  - `scripts/cem_trajectories.py` (`CEMTrajectories`) rebuilds any candidate exactly with
+    `FrenetPlanner.generate_trajectory`. It uses the start state in contexts (including `d_s`,
+    `d_ss`), `reference_line.parquet` and the candidate's (d, v, T).
+  - The executed plan per cycle is stored in `best_trajectory.parquet` (ego frame).
+  - `--verify` checks the best plans against the stored ones (float32 storage) and the speed /
+    acceleration labels of all candidates.
+  - Tested on ARG_Carcarana-1_3 (34 of 36 cycles in low-speed mode) and ZAM_Tjunction-1_374:
+    - 325k feasible trajectories the planner evaluated, and all 390k candidates generated in the run,
+      rebuilt **bit for bit** from the files.
+    - This requires d, v, T stored as float64. With float32 the error was about 2e-6 m, and one
+      trajectory had a different number of points.
 - **Collections:**
   - **v1** (2026-10-08/09) had no reference paths. It was moved off this PC (Train.zip).
-  - **v2** is a full recollection with reference paths, planned with the same code. The CEM data
+  - **v2** is a full recollection with reference paths, best trajectories, reference line and
+    d_ss, planned with the same code. The CEM data
     should be byte-identical to v1, which also checks the suspected hardware fault.
   - v2 uses OUTPUT_DIR `cem_train_R8x250_v2` and MEASUREMENTS_DIR `data/measurements/10k_v2`.
   - A full run takes about 2 h with 22 shards (v1: 1 h 55 min; the rerun of 150 scenarios: 5 min).
