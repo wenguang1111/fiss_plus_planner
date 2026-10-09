@@ -72,19 +72,15 @@ changing planner, cost or training code.
   - `cem_data/<scenario>/{contexts,candidates,proposals}.parquet`, `scenario.json`;
   - `imgs/<scenario>/<t>.png`;
   - `dataset_info.json`.
-- **State:** 6682 of 6832 scenarios done.
-  - 147 are missing (one shard died, plus 24 that fail at route planning).
-  - 3 were corrupted on disk after writing, so their .done markers were removed.
-  - **Possible SSD/RAM fault on the collection PC:** files changed without being rewritten.
-    Verify data with sha256 sums before use.
-  - Rerun of the missing ones: `cfgs/rerun_missing.yaml` (FILES = the 150 scenarios without a
-    .done marker; not committed). Run with
-    `demo_cr.py --cfg_file cfgs/rerun_missing.yaml --shard k --num_shards 15`.
-    Its first attempt failed at import, which is fixed in CVAE.py. POL_Poznan-11 is already
-    regenerated.
-  - Then: integrity scan of all PNG and parquet files, package (see below), rebuild the cache.
-- **Statistics:** 86 % success; 930 failures (414 rear-end, about 200 failing at cycle 0, 311
-  failing later); 510k cycles; 1.1 B candidates; 53 GB plus 5 GB images.
+- **State (complete, 2026-10-09):** 6808 of 6832 scenarios. The other 24 fail before planning
+  (18 without a global route, 6 without an ego trajectory) and have no data.
+  - The missing ones were recollected with `cfgs/rerun_missing.yaml` (not committed).
+  - An integrity scan of all PNG and parquet files was clean.
+  - **Possible SSD/RAM fault on the collection PC:** 3 files had changed on disk without being
+    rewritten; they were recollected. Verify with sha256 after every copy.
+- **Statistics:** 86.1 % success; 945 failures (419 rear-end, 316 failing at cycle 0);
+  519,001 cycles; 826 M feasible candidates; 54 GB cem_data plus 5.2 GB images. The cache
+  (cem_cache.py) is 48 GB, built in 73 s with nothing skipped.
 - **Splits:**
   - data/10k Train / Verification / Test are disjoint.
   - data/demo/Test (used for all tuning) overlaps 10k/Train by 57 scenarios. Evaluate the CVAE
