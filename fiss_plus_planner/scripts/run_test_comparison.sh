@@ -4,7 +4,8 @@
 #     bash fiss_plus_planner/scripts/run_test_comparison.sh            # all three planners
 #     RUN_FOP=0 bash fiss_plus_planner/scripts/run_test_comparison.sh  # without FOP
 # Configs: cfgs/cvae_fop.yaml, cfgs/cem_test.yaml, cfgs/fop_test.yaml (same SAFETY / MOTION_MODEL).
-# A planner whose measurement folder already has CSVs is skipped (delete the folder to run it again).
+# A planner whose measurement folder already has CSVs is skipped (delete the folder to run it again);
+# if processes with its config are still running (e.g. started by hand), the script waits for them first.
 # Result: data/measurements/compare_test/{report.txt,summary.csv,paired_costs.csv}.
 # Parallel processes share CPU and GPU: compare J and success here, measure runtimes separately.
 set -u
@@ -17,6 +18,10 @@ mkdir -p "$LOGS"
 # run NAME CONFIG MEASUREMENT_DIR SHARDS
 run() {
     local name=$1 cfg=$2 mdir=$3 shards=$4
+    if pgrep -f "cfg_file $cfg" > /dev/null; then
+        echo "== $(date '+%F %T') $name: processes with $cfg are running, waiting for them"
+        while pgrep -f "cfg_file $cfg" > /dev/null; do sleep 30; done
+    fi
     if ls "$mdir"/measurement_*.csv > /dev/null 2>&1; then
         echo "== $(date '+%F %T') $name: $mdir has results, skipped"
         return
