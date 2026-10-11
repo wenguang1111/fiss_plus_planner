@@ -1,0 +1,20 @@
+972 scenarios in every run (CVAE_FOP: 972, CEM: 972, FOP: 972)
+
+          scenarios  success  success_rate  rear_end_failures  other_failures  fop_fallback_share  runtime_mean_ms  runtime_median_ms  runtime_p95_ms
+planner                                                                                                                                              
+CVAE_FOP        972      851        0.8755                 44              77              0.2235          22.7959            11.9057         86.9660
+CEM             972      837        0.8611                 48              87              0.0000         122.7828            98.1370        298.6157
+FOP             972      857        0.8817                 41              74              0.0000          60.2831            49.0181        151.4610 
+
+J_total on the 822 scenarios solved by all planners (difference to CEM):
+  CVAE_FOP     mean   13.863 | diff +2.022 ± 0.314 (95 % CI), median +0.513, Wilcoxon p 5.7e-101, lower than CEM in 12.4%
+  CEM          mean   11.840
+  FOP          mean   14.566 | diff +2.726 ± 1.025 (95 % CI), median +0.346, Wilcoxon p 6.3e-90, lower than CEM in 17.0%
+
+mean cost terms on these scenarios:
+          J_ter    J_V    J_A    J_J   J_LC    J_D
+CVAE_FOP  0.885  7.921  1.461  0.824  0.565  2.206
+CEM       0.815  6.427  1.318  0.656  0.540  2.083
+FOP       0.901  8.139  1.422  1.297  0.546  2.261
+
+written to data/measurements/compare_test

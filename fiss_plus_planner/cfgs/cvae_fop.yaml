@@ -63,7 +63,7 @@ MPPI:
 # requirement; if none is feasible, the dense FOP grid N_W_SAMPLE x N_S_SAMPLE x N_T_SAMPLE with it and,
 # if SAFETY clearance_fallback allows, without it (as the other planners).
 CVAE_FOP:
-  run: "data/output/cvae_local/runs/attn_tau0.25_beta0.1"  # train_cost_cvae.py run directory
+  run: "data/models/cvae_v1"   # CVAE v1 (frozen copy of runs/attn_tau0.25_beta0.1, see results/cvae_v1)
   num_samples: 16      # K
   sampler: "cvae"      # cvae | uniform | marginal (same K without the scene, for the ablation)
   seed: 0              # samples of cycle t use seed + t

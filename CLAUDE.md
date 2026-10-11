@@ -177,6 +177,14 @@ changing planner, cost or training code.
     then MMD / InfoVAE.
   - The user decided against SIGReg.
   - Both models already clamp logvar to [-10, 10].
+- **CVAE v1 = reference for later versions and ablations** (git tag `cvae-v1` here and in the
+  submodule; record `results/cvae_v1/README.md`):
+  - frozen model `fiss_plus_planner/data/models/cvae_v1` (tau 0.25, beta_end 0.1; sha256 in
+    SHA256SUMS);
+  - Test result: success 87.6 % (CEM 86.1 %, FOP 88.2 %). J_total on the 822 scenarios solved by
+    all: CVAE-FOP 13.86, CEM 11.84, FOP 14.57. The gap to CEM is mostly J_V.
+  - Raw measurements and per-cycle logs are archived in `fiss_plus_planner/data/results/cvae_v1`.
+  - New CVAE versions get a new run folder and `data/models/cvae_vN`; never overwrite v1.
 - **CVAE-FOP planner** (2026-10-11): `fiss_plus_planner/planners/cvae_fop_planner.py`,
   `PLANNER: CVAE_FOP`, config `cfgs/cvae_fop.yaml` (data/10k/Test).
   - Per cycle:

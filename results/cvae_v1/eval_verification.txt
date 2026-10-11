@@ -1,0 +1,7 @@
+20000 held-out cycles of /home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/cvae_local/cem_verif_cache, K = 16 samples each (run /home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/cvae_local/runs/attn_tau0.25_beta0.1)
+sampler     in_bounds  best_dist  best_cost@K  mean_dist   spread
+cvae            0.928      0.281        0.137      0.378    0.389
+uniform         1.000      1.203        0.372      1.607    1.247
+marginal        0.616      0.756        0.091      1.105    0.952
+target          1.000      0.245        0.117      0.184    0.475
+target distribution (what the CVAE should reproduce): spread 0.498
