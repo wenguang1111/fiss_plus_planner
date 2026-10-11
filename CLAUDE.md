@@ -210,8 +210,22 @@ changing planner, cost or training code.
   - Ablation ideas not built yet: regret vs the CEM teacher on the same state, the previous best z
     as an extra sample (warm start), inference time vs K / bf16 / TensorRT, storing the K raw
     samples.
-  - Next: closed loop on data/10k/Test (quality with shards, timing with one process), against FOP,
-    CEM, FISS+ with the same SAFETY settings.
+  - **Test comparison:** `bash fiss_plus_planner/scripts/run_test_comparison.sh` (`RUN_FOP=0`
+    without FOP).
+    - Runs `cfgs/cvae_fop.yaml` (12 shards), `cfgs/cem_test.yaml` (CEM R8x250, 22 shards) and
+      `cfgs/fop_test.yaml` (FOP 10x10x10, 22 shards). The configs differ only in PLANNER and paths.
+    - Then `scripts/compare_planners.py --ref CEM` writes `data/measurements/compare_test/`
+      (report.txt, summary.csv, paired_costs.csv):
+      - success (rear-end / other failures), FOP fallback share, runtime per cycle;
+      - J_total paired on the scenarios all planners solve: diff with 95 % CI, Wilcoxon p, share
+        lower, cost terms.
+    - Logs are in `logs_test/`. A planner whose measurement folder has CSVs is skipped. Delete its
+      measurement and output folders to rerun it: non-collection runs do not skip finished
+      scenarios and append.
+    - Parallel runs only give J and success. Measure runtime separately with one process.
+    - torch is limited to `Num_Threads_For_CollisionChecker` CPU threads. Its default pool made 12
+      parallel CVAE processes reach load 200.
+  - Next: the comparison above, then single-process timing and FISS+ with the same SAFETY settings.
 - **Planned: route condition (`--nav`)**, taken from Giovanni's world-model CVAE.
   - The BEV images do not show the route, so at intersections the CVAE cannot see which branch is
     planned.

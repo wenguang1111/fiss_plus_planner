@@ -46,6 +46,9 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         self.log_cycles = bool(cfg.get("log_cycles", False))
         self.regret = bool(cfg.get("regret", False))
         self.scenario_dir, self.scenario_name = scenario_dir, scenario_file.removesuffix(".xml")
+        # The CPU work of the sampler is small; torch's default pool (one thread per core) only
+        # oversubscribes the CPU when several planner processes run in parallel
+        torch.set_num_threads(max(1, number_threads))
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.cvae = CostAwareCVAE(cfg["run"], self.device)
         self.drawer = None   # built with the reference line (generate_frenet_frame)
