@@ -54,6 +54,7 @@ from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioD
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
 from fiss_plus_planner.planners.sparse_planner_world_model import SparsePlannerWorldModelSettings, SparsePlannerWorldModel
+from fiss_plus_planner.planners.cvae_fop_planner import CVAE_FOP_Wrapper
 
 # === IEEE-like font family and sizes (10pt doc) ===
 S = {
@@ -409,6 +410,14 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner = MPPI_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                    runtime_measurement, mppi_cfg=sampler_cfg.get('MPPI'))
         use_cpp_planner = True
+    elif method == 'CVAE_FOP':
+        planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        apply_settings(planner_settings, safety_cfg)
+        apply_settings(planner_settings, motion_model_cfg)
+        planner = CVAE_FOP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                   runtime_measurement, cvae_cfg=sampler_cfg.get('CVAE_FOP'),
+                                   scenario_dir=input_dir, scenario_file=file)
+        use_cpp_planner = True
     elif method == 'Sparse_CPP':
         # Use C++ Sparse Planner with pybind11
         planner_settings = SparsePlannerSettings_CPP(num_width, num_speed, num_t, input_dir, file)
@@ -487,7 +496,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         max_speed = max(desired_speed, current_frenet_state.s_d)
 
         start_time = time.time()
-        if method in ('FOP_CPP', 'FISS+_CPP', 'CEM_CPP', 'MPPI_CPP'):
+        if method in ('FOP_CPP', 'FISS+_CPP', 'CEM_CPP', 'MPPI_CPP', 'CVAE_FOP'):
             best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state,
                                          desired_speed=desired_speed)
         else:
@@ -530,6 +539,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 int(round(planner.settings.max_t / planner.settings.tick_t)))
             break
         processing_time = (end_time - start_time)
+        if method == 'CVAE_FOP':  # without the BEV rendering and the untimed diagnostics
+            processing_time -= planner.time_untimed
+            stats.num_FOP_intervention += planner.num_FOP_intervention
         stats.runtime_history.append(processing_time)
         if method == 'Sparse_FOP' or method == 'Sparse' or method == 'Sparse_CPP' or method == 'Sparse_WorldModel':
             stats.average_runtime += processing_time - planner.time_image_generation
@@ -618,6 +630,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.success = True
             goal_reached = True
 
+    if method == 'CVAE_FOP' and planner.cycle_log:
+        os.makedirs(os.path.join(output_dir, "cvae_cycles"), exist_ok=True)
+        pd.DataFrame(planner.cycle_log).to_csv(
+            os.path.join(output_dir, "cvae_cycles", f"{os.path.splitext(file)[0]}.csv"), index=False)
     if collect_ml_data and global_coordination_state_list:
         scenario_name = os.path.splitext(file)[0]
         if method == 'CEM_CPP':
@@ -784,7 +800,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist, best_trajs = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
                 number_threads, runtime_measurement, collect_data_for_ml,
-                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI')}, safety_cfg=cfg.get('SAFETY'),
+                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI'), 'CVAE_FOP': cfg.get('CVAE_FOP')},
+                safety_cfg=cfg.get('SAFETY'),
                 motion_model_cfg=cfg.get('MOTION_MODEL'))
 
         if ego_vehicle_trajectory is None:

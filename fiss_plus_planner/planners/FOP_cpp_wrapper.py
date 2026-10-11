@@ -55,6 +55,29 @@ CLEARANCE_SETTINGS = ("check_clearance", "clearance_time_gap", "clearance_min_ga
                       "clearance_fallback")
 
 
+def to_cpp_state(frenet_state: FrenetState):
+    """C++ FrenetState of a Python FrenetState (d_s, d_ss NaN when not set)."""
+    cpp_state = frenet_planner_cpp.FrenetState()
+    for name in ("t", "s", "s_d", "s_dd", "s_ddd", "d", "d_d", "d_dd", "d_ddd"):
+        setattr(cpp_state, name, getattr(frenet_state, name))
+    for name in ("d_s", "d_ss"):
+        value = getattr(frenet_state, name, None)
+        setattr(cpp_state, name, float('nan') if value is None else value)
+    return cpp_state
+
+
+def to_py_trajectory(cpp_traj) -> FrenetTrajectory:
+    """Python FrenetTrajectory of a C++ one."""
+    traj = FrenetTrajectory()
+    for name in ("t", "s", "s_d", "s_dd", "s_ddd", "d", "d_d", "d_dd", "d_ddd", "d_s", "d_ss",
+                 "x", "y", "yaw", "ds", "c", "c_d", "c_dd"):
+        setattr(traj, name, list(getattr(cpp_traj, name)))
+    traj.cost_final = cpp_traj.cost_final
+    for name in ("d", "s_d", "t"):
+        setattr(traj.sampling_param, name, getattr(cpp_traj.sampling_param, name))
+    return traj
+
+
 class FOP_CPP_Wrapper(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
                  obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None, number_threads: int = 1 ,runtime_measurement: bool = False):
@@ -296,76 +319,20 @@ class FOP_CPP_Wrapper(object):
         (None: v_des = max_target_speed)."""
         if self.cpp_planner is not None:
             try:
-                cpp_state = frenet_planner_cpp.FrenetState()
-                cpp_state.t = frenet_state.t
-                cpp_state.s = frenet_state.s
-                cpp_state.s_d = frenet_state.s_d
-                cpp_state.s_dd = frenet_state.s_dd
-                cpp_state.s_ddd = frenet_state.s_ddd
-                cpp_state.d = frenet_state.d
-                cpp_state.d_d = frenet_state.d_d
-                cpp_state.d_dd = frenet_state.d_dd
-                cpp_state.d_ddd = frenet_state.d_ddd
-                for name in ("d_s", "d_ss"):
-                    value = getattr(frenet_state, name, None)
-                    setattr(cpp_state, name, float('nan') if value is None else value)
+                cpp_state = to_cpp_state(frenet_state)
                 
                 cpp_traj = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads,
                                                  -1.0 if desired_speed is None else desired_speed)
                 
                 if cpp_traj.is_generated:
-                    py_traj = FrenetTrajectory()
-                    py_traj.t = list(cpp_traj.t)
-                    py_traj.s = list(cpp_traj.s)
-                    py_traj.s_d = list(cpp_traj.s_d)
-                    py_traj.s_dd = list(cpp_traj.s_dd)
-                    py_traj.s_ddd = list(cpp_traj.s_ddd)
-                    py_traj.d = list(cpp_traj.d)
-                    py_traj.d_d = list(cpp_traj.d_d)
-                    py_traj.d_dd = list(cpp_traj.d_dd)
-                    py_traj.d_ddd = list(cpp_traj.d_ddd)
-                    py_traj.d_s = list(cpp_traj.d_s)
-                    py_traj.d_ss = list(cpp_traj.d_ss)
-                    py_traj.x = list(cpp_traj.x)
-                    py_traj.y = list(cpp_traj.y)
-                    py_traj.yaw = list(cpp_traj.yaw)
-                    py_traj.ds = list(cpp_traj.ds)
-                    py_traj.c = list(cpp_traj.c)
-                    py_traj.c_d = list(cpp_traj.c_d)
-                    py_traj.c_dd = list(cpp_traj.c_dd)
-                    py_traj.cost_final = cpp_traj.cost_final
-                    py_traj.sampling_param.d = cpp_traj.sampling_param.d
-                    py_traj.sampling_param.s_d = cpp_traj.sampling_param.s_d
-                    py_traj.sampling_param.t = cpp_traj.sampling_param.t
+                    py_traj = to_py_trajectory(cpp_traj)
                     self.best_traj = py_traj
 
                     if self.doing_runtime_measurement==False:
                         py_fplist = []
                         cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
                         for cpp_fp in cpp_fplist:
-                            fp = FrenetTrajectory()
-                            fp.t = list(cpp_fp.t)
-                            fp.s = list(cpp_fp.s)
-                            fp.s_d = list(cpp_fp.s_d)
-                            fp.s_dd = list(cpp_fp.s_dd)
-                            fp.s_ddd = list(cpp_fp.s_ddd)
-                            fp.d = list(cpp_fp.d)
-                            fp.d_d = list(cpp_fp.d_d)
-                            fp.d_dd = list(cpp_fp.d_dd)
-                            fp.d_ddd = list(cpp_fp.d_ddd)
-                            fp.d_s = list(cpp_fp.d_s)
-                            fp.d_ss = list(cpp_fp.d_ss)
-                            fp.x = list(cpp_fp.x)
-                            fp.y = list(cpp_fp.y)
-                            fp.yaw = list(cpp_fp.yaw)
-                            fp.ds = list(cpp_fp.ds)
-                            fp.c = list(cpp_fp.c)
-                            fp.c_d = list(cpp_fp.c_d)
-                            fp.c_dd = list(cpp_fp.c_dd)
-                            fp.cost_final = cpp_fp.cost_final
-                            fp.sampling_param.d = cpp_fp.sampling_param.d
-                            fp.sampling_param.s_d = cpp_fp.sampling_param.s_d
-                            fp.sampling_param.t = cpp_fp.sampling_param.t
+                            fp = to_py_trajectory(cpp_fp)
                             py_fplist.append(fp)
                         self.all_trajs.append(py_fplist)
                         
@@ -380,19 +347,7 @@ class FOP_CPP_Wrapper(object):
         """Use externally provided samples (d, s_d, t) to generate best trajectory in C++."""
         if self.cpp_planner is not None:
             try:
-                cpp_state = frenet_planner_cpp.FrenetState()
-                cpp_state.t = frenet_state.t
-                cpp_state.s = frenet_state.s
-                cpp_state.s_d = frenet_state.s_d
-                cpp_state.s_dd = frenet_state.s_dd
-                cpp_state.s_ddd = frenet_state.s_ddd
-                cpp_state.d = frenet_state.d
-                cpp_state.d_d = frenet_state.d_d
-                cpp_state.d_dd = frenet_state.d_dd
-                cpp_state.d_ddd = frenet_state.d_ddd
-                for name in ("d_s", "d_ss"):
-                    value = getattr(frenet_state, name, None)
-                    setattr(cpp_state, name, float('nan') if value is None else value)
+                cpp_state = to_cpp_state(frenet_state)
 
                 cpp_samples = []
                 for sample in sampling_parameters:
@@ -407,58 +362,14 @@ class FOP_CPP_Wrapper(object):
                 )
 
                 if cpp_traj.is_generated:
-                    py_traj = FrenetTrajectory()
-                    py_traj.t = list(cpp_traj.t)
-                    py_traj.s = list(cpp_traj.s)
-                    py_traj.s_d = list(cpp_traj.s_d)
-                    py_traj.s_dd = list(cpp_traj.s_dd)
-                    py_traj.s_ddd = list(cpp_traj.s_ddd)
-                    py_traj.d = list(cpp_traj.d)
-                    py_traj.d_d = list(cpp_traj.d_d)
-                    py_traj.d_dd = list(cpp_traj.d_dd)
-                    py_traj.d_ddd = list(cpp_traj.d_ddd)
-                    py_traj.d_s = list(cpp_traj.d_s)
-                    py_traj.d_ss = list(cpp_traj.d_ss)
-                    py_traj.x = list(cpp_traj.x)
-                    py_traj.y = list(cpp_traj.y)
-                    py_traj.yaw = list(cpp_traj.yaw)
-                    py_traj.ds = list(cpp_traj.ds)
-                    py_traj.c = list(cpp_traj.c)
-                    py_traj.c_d = list(cpp_traj.c_d)
-                    py_traj.c_dd = list(cpp_traj.c_dd)
-                    py_traj.cost_final = cpp_traj.cost_final
-                    py_traj.sampling_param.d = cpp_traj.sampling_param.d
-                    py_traj.sampling_param.s_d = cpp_traj.sampling_param.s_d
-                    py_traj.sampling_param.t = cpp_traj.sampling_param.t
+                    py_traj = to_py_trajectory(cpp_traj)
                     self.best_traj = py_traj
 
                     if self.doing_runtime_measurement==False:
                         py_fplist = []
                         cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()
                         for cpp_fp in cpp_fplist:
-                            fp = FrenetTrajectory()
-                            fp.t = list(cpp_fp.t)
-                            fp.s = list(cpp_fp.s)
-                            fp.s_d = list(cpp_fp.s_d)
-                            fp.s_dd = list(cpp_fp.s_dd)
-                            fp.s_ddd = list(cpp_fp.s_ddd)
-                            fp.d = list(cpp_fp.d)
-                            fp.d_d = list(cpp_fp.d_d)
-                            fp.d_dd = list(cpp_fp.d_dd)
-                            fp.d_ddd = list(cpp_fp.d_ddd)
-                            fp.d_s = list(cpp_fp.d_s)
-                            fp.d_ss = list(cpp_fp.d_ss)
-                            fp.x = list(cpp_fp.x)
-                            fp.y = list(cpp_fp.y)
-                            fp.yaw = list(cpp_fp.yaw)
-                            fp.ds = list(cpp_fp.ds)
-                            fp.c = list(cpp_fp.c)
-                            fp.c_d = list(cpp_fp.c_d)
-                            fp.c_dd = list(cpp_fp.c_dd)
-                            fp.cost_final = cpp_fp.cost_final
-                            fp.sampling_param.d = cpp_fp.sampling_param.d
-                            fp.sampling_param.s_d = cpp_fp.sampling_param.s_d
-                            fp.sampling_param.t = cpp_fp.sampling_param.t
+                            fp = to_py_trajectory(cpp_fp)
                             py_fplist.append(fp)
                         self.all_trajs.append(py_fplist)
 

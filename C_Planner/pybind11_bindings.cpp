@@ -413,7 +413,19 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("time_step_now") = 0,
              py::arg("num_threads") = 1,
              py::arg("desired_speed") = -1.0)
+        .def_readwrite("settings", &Frenet_Planner::settings)
         .def("get_samples", &Frenet_Planner::get_samples, py::arg("current_s") = 0.0)
+        .def("search_space",
+             [](Frenet_Planner& self, double current_s, double max_target_speed) -> py::object {
+                 self.settings.highest_speed = max_target_speed;  // v_max of the cycle, as plan() sets it
+                 SearchSpace sp;
+                 if (!self.search_space(current_s, sp)) {
+                     return py::none();
+                 }
+                 return py::make_tuple(sp.d_min, sp.d_max, sp.v_min, sp.v_max, sp.t_min, sp.t_max);
+             },
+             py::arg("current_s"), py::arg("max_target_speed"),
+             "(d_min, d_max, v_min, v_max, T_min, T_max) of the cycle, None if the vehicle does not fit")
         .def("evaluate_samples", &Frenet_Planner::evaluate_samples,
              py::arg("frenet_state"), py::arg("samples"), py::arg("max_target_speed"),
              py::arg("time_step_now") = 0, py::arg("full_violation") = true,
