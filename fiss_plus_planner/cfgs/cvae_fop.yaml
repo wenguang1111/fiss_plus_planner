@@ -67,5 +67,6 @@ CVAE_FOP:
   num_samples: 16      # K
   sampler: "cvae"      # cvae | uniform | marginal (same K without the scene, for the ablation)
   seed: 0              # samples of cycle t use seed + t
+  warm_start: True     # add the previous cycle's executed z as sample K + 1 (CVAE v1: False)
   log_cycles: True     # per-cycle diagnostics -> OUTPUT_DIR/cvae_cycles/<scenario>.csv
   regret: False        # also plan the dense grid in cycles solved by the samples (untimed, slower)

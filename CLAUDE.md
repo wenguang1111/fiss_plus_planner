@@ -207,7 +207,19 @@ changing planner, cost or training code.
     - `log_cycles`: per-cycle CSV in `OUTPUT_DIR/cvae_cycles`: stage
       samples/grid/grid_no_clearance/failed, feasible count, rejection reasons, J of the samples /
       grid / plan, chosen z, stage times;
-    - `regret`: also plan the grid in cycles solved by the samples (untimed).
+    - `regret`: also plan the grid in cycles solved by the samples (untimed);
+    - `warm_start` (default true since 2026-10-11, CVAE v1: false): the previous cycle's executed z
+      is sample K + 1.
+  - **Warm start result** (`results/ablations/warm_start/README.md`, Test):
+    - success unchanged at 87.6 %; the FOP fallback share drops from 22.4 % to 11.6 %;
+    - J_total 13.21 vs 13.86 (v1) and 11.84 (CEM); paired vs v1 -0.63 ± 0.20, lower in 66 %;
+    - the warm sample is chosen in 78 % of the cycles the samples solve.
+  - **Variant runs:** `bash fiss_plus_planner/scripts/run_cvae_variant.sh NAME KEY=VALUE ...`
+    (e.g. `k32 CVAE_FOP.num_samples=32`):
+    - runs `cfgs/cvae_fop.yaml` with the overrides on Test into `data/{measurements,output}/cvae_NAME`;
+    - compares against the stored CVAE v1, CEM and FOP results (`results/cvae_v1`) into
+      `data/measurements/compare_NAME/report.txt`;
+    - keep each ablation's report, config and measurements in `results/ablations/<name>/`.
   - Smoke test (5 Verification scenarios):
     - all succeed;
     - samples-only cycles take 2.5 ms (CVAE 1.9 ms, C++ evaluation 0.5 ms); grid cycles 9.5 ms;
@@ -215,9 +227,8 @@ changing planner, cost or training code.
     - 95 % of the samples are feasible in samples-stage cycles;
     - the 16 samples beat the 1000-point grid in 58 % of the cycles;
     - ESP_Barcelona-70_11 needs the grid in 63 % of its cycles (worth a look).
-  - Ablation ideas not built yet: regret vs the CEM teacher on the same state, the previous best z
-    as an extra sample (warm start), inference time vs K / bf16 / TensorRT, storing the K raw
-    samples.
+  - Ablation ideas not built yet: regret vs the CEM teacher on the same state, inference time vs
+    K / bf16 / TensorRT, storing the K raw samples.
   - **Test comparison:** `bash fiss_plus_planner/scripts/run_test_comparison.sh`
     (`PLANNERS="CVAE_FOP CEM"` for a subset, `SHARDS=n`, default 22).
     - Runs `cfgs/cvae_fop.yaml`, `cfgs/cem_test.yaml` (CEM R8x250) and `cfgs/fop_test.yaml`

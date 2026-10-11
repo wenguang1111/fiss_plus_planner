@@ -13,6 +13,7 @@ Config section CVAE_FOP:
     sampler      cvae | uniform | marginal (ablation: the same K from the search space, or from the
                  training targets' normal distribution, without the scene)
     seed         samples of cycle t are drawn with seed + t
+    warm_start   add the previous cycle's executed z as sample K + 1 (as CEM starts from its previous best)
     log_cycles   keep per-cycle diagnostics in cycle_log (written to OUTPUT_DIR/cvae_cycles)
     regret       also plan the dense grid in cycles solved by the samples, for the regret (untimed)
 
@@ -45,6 +46,8 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         self.seed = int(cfg.get("seed", 0))
         self.log_cycles = bool(cfg.get("log_cycles", False))
         self.regret = bool(cfg.get("regret", False))
+        self.warm_start = bool(cfg.get("warm_start", False))
+        self.prev_z = None   # z of the previous cycle's plan (warm start)
         self.scenario_dir, self.scenario_name = scenario_dir, scenario_file.removesuffix(".xml")
         # The CPU work of the sampler is small; torch's default pool (one thread per core) only
         # oversubscribes the CPU when several planner processes run in parallel
@@ -100,6 +103,8 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         if space is not None:
             lo, hi = np.array(space[0::2]), np.array(space[1::2])
             z = self.draw_samples(space, time_step_now)
+            if self.warm_start and self.prev_z is not None:
+                z = np.vstack([z, self.prev_z])
             n_outside = int(np.any((z < lo) | (z > hi), axis=1).sum())
             z = np.clip(z, lo, hi)
         t2 = time.perf_counter()
@@ -131,12 +136,18 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
             j_grid = grid.cost_final if grid.is_generated else np.inf
         self.time_untimed = (t1 - t0) + (time.perf_counter() - t4)
 
+        warm_chosen = (stage == "samples" and self.warm_start and self.prev_z is not None
+                       and np.allclose([best.sampling_param.d, best.sampling_param.s_d, best.sampling_param.t],
+                                       np.clip(self.prev_z, lo, hi), rtol=0, atol=1e-12))
+        self.prev_z = (np.array([best.sampling_param.d, best.sampling_param.s_d, best.sampling_param.t])
+                       if best.is_generated else None)
+
         if self.log_cycles:
             st = sample_stats
             self.cycle_log.append({
                 "time_step": time_step_now, "stage": stage, "v": frenet_state.s_d, "v_max": max_target_speed,
                 "low_speed": frenet_state.s_d < self.settings.low_speed_threshold,
-                "num_samples": self.k if st else 0, "num_outside": n_outside,
+                "num_samples": len(z) if st else 0, "num_outside": n_outside, "warm_chosen": warm_chosen,
                 "num_feasible": st.num_collision_free if st else 0,
                 "rejected_dynamic": st.num_rejected_dynamic if st else 0,
                 "rejected_offroad": st.num_rejected_offroad if st else 0,

@@ -1,0 +1,33 @@
+972 scenarios in every run (warm: 972, CVAE_v1: 972, CEM: 972, FOP: 972)
+
+         scenarios  success  success_rate  rear_end_failures  other_failures  fop_fallback_share  runtime_mean_ms  runtime_median_ms  runtime_p95_ms
+planner                                                                                                                                             
+warm           972      851        0.8755                 43              78              0.1155          18.5839            10.1795         73.2236
+CVAE_v1        972      851        0.8755                 44              77              0.2235          22.7959            11.9057         86.9660
+CEM            972      837        0.8611                 48              87              0.0000         122.7828            98.1370        298.6157
+FOP            972      857        0.8817                 41              74              0.0000          60.2831            49.0181        151.4610 
+
+J_total on the 820 scenarios solved by all planners (difference to CEM):
+  warm         mean   13.214 | diff +1.371 ± 0.203 (95 % CI), median +0.450, Wilcoxon p 1.8e-98, lower than CEM in 14.3%
+  CVAE_v1      mean   13.861 | diff +2.018 ± 0.315 (95 % CI), median +0.503, Wilcoxon p 1.4e-100, lower than CEM in 12.4%
+  CEM          mean   11.843
+  FOP          mean   14.568 | diff +2.726 ± 1.028 (95 % CI), median +0.346, Wilcoxon p 1.4e-89, lower than CEM in 17.1%
+
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+warm     0.861  7.406  1.391  0.829  0.593  2.134
+CVAE_v1  0.884  7.929  1.462  0.823  0.563  2.200
+CEM      0.814  6.436  1.320  0.656  0.538  2.078
+FOP      0.900  8.148  1.423  1.298  0.544  2.255
+
+written to data/measurements/compare_warm
+
+---- paired against CVAE v1 ----
+J_total on the 845 scenarios solved by all planners (difference to CVAE_v1):
+  warm         mean   13.393 | diff -0.629 ± 0.197 (95 % CI), median -0.040, Wilcoxon p 4.8e-21, lower than CVAE_v1 in 65.7%
+  CVAE_v1      mean   14.022
+
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+warm     0.867  7.491  1.407  0.846  0.580  2.202
+CVAE_v1  0.889  8.002  1.477  0.838  0.551  2.266
