@@ -64,7 +64,8 @@ changing planner, cost or training code.
 
 - **Collection:** `Collect_Data_For_ML` + `PLANNER: CEM_CPP` on data/10k/Train, run with
   `demo_cr.py --shard k --num_shards n`.
-  - Needs C_Planner built with `-DENABLE_DATA_COLLECTION=ON`; rebuild OFF before timing runs.
+  - Needs C_Planner built with `-DENABLE_DATA_COLLECTION=ON`; rebuild OFF before timing runs
+    (the build is OFF since 2026-10-11).
   - Recording evaluates every check (kFullViolation) but ranks the early-exit view, so its
     decisions are bitwise identical to a normal run.
   - Guide: README.md "Collecting CVAE training data with CEM".
@@ -104,8 +105,14 @@ changing planner, cost or training code.
   (18 without a global route, 6 without an ego trajectory) and have no data.
   - The missing ones were recollected with `cfgs/rerun_missing.yaml` (not committed).
   - An integrity scan of all PNG and parquet files was clean.
-  - **Possible SSD/RAM fault on the collection PC:** 3 files had changed on disk without being
-    rewritten; they were recollected. Verify with sha256 after every copy.
+  - **RAM fault on the local PC (confirmed 2026-10-11; non-ECC DDR5, no kernel reports):** pages in
+    the page cache get corrupted, so a process can read wrong bytes from a correct file.
+    - It broke 10 files inside Train.zip (the zip's CRCs match the bad data; fixed on alex).
+    - It showed 6 wrong d values in one Verification file until the cache was evicted.
+    - Reruns are bit-identical (deterministic planner), so rerun + sha256 is the reliable check.
+      `scripts/check_cem_data.py` finds only gross corruption.
+    - Compare sha256 of every copy, also against direct-from-disk reads (O_DIRECT).
+    - Advise memtest86+ / JEDEC memory speed before trusting large data jobs on this PC.
 - **v1 statistics:** 86.1 % success; 945 failures (419 rear-end, 316 failing at cycle 0);
   519,001 cycles; 826 M feasible candidates; 54 GB cem_data plus 5.2 GB images. The cache
   (cem_cache.py) is 48 GB, built in 73 s with nothing skipped.
@@ -113,7 +120,11 @@ changing planner, cost or training code.
   - data/10k Train / Verification / Test are disjoint.
   - data/demo/Test (used for all tuning) overlaps 10k/Train by 57 scenarios. Evaluate the CVAE
     planner on 10k/Test, or on demo/Test without the overlaps.
-  - Verification has not been collected yet (optional validation set).
+  - **Verification** (2026-10-11, `cfgs/collect_verification.yaml`, same settings and build as v2):
+    - `data/output/cem_verif_R8x250_v2`: 1947 of 1952 scenarios (5 fail before planning),
+      149,326 cycles;
+    - checksums (read directly from disk) in `cem_verif_R8x250_v2.sha256`;
+    - cache `data/output/cvae_local/cem_verif_cache`. Not used for training or model selection.
 
 ## Cost-aware CVAE (CVAE_efficient_sampling, branch `cost-aware`)
 
@@ -132,7 +143,9 @@ changing planner, cost or training code.
   - `cem_dataset.py`.
   - `train_cost_cvae.py`: checkpoints, SIGUSR1/SIGTERM and `--max_hours` stop, resumes with the
     same command. Exit code 3 = stopped and must be resumed; 0 = complete.
-  - `test_cost_cvae.py`: held-out check against uniform and marginal samplers.
+  - `test_cost_cvae.py`: held-out check against uniform and marginal samplers, plus a `target`
+    row (K draws from the target itself: the ceiling of a perfect CVAE). `--cache` evaluates on
+    another data set (e.g. Verification).
   - `CVAE.py: CostAwareCVAE`: inference, frames -> [d, v, T].
   - `slurm_train.sh`: one sbatch is enough; it resubmits itself on exit code 3 (at most
     MAX_RESUBMIT = 5).
@@ -143,21 +156,62 @@ changing planner, cost or training code.
   - HCVAE (`--model hcvae`; four hierarchical latent levels, about 2 M params).
 - **Measured locally:** about 1200 items/s on an RTX 5070 Ti, about 7 min/epoch, 2 GB GPU at
   batch 64.
-- **Open issue:** the 2-epoch smoke test collapsed to almost one point per scene (sample spread
-  0.03 vs target 0.61, posterior collapse with `--beta_end 1.0`).
-  - The pipeline itself works: the sample mean follows the scene.
+- **First full trainings (2026-10-10/11):**
+  - Setup: attnCVAE, 20 epochs, draws_per_cycle 1, seed 0, v2 cache.
+  - Local runs are in `data/output/cvae_local/runs/<name>`; the same runs on alex agree within
+    noise.
+  - Verification, 20000 cycles, K 16. best_cost@16 for cvae | target ceiling | marginal:
+    - tau 0.25, beta_end 0.1: 0.137 | 0.117 | 0.091 (best so far; CVAE-FOP uses it);
+    - tau 0.5, beta_end 0.1: 0.236 | 0.180 | 0.116;
+    - tau 0.5, beta_end 1.0: collapsed (spread 0.085 vs 0.571), 0.390.
+  - The held-out split gave the same numbers, so the model generalises.
+  - best_cost uses the nearest CEM candidate's J~ and so favours broad samplers (marginal beats even
+    the target).
+  - Room left: mean_dist 0.378 vs target 0.184, spread 0.389 vs target 0.498.
+  - Next options: tau 0.1, free bits / smaller beta_end, closed-loop evaluation.
+- **Posterior collapse** (2-epoch smoke test, spread 0.03 vs 0.61 with `--beta_end 1.0`): fixed by
+  `--beta_end 0.1`.
   - `generation_check.py` runs after every epoch (`--gen_check_cycles` 300, K 16) and writes
     gen_in_bounds, gen_best_cost, gen_mean_dist, gen_spread and target_spread to `log.tsv`.
   - First remedy: `--beta_end 0.1`. Then free bits (Kingma 2016), cyclical annealing (Fu 2019),
     then MMD / InfoVAE.
   - The user decided against SIGReg.
   - Both models already clamp logvar to [-10, 10].
-- **Not done yet:** the CVAE-FOP planner (sampling with CostAwareCVAE, dense-FOP fallback when
-  no sample is feasible). It needs:
-  - clipping of the samples to the search space;
-  - the 3-frame history padded as [0, 0, 1] at t = 1 (the old sparse planners use [0, 1, 1]).
-
-  Planned evaluation metrics: best cost@K, feasible ratio, fallback rate, regret vs dense FOP.
+- **CVAE-FOP planner** (2026-10-11): `fiss_plus_planner/planners/cvae_fop_planner.py`,
+  `PLANNER: CVAE_FOP`, config `cfgs/cvae_fop.yaml` (data/10k/Test).
+  - Per cycle:
+    1. render the BEV frame (same drawer as the training images; frame 0 is pixel-identical);
+    2. draw K = 16 CVAE samples, clipped to the search space (C++ `search_space`);
+    3. evaluate them with the clearance requirement;
+    4. if none is feasible: the dense FOP grid 10x10x10 (num_FOP_intervention) with the clearance
+       requirement, then without it if `SAFETY: clearance_fallback`;
+    5. otherwise the cycle fails.
+  - The user chose this order on 2026-10-11, so the rules match the other planners and the CEM data.
+  - Without the clearance fallback, FOP 10x10x10 alone fails ESP_Barcelona-70_11 and
+    POL_Krakow-93_1, as CVAE-FOP did.
+  - Runtime excludes the BEV rendering (user's choice; the raster would come from perception) and
+    the untimed diagnostics.
+  - Target hardware: this PC (RTX 5070 Ti, PyTorch). Time with one process; parallel shards share
+    the GPU and CPU. Use about 12 shards for quality runs (each loads CUDA and the model).
+  - Config `CVAE_FOP`:
+    - `run`, `num_samples`, `seed` (cycle t uses seed + t);
+    - `sampler` cvae | uniform | marginal (ablation baselines with the same K);
+    - `log_cycles`: per-cycle CSV in `OUTPUT_DIR/cvae_cycles`: stage
+      samples/grid/grid_no_clearance/failed, feasible count, rejection reasons, J of the samples /
+      grid / plan, chosen z, stage times;
+    - `regret`: also plan the grid in cycles solved by the samples (untimed).
+  - Smoke test (5 Verification scenarios):
+    - all succeed;
+    - samples-only cycles take 2.5 ms (CVAE 1.9 ms, C++ evaluation 0.5 ms); grid cycles 9.5 ms;
+      rendering 19 ms (untimed);
+    - 95 % of the samples are feasible in samples-stage cycles;
+    - the 16 samples beat the 1000-point grid in 58 % of the cycles;
+    - ESP_Barcelona-70_11 needs the grid in 63 % of its cycles (worth a look).
+  - Ablation ideas not built yet: regret vs the CEM teacher on the same state, the previous best z
+    as an extra sample (warm start), inference time vs K / bf16 / TensorRT, storing the K raw
+    samples.
+  - Next: closed loop on data/10k/Test (quality with shards, timing with one process), against FOP,
+    CEM, FISS+ with the same SAFETY settings.
 - **Planned: route condition (`--nav`)**, taken from Giovanni's world-model CVAE.
   - The BEV images do not show the route, so at intersections the CVAE cannot see which branch is
     planned.
@@ -245,5 +299,5 @@ resubmits itself.
 - Report the settings (tau, beta_end, model, draws_per_cycle) with the numbers.
 - Record the chosen setting in this file.
 
-**After the CVAE training:** build the CVAE-FOP planner (see "Not done yet" above) and evaluate
-it in closed loop on data/10k/Test.
+**After the CVAE training:** evaluate the CVAE-FOP planner (see "CVAE-FOP planner" above) in
+closed loop on data/10k/Test.
