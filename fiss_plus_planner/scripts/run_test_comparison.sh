@@ -1,51 +1,54 @@
 #!/bin/bash
-# Closed loop on data/10k/Test with CVAE-FOP, CEM (R8x250) and FOP (10x10x10), then the comparison.
-# Run in tmux, from anywhere:
-#     bash fiss_plus_planner/scripts/run_test_comparison.sh            # all three planners
-#     RUN_FOP=0 bash fiss_plus_planner/scripts/run_test_comparison.sh  # without FOP
+# Closed loop on data/10k/Test with CVAE-FOP, CEM (R8x250) and FOP (10x10x10), one planner after the
+# other, then the comparison. Run in tmux, from anywhere:
+#     bash fiss_plus_planner/scripts/run_test_comparison.sh                  # all three planners
+#     PLANNERS="CVAE_FOP CEM" bash fiss_plus_planner/scripts/run_test_comparison.sh
+#     SHARDS=16 bash ...                                                     # processes per planner
+# Every planner run starts from scratch: its measurement folder, output folder and logs are deleted.
 # Configs: cfgs/cvae_fop.yaml, cfgs/cem_test.yaml, cfgs/fop_test.yaml (same SAFETY / MOTION_MODEL).
-# A planner whose measurement folder already has CSVs is skipped (delete the folder to run it again);
-# if processes with its config are still running (e.g. started by hand), the script waits for them first.
 # Result: data/measurements/compare_test/{report.txt,summary.csv,paired_costs.csv}.
-# Parallel processes share CPU and GPU: compare J and success here, measure runtimes separately.
+# The shards share CPU and GPU: compare J and success here, measure runtimes with one process.
 set -u
 cd "$(dirname "$0")/.." || exit 1   # fiss_plus_planner/
 PY=${PY:-$HOME/miniconda3/envs/LUT/bin/python}
-RUN_FOP=${RUN_FOP:-1}
+PLANNERS=${PLANNERS:-"CVAE_FOP CEM FOP"}
+SHARDS=${SHARDS:-22}
 LOGS=logs_test
-mkdir -p "$LOGS"
+declare -A CFG=([CVAE_FOP]=cfgs/cvae_fop.yaml [CEM]=cfgs/cem_test.yaml [FOP]=cfgs/fop_test.yaml)
 
-# run NAME CONFIG MEASUREMENT_DIR SHARDS
-run() {
-    local name=$1 cfg=$2 mdir=$3 shards=$4
-    if pgrep -f "cfg_file $cfg" > /dev/null; then
-        echo "== $(date '+%F %T') $name: processes with $cfg are running, waiting for them"
-        while pgrep -f "cfg_file $cfg" > /dev/null; do sleep 30; done
-    fi
-    if ls "$mdir"/measurement_*.csv > /dev/null 2>&1; then
-        echo "== $(date '+%F %T') $name: $mdir has results, skipped"
-        return
-    fi
-    echo "== $(date '+%F %T') $name: $shards processes"
-    for k in $(seq 0 $((shards - 1))); do
-        "$PY" scripts/demo_cr.py --cfg_file "$cfg" --shard "$k" --num_shards "$shards" > "$LOGS/${name}_$k.log" 2>&1 &
+if pgrep -f "python.*scripts/demo_cr.py" > /dev/null; then
+    echo "demo_cr.py processes are running; stop them first:"
+    pgrep -fa "python.*scripts/demo_cr.py" | cut -c1-120
+    exit 1
+fi
+
+cfg_value() {  # cfg_value CONFIG KEY: a top-level string of the config
+    "$PY" -c "import yaml, sys; print(yaml.safe_load(open(sys.argv[1]))[sys.argv[2]].rstrip('/'))" "$1" "$2"
+}
+num_inputs=$(ls "$(cfg_value cfgs/cvae_fop.yaml INPUT_DIR)" | grep -c '\.xml$')
+
+COMPARE=()
+for name in $PLANNERS; do
+    cfg=${CFG[$name]}
+    mdir=$(cfg_value "$cfg" MEASUREMENTS_DIR)
+    odir=$(cfg_value "$cfg" OUTPUT_DIR)
+    [[ "$mdir" == data/measurements/?* && "$odir" == data/output/?* ]] || { echo "unexpected folders: $mdir $odir"; exit 1; }
+    rm -rf "$mdir" "$odir" "$LOGS/${name}"_*.log
+    mkdir -p "$LOGS"
+    start=$(date +%s)
+    echo "== $(date '+%F %T') $name ($cfg): $SHARDS processes, $num_inputs scenarios"
+    for k in $(seq 0 $((SHARDS - 1))); do
+        "$PY" scripts/demo_cr.py --cfg_file "$cfg" --shard "$k" --num_shards "$SHARDS" > "$LOGS/${name}_$k.log" 2>&1 &
     done
     wait
-    local crashed
-    crashed=$(grep -l "Traceback" "$LOGS/${name}"_*.log 2> /dev/null | wc -l)
-    echo "== $(date '+%F %T') $name done: $(cat "$mdir"/measurement_*.csv | grep -vc '^scenario') scenarios"
+    done_n=$(cat "$mdir"/measurement_*.csv 2> /dev/null | grep -vc '^scenario')
+    echo "== $(date '+%F %T') $name done in $(( ($(date +%s) - start) / 60 )) min: $done_n of $num_inputs scenarios"
+    crashed=$(grep -l "Traceback" "$LOGS/${name}"_*.log | wc -l)
     if [ "$crashed" -gt 0 ]; then
-        echo "!! WARNING $name: $crashed logs with a Traceback, e.g. $(grep -l Traceback "$LOGS/${name}"_*.log | head -1)"
+        echo "!! $name: $crashed logs with a Traceback, e.g. $(grep -l Traceback "$LOGS/${name}"_*.log | head -1)"
     fi
-}
-
-run CVAE_FOP cfgs/cvae_fop.yaml data/measurements/cvae_fop_test 12   # each process loads CUDA and the model
-run CEM cfgs/cem_test.yaml data/measurements/cem_test 22
-COMPARE=(--run CVAE_FOP=data/measurements/cvae_fop_test --run CEM=data/measurements/cem_test)
-if [ "$RUN_FOP" = 1 ]; then
-    run FOP cfgs/fop_test.yaml data/measurements/fop_test 22
-    COMPARE+=(--run FOP=data/measurements/fop_test)
-fi
+    COMPARE+=(--run "$name=$mdir")
+done
 
 OUT=data/measurements/compare_test
 mkdir -p "$OUT"

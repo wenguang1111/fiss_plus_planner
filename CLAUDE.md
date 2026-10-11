@@ -210,18 +210,21 @@ changing planner, cost or training code.
   - Ablation ideas not built yet: regret vs the CEM teacher on the same state, the previous best z
     as an extra sample (warm start), inference time vs K / bf16 / TensorRT, storing the K raw
     samples.
-  - **Test comparison:** `bash fiss_plus_planner/scripts/run_test_comparison.sh` (`RUN_FOP=0`
-    without FOP).
-    - Runs `cfgs/cvae_fop.yaml` (12 shards), `cfgs/cem_test.yaml` (CEM R8x250, 22 shards) and
-      `cfgs/fop_test.yaml` (FOP 10x10x10, 22 shards). The configs differ only in PLANNER and paths.
+  - **Test comparison:** `bash fiss_plus_planner/scripts/run_test_comparison.sh`
+    (`PLANNERS="CVAE_FOP CEM"` for a subset, `SHARDS=n`, default 22).
+    - Runs `cfgs/cvae_fop.yaml`, `cfgs/cem_test.yaml` (CEM R8x250) and `cfgs/fop_test.yaml`
+      (FOP 10x10x10) one after the other. The configs differ only in PLANNER and paths.
     - Then `scripts/compare_planners.py --ref CEM` writes `data/measurements/compare_test/`
       (report.txt, summary.csv, paired_costs.csv):
       - success (rear-end / other failures), FOP fallback share, runtime per cycle;
       - J_total paired on the scenarios all planners solve: diff with 95 % CI, Wilcoxon p, share
         lower, cost terms.
-    - Logs are in `logs_test/`. A planner whose measurement folder has CSVs is skipped. Delete its
-      measurement and output folders to rerun it: non-collection runs do not skip finished
-      scenarios and append.
+    - Logs are in `logs_test/`. Every planner run starts from scratch: the script deletes its
+      measurement and output folders and logs. It refuses to start while demo_cr.py processes run,
+      and reports scenarios done vs 976. Planners running in parallel (load 370) were much slower
+      than one after the other.
+    - Ctrl+C in the script's terminal can leave the shard processes running. Check with
+      `pgrep -fa demo_cr.py` and stop them with `pkill -f scripts/demo_cr.py`.
     - Parallel runs only give J and success. Measure runtime separately with one process.
     - torch is limited to `Num_Threads_For_CollisionChecker` CPU threads. Its default pool made 12
       parallel CVAE processes reach load 200.
