@@ -214,6 +214,18 @@ changing planner, cost or training code.
     - success unchanged at 87.6 %; the FOP fallback share drops from 22.4 % to 11.6 %;
     - J_total 13.21 vs 13.86 (v1) and 11.84 (CEM); paired vs v1 -0.63 ± 0.20, lower in 66 %;
     - the warm sample is chosen in 78 % of the cycles the samples solve.
+  - **Full ego-state condition (negative result, tag `ablation-ego-full`,
+    `results/ablations/ego_state_full/README.md`):**
+    - Setup: `train_cost_cvae.py --ego` gives the attnCVAE 8 extra tokens from
+      `cem_dataset.EGO_COLUMNS` (v, a, s_d, s_dd, d, d_d, d_dd, v_des), clipped to 0.1-99.9 % and
+      standardised (`normalizer/ego_scaler.json`).
+    - Offline it is more accurate in speed (error 0.77 vs 1.12 m/s; it uses v_des like the data),
+      but in closed loop it is worse than v1 + warm start (J 13.85 vs 13.25; +0.58 ± 0.17 paired).
+    - Cause: inertia / causal confusion (Codevilla 2019, de Haan 2019). The input speed comes from
+      its own plans, so the vehicle gets stuck creeping slowly in about 10 % of the scenarios
+      (85 % of the gap).
+    - Next: B = task-only input (no ego speed / acceleration), then A = ego-speed dropout
+      (ChauffeurNet, Bansal 2019).
   - **Variant runs:** `bash fiss_plus_planner/scripts/run_cvae_variant.sh NAME KEY=VALUE ...`
     (e.g. `k32 CVAE_FOP.num_samples=32`):
     - runs `cfgs/cvae_fop.yaml` with the overrides on Test into `data/{measurements,output}/cvae_NAME`;

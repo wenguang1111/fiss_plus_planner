@@ -61,7 +61,8 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         self.cycle_stats = Stats()
         self.cycle_log = []
         self.cpp_settings = self.cpp_planner.settings  # clearance_fallback is switched off for the samples
-        self.cvae.generate_samples([np.zeros((self.cvae.img_size,) * 2, np.uint8)], self.k)  # CUDA warm-up
+        self.cvae.generate_samples([np.zeros((self.cvae.img_size,) * 2, np.uint8)], self.k,  # CUDA warm-up
+                                   ego=np.zeros(8) if self.cvae.uses_ego else None)
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         csp, ref_pts = super().generate_frenet_frame(centerline_pts)
@@ -74,11 +75,12 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
     def get_stats(self) -> Stats:
         return self.cycle_stats
 
-    def draw_samples(self, space, time_step_now: int) -> np.ndarray:
-        """K samples [d, v, T] of the configured sampler (before clipping)."""
+    def draw_samples(self, space, time_step_now: int, ego=None) -> np.ndarray:
+        """K samples [d, v, T] of the configured sampler (before clipping); ego: the raw ego state for a CVAE
+        trained with --ego."""
         if self.sampler == "cvae":
             torch.manual_seed(self.seed + time_step_now)
-            return self.cvae.generate_samples(self.frames, self.k)
+            return self.cvae.generate_samples(self.frames, self.k, ego=ego)
         rng = np.random.default_rng(self.seed + time_step_now)
         if self.sampler == "uniform":
             lo, hi = np.array(space[0::2]), np.array(space[1::2])
@@ -102,7 +104,12 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         space = self.cpp_planner.search_space(frenet_state.s, max_target_speed)
         if space is not None:
             lo, hi = np.array(space[0::2]), np.array(space[1::2])
-            z = self.draw_samples(space, time_step_now)
+            # Ego state and task as in the training data (planning.py cem_cycle_record, cem_dataset.EGO_COLUMNS)
+            ego = None if not self.cvae.uses_ego else [
+                initial_state.velocity, initial_state.acceleration, frenet_state.s_d, frenet_state.s_dd,
+                frenet_state.d, frenet_state.d_d, frenet_state.d_dd,
+                max_target_speed if desired_speed is None else desired_speed]
+            z = self.draw_samples(space, time_step_now, ego)
             if self.warm_start and self.prev_z is not None:
                 z = np.vstack([z, self.prev_z])
             n_outside = int(np.any((z < lo) | (z > hi), axis=1).sum())

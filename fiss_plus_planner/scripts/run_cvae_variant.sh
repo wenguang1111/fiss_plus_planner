@@ -7,6 +7,7 @@
 # KEY is a (dotted) key of cfgs/cvae_fop.yaml, VALUE is parsed as YAML. The variant runs from scratch
 # into data/output/cvae_NAME and data/measurements/cvae_NAME (config.yaml of the run is kept there).
 # Report: data/measurements/compare_NAME/report.txt (differences to CEM and to CVAE v1).
+# EXTRA="warm=../results/ablations/warm_start/measurements ..." adds stored runs to the comparison.
 set -u
 cd "$(dirname "$0")/.." || exit 1   # fiss_plus_planner/
 PY=${PY:-$HOME/miniconda3/envs/LUT/bin/python}
@@ -61,6 +62,7 @@ crashed=$(grep -l "Traceback" "$LOGS/cvae_${NAME}"_*.log | wc -l)
 OUT=data/measurements/compare_$NAME
 mkdir -p "$OUT"
 RUNS=(--run "$NAME=$MDIR" --run "CVAE_v1=$V1/cvae_fop_test" --run "CEM=$V1/cem_test" --run "FOP=$V1/fop_test")
+for r in ${EXTRA:-}; do RUNS+=(--run "$r"); done
 {
     "$PY" scripts/compare_planners.py "${RUNS[@]}" --ref CEM --out "$OUT"
     echo; echo "---- paired against CVAE v1 ----"

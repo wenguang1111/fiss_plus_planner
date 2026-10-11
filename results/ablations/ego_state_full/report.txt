@@ -1,0 +1,36 @@
+972 scenarios in every run (ego: 972, CVAE_v1: 972, CEM: 972, FOP: 972, warm: 972)
+
+         scenarios  success  success_rate  rear_end_failures  other_failures  fop_fallback_share  runtime_mean_ms  runtime_median_ms  runtime_p95_ms
+planner                                                                                                                                             
+ego            972      849        0.8735                 45              78              0.1146          18.9576            10.3641         73.8505
+CVAE_v1        972      851        0.8755                 44              77              0.2235          22.7959            11.9057         86.9660
+CEM            972      837        0.8611                 48              87              0.0000         122.7828            98.1370        298.6157
+FOP            972      857        0.8817                 41              74              0.0000          60.2831            49.0181        151.4610
+warm           972      851        0.8755                 43              78              0.1155          18.5839            10.1795         73.2236 
+
+J_total on the 817 scenarios solved by all planners (difference to CEM):
+  ego          mean   13.853 | diff +1.980 ± 0.244 (95 % CI), median +0.726, Wilcoxon p 8.9e-107, lower than CEM in 11.5%
+  CVAE_v1      mean   13.898 | diff +2.024 ± 0.316 (95 % CI), median +0.504, Wilcoxon p 2.9e-100, lower than CEM in 12.4%
+  CEM          mean   11.874
+  FOP          mean   14.609 | diff +2.736 ± 1.032 (95 % CI), median +0.349, Wilcoxon p 8.6e-90, lower than CEM in 16.9%
+  warm         mean   13.249 | diff +1.375 ± 0.203 (95 % CI), median +0.453, Wilcoxon p 1.8e-98, lower than CEM in 14.1%
+
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+ego      0.883  7.969  1.410  0.806  0.617  2.167
+CVAE_v1  0.882  7.955  1.467  0.826  0.564  2.204
+CEM      0.813  6.457  1.324  0.658  0.540  2.082
+FOP      0.899  8.175  1.428  1.302  0.546  2.259
+warm     0.859  7.430  1.395  0.831  0.595  2.138
+
+written to data/measurements/compare_ego
+
+---- paired against CVAE v1 ----
+J_total on the 844 scenarios solved by all planners (difference to CVAE_v1):
+  ego          mean   13.984 | diff -0.043 ± 0.228 (95 % CI), median +0.009, Wilcoxon p 0.00064, lower than CVAE_v1 in 45.6%
+  CVAE_v1      mean   14.026
+
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+ego      0.890  8.004  1.425  0.822  0.606  2.237
+CVAE_v1  0.889  7.990  1.480  0.839  0.554  2.273
