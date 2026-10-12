@@ -31,7 +31,7 @@ class ScenarioDrawer:
     COLOR_BLACK = "#000000"
     COLOR_WHITE = "#FFFFFF"
     COLOR_GRAY = "#808080"
-    GENERATE_GIF = True
+    GENERATE_GIF = False  # a GIF of all frames next to the PNGs (not needed for the training data)
     GIF_DURATION_MS = 100
     GIF_LOOP = 0
     img_dim = 256
