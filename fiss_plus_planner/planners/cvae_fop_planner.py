@@ -172,4 +172,7 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         if not best.is_generated:
             return None
         self.best_traj = to_py_trajectory(best)
+        self.best_traj.stage = stage  # shown in the GIF frames
+        if not self.doing_runtime_measurement:  # trajectories for SAVE_GIF (planning.py)
+            self.all_trajs.append([self.best_traj])
         return self.best_traj

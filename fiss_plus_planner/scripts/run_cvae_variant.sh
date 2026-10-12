@@ -10,6 +10,11 @@
 # EXTRA="warm=../results/ablations/warm_start/measurements ..." adds stored runs to the comparison.
 set -u
 cd "$(dirname "$0")/.." || exit 1   # fiss_plus_planner/
+# One CPU core per planner process: numpy (OpenBLAS) and torch (OpenMP) would otherwise start a thread pool
+# per core in every process. Ctrl+C / kill / a closed terminal also stops the planner processes (background
+# jobs of a script ignore Ctrl+C and would keep running without it).
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+trap 'echo "stopped: ending the planner processes"; pkill -P $$; exit 130' INT TERM HUP
 PY=${PY:-$HOME/miniconda3/envs/LUT/bin/python}
 SHARDS=${SHARDS:-22}
 NAME=${1:?usage: run_cvae_variant.sh NAME [KEY=VALUE ...]}

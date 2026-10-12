@@ -1,10 +1,13 @@
 """Closed-loop comparison of planners from their measurement CSVs (demo_cr.py, all shards of a run).
 
-Per planner: success rate (failures split into rear-end and others), FOP fallback share (CVAE_FOP),
-runtime per cycle (from the runtime history). The scenario cost J_total = J_run + J_ter is compared
-pairwise on the scenarios every planner solved: mean, difference to the reference planner with a 95 %
-confidence interval and the Wilcoxon signed-rank p-value, share of scenarios with a lower J, and the
-mean cost terms.
+Per planner: success rate (failures split into rear-end and others), how the runs ended (goal region /
+map end / time limit / failed, from the termination column of newer runs; goal region and map end count as
+reached), FOP fallback share (CVAE_FOP)
+and runtime per cycle (from the runtime history). The scenario cost J_total = J_run + J_ter is compared
+pairwise on the scenarios every planner solved and, with the termination column, on the scenarios where
+every planner reached the goal (as CommonRoad compares the costs of valid solutions only) and where every
+planner ended the same way: mean, difference to the reference planner with a 95 % confidence interval and the Wilcoxon
+signed-rank p-value, share of scenarios with a lower J, and the mean cost terms.
 
 python scripts/compare_planners.py --run CVAE_FOP=data/measurements/cvae_fop_test \\
     --run CEM=data/measurements/cem_test [--run FOP=data/measurements/fop_test] [--ref CEM] [--out <dir>]
@@ -19,6 +22,7 @@ import pandas as pd
 from scipy import stats
 
 TERMS = ["J_ter", "J_V", "J_A", "J_J", "J_LC", "J_D"]
+REACHED = ("goal", "map_end")  # terminations that count as the goal reached
 
 
 def load(measurement_dir: str) -> pd.DataFrame:
@@ -36,11 +40,30 @@ def load(measurement_dir: str) -> pd.DataFrame:
     for col in ("success", "rear_end_failure"):
         df[col] = df[col].astype(str).str.strip() == "True"
     df["J_total"] = pd.to_numeric(df["final_trajector_cost"], errors="coerce")
+    if "termination" in df:
+        df["termination"] = df["termination"].fillna("").astype(str).str.strip()
     return df
 
 
 def runtime_ms(df: pd.DataFrame) -> np.ndarray:
     return 1e3 * np.concatenate([json.loads(h) for h in df["runtime history [s]"] if isinstance(h, str)] or [[]])
+
+
+def paired_report(data: dict, names: list, ref: str, scenarios: list, label: str) -> pd.DataFrame:
+    paired = pd.DataFrame({n: data[n].loc[scenarios, "J_total"] for n in names})
+    print(f"J_total on the {len(scenarios)} scenarios {label} (difference to {ref}):")
+    for n in names:
+        line = f"  {n:12s} mean {paired[n].mean():8.3f}"
+        if n != ref and len(scenarios) > 1:
+            diff = paired[n] - paired[ref]
+            half = stats.t.ppf(0.975, len(diff) - 1) * diff.std(ddof=1) / np.sqrt(len(diff))
+            p_w = stats.wilcoxon(diff).pvalue if (diff != 0).any() else 1.0
+            line += (f" | diff {diff.mean():+.3f} ± {half:.3f} (95 % CI), median {diff.median():+.3f}, "
+                     f"Wilcoxon p {p_w:.2g}, lower than {ref} in {(diff < 0).mean():.1%}")
+        print(line)
+    terms = pd.DataFrame({n: data[n].loc[scenarios, TERMS].astype(float).mean() for n in names}).T
+    print("mean cost terms on these scenarios:\n" + terms.round(3).to_string() + "\n")
+    return paired
 
 
 def main():
@@ -71,24 +94,22 @@ def main():
             "fop_fallback_share": (d["num_FOP_intervence_for_SP"].sum() / d["steps"].sum()) if len(d) else np.nan,
             "runtime_mean_ms": rt.mean() if rt.size else np.nan, "runtime_median_ms": np.median(rt) if rt.size else np.nan,
             "runtime_p95_ms": np.percentile(rt, 95) if rt.size else np.nan,
+            **({"reached": d.termination.isin(REACHED).mean(),
+                **{f"end_{k}": (d.termination == k).mean() for k in ("goal", "map_end", "time_limit", "failed")}}
+               if "termination" in d else {}),
         })
     summary = pd.DataFrame(rows).set_index("planner")
     print(summary.round(4).to_string(), "\n")
 
     solved = [s for s in common if all(data[n].at[s, "success"] for n in names)]
-    paired = pd.DataFrame({n: data[n].loc[solved, "J_total"] for n in names})
-    print(f"J_total on the {len(solved)} scenarios solved by all planners (difference to {ref}):")
-    for n in names:
-        line = f"  {n:12s} mean {paired[n].mean():8.3f}"
-        if n != ref:
-            diff = paired[n] - paired[ref]
-            half = stats.t.ppf(0.975, len(diff) - 1) * diff.std(ddof=1) / np.sqrt(len(diff))
-            p_w = stats.wilcoxon(diff).pvalue if (diff != 0).any() else 1.0
-            line += (f" | diff {diff.mean():+.3f} ± {half:.3f} (95 % CI), median {diff.median():+.3f}, "
-                     f"Wilcoxon p {p_w:.2g}, lower than {ref} in {(diff < 0).mean():.1%}")
-        print(line)
-    terms = pd.DataFrame({n: data[n].loc[solved, TERMS].astype(float).mean() for n in names}).T
-    print("\nmean cost terms on these scenarios:\n" + terms.round(3).to_string())
+    paired = paired_report(data, names, ref, solved, "solved by all planners")
+    if all("termination" in d for d in data.values()):
+        at_goal = [s for s in common if all(data[n].at[s, "termination"] in REACHED for n in names)]
+        paired_report(data, names, ref, at_goal, "where every planner reached the goal")
+        # the same end for all: all reached the goal, or all ran to the time limit (same duration, e.g. the
+        # scenarios without a goal position)
+        same_end = at_goal + [s for s in common if all(data[n].at[s, "termination"] == "time_limit" for n in names)]
+        paired_report(data, names, ref, same_end, "where every planner ended the same way (all reached / all timed out)")
 
     if args.out:
         os.makedirs(args.out, exist_ok=True)

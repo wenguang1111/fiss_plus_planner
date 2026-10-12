@@ -48,11 +48,14 @@ cmake .. -DENABLE_DATA_COLLECTION=ON && make -j16
 Rebuild with `-DENABLE_DATA_COLLECTION=OFF` before measuring planner runtimes again. If the
 option is missing, the collection stops with an `ImportError` that says so.
 
-## 2. Configure `fiss_plus_planner/cfgs/demo_config.yaml`
+## 2. Configure
+
+Collection v3 (goal reached by position only, world-model data): `fiss_plus_planner/cfgs/collect_train_v3.yaml`
+and `collect_verification_v3.yaml`. The v2 configs are `demo_config.yaml` and `collect_verification.yaml`.
 
 ```yaml
-OUTPUT_DIR: "data/output/cem_train_R8x250_v2/"   # a new, empty folder per data set
-MEASUREMENTS_DIR: "data/measurements/10k_v2"     # new folder too: the shard CSVs are appended to
+OUTPUT_DIR: "data/output/cem_train_R8x250_v3/"   # a new, empty folder per data set
+MEASUREMENTS_DIR: "data/measurements/10k_v3"     # new folder too: the shard CSVs are appended to
 INPUT_DIR: "data/10k/Train"                   # data/10k/Verification for the validation set
 PLANNER: "CEM_CPP"
 SAVE_GIF: False
@@ -60,6 +63,7 @@ SAVE_MEASUREMENTS: True
 Num_Threads_For_CollisionChecker: 1           # 1 per process when running parallel shards
 Runtime_Measurement: True                     # False keeps every trajectory in Python (3x memory)
 Collect_Data_For_ML: True
+ML_DATA: {samples: 16, tau: 0.25, seed: 0}    # world-model data, see section 4
 CEM: {num_iterations: 8, population: 250, ...}
 ```
 
@@ -68,7 +72,18 @@ data again.
 
 ## 3. Run
 
-Run from `fiss_plus_planner/`, in tmux. `--shard k --num_shards n` lets process k handle every
+`scripts/run_collection.sh` runs the shards (16 processes by default; Ctrl+C stops them all) and then
+merges the world-model data:
+
+```bash
+tmux new -s collect
+conda activate LUT
+cd fiss_plus_planner
+bash scripts/run_collection.sh cfgs/collect_train_v3.yaml              # SHARDS=22 bash ... for 22 processes
+bash scripts/run_collection.sh cfgs/collect_verification_v3.yaml
+```
+
+By hand, from `fiss_plus_planner/`, in tmux. `--shard k --num_shards n` lets process k handle every
 n-th scenario (sorted by name). The command below starts 22 processes, one per CPU core, which
 takes about 2 h for the 6832 Train scenarios:
 
@@ -120,10 +135,18 @@ du -sh data/output/cem_train_R8x250_v2                        # about 15 MB per 
     `python scripts/cem_trajectories.py --data <OUTPUT_DIR> --verify`.
   - `proposals.parquet`: mean and std of the Gaussian each CEM iteration was drawn from, in unit
     coordinates of the sampling bounds. It is needed for importance weights at training time.
-  - `scenario.json`: success, rear_end_failure, cycles and failed_at_time_step.
+  - `sampled_vars.parquet`: data of the world-model CVAE (CVAE_trajectory_planning), per cycle with a
+    plan 17 rows: `sample` 0 is the executed plan, 1..16 are other feasible candidates drawn
+    without replacement with probability exp(-J~/tau)/q(z) (`weight`; the target of the cost-aware
+    CVAE, ML_DATA). Columns: scenario, time_step, x, y, path_length, yaw (ego frame of the cycle,
+    CEM length T / 0.1 s + 1 points), sample, J, weight, d, v, T.
+  - `scenario.json`: success, rear_end_failure, termination, cycles and failed_at_time_step.
 - `OUTPUT_DIR/cem_data/dataset_info.json`: git commit, planner/CEM/cost settings, rejection
   codes and the meaning of the columns.
 - `MEASUREMENTS_DIR/measurement_CEM_CPP_shard<k>.csv`: per-scenario success and cost.
+- `OUTPUT_DIR/sampled_vars.parquet`, `conditions.parquet`, `wm_data_info.json`: the world-model data of all
+  scenarios in the layout of the WorldModel branch's Collect_Data_For_ML (with `imgs/` and `completed/`),
+  merged by `python scripts/merge_wm_data.py --data <OUTPUT_DIR>` (run_collection.sh does this).
 
 Failed scenarios are kept up to and including the failing cycle; filter them at training time
 using `scenario.json`. Cost weights for the CVAE (exp(-J/tau), importance weights from the

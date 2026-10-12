@@ -51,6 +51,10 @@ changing planner, cost or training code.
 - **Map handling:**
   - the reference line is extended straight past the route end;
   - lanes merging into the route widen the road profile.
+- **Goal reached (2026-10-12):** the ego position lies in the goal region (CommonRoad `contains_point`,
+  without the time window, velocity and orientation of `GoalRegion.is_reached`), or the route end / map end
+  is reached. The measurement CSVs and scenario.json have `termination` = goal / map_end / time_limit /
+  failed; compare_planners.py reports the costs also on the scenarios where all planners reached the goal.
 - **Failure label:** `rear_end_failure` = a recorded follower drives into the standing ego
   (nuPlan at-fault idea). The recorded traffic is not reactive.
 - **CEM** (data source for the CVAE): R8 x 250 (8 iterations, 250 samples each), elite 0.1,
@@ -95,6 +99,14 @@ changing planner, cost or training code.
     - This requires d, v, T stored as float64. With float32 the error was about 2e-6 m, and one
       trajectory had a different number of points.
 - **Collections:**
+  - **v3** (2026-10-12, collected by the user on another PC): recollection with the new goal logic.
+    Configs `cfgs/collect_{train,verification}_v3.yaml`, run with `scripts/run_collection.sh CFG`.
+    - It also writes `cem_data/<s>/sampled_vars.parquet` for Giovanni's world-model CVAE
+      (`planning.wm_samples`, `ML_DATA`): per cycle the executed plan + 16 feasible candidates drawn
+      with p ∝ exp(-J~/0.25)/q(z), with x, y, yaw in the ego frame.
+    - `scripts/merge_wm_data.py` merges these into the WorldModel-branch layout
+      (OUT/sampled_vars.parquet, conditions.parquet).
+    - The CEM data are identical to v2 up to the changed episode ends.
   - **v1** (2026-10-08/09) had no reference paths. It was moved off this PC (Train.zip).
   - **v2** is a full recollection with reference paths, best trajectories, reference line and
     d_ss, planned with the same code. The CEM data

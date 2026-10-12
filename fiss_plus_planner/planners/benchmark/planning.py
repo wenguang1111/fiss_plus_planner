@@ -5,6 +5,7 @@ import csv
 import fcntl
 import json
 import subprocess
+import zlib
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -41,7 +42,7 @@ from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
-from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
+from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper, to_cpp_state
 from fiss_plus_planner.planners import FOP_cpp_wrapper as fop_cpp
 from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
 from fiss_plus_planner.planners.CEM_cpp_wrapper import CEM_CPP_Wrapper
@@ -55,6 +56,7 @@ from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOpt
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
 from fiss_plus_planner.planners.sparse_planner_world_model import SparsePlannerWorldModelSettings, SparsePlannerWorldModel
 from fiss_plus_planner.planners.cvae_fop_planner import CVAE_FOP_Wrapper
+from CVAE_efficient_sampling.cem_cache import EPS, J_SCALE_QUANTILE, log_mixture_density, unit
 
 # === IEEE-like font family and sizes (10pt doc) ===
 S = {
@@ -237,11 +239,14 @@ def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
-                            sampler_cfg: dict = None, safety_cfg: dict = None, motion_model_cfg: dict = None
-                            ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
+                            sampler_cfg: dict = None, safety_cfg: dict = None, motion_model_cfg: dict = None,
+                            ml_data_cfg: dict = None) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
     """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}}.
-    safety_cfg / motion_model_cfg: SAFETY / MOTION_MODEL config sections of the C++ planners."""
+    safety_cfg / motion_model_cfg: SAFETY / MOTION_MODEL config sections of the C++ planners.
+    ml_data_cfg: ML_DATA config section (trajectories of the world-model data, see wm_samples)."""
     sampler_cfg = sampler_cfg or {}
+    ml_data_cfg = {**ML_DATA_DEFAULTS, **(ml_data_cfg or {})}
+    scenario_name = os.path.splitext(file)[0]
     # Plan a global route
     global_planner = GlobalPlanner()
     try:
@@ -272,21 +277,6 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         goal_speed = None
     desired_speed = goal_speed if goal_speed is not None else DEFAULT_SPEED_LIMIT
     desired_speed_list = []  # v_des(x(t)) of every executed state, for the scenario cost
-    
-    # Get goal lanelet and center position
-    if goal_region.lanelets_of_goal_position is not None and len(goal_region.lanelets_of_goal_position) > 0:
-        goal_lanelet_idx = goal_region.lanelets_of_goal_position[0][0]
-        goal_lanelet = scenario.lanelet_network.find_lanelet_by_id(goal_lanelet_idx)
-        center_vertices = goal_lanelet.center_vertices
-        mid_idx = int((center_vertices.shape[0] - 1) / 2)
-        goal_center = center_vertices[mid_idx]
-    else:
-        # Fallback: use goal position from goal state if available
-        if has_goal_state and goal_region.state_list[0].has_value("position"):
-            goal_center = goal_region.state_list[0].position.center
-        else:
-            # Use the end of the reference path as goal
-            goal_center = ego_lane_pts[-1]
 
     stats = Stats()
     # Obstacle lists
@@ -463,6 +453,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     # origin, yaw 0), a rigid transform of the global result.
     collect_ml_data = collect_data_for_ml and method in ('FOP_CPP', 'CEM_CPP')
     cem_cycles = []  # CEM_CPP: context and candidate records of every planned cycle
+    wm_rows = []     # CEM_CPP: executed plan + cost-weighted candidates with x, y, yaw per cycle (wm_samples)
     all_trajs_accumulated = []
     reference_path_lookahead_m = ScenarioDrawer.VIEW_SIZE_DEFAULT / 2.0
     optimal_path_x_local_list = []
@@ -513,6 +504,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             if method == 'CEM_CPP':
                 cem_cycles.append(cem_cycle_record(planner, i, current_frenet_state, inital_state,
                                                    desired_speed, max_speed, best_traj_ego, ref_local, path_local))
+                if found:
+                    wm_rows += wm_samples(planner, cem_cycles[-1], scenario_name, current_frenet_state,
+                                          best_traj_ego, ego_pos, ego_yaw, **ml_data_cfg)
             if found:
                 optimal_path_x_local_list.append(path_local[:, 0].tolist())
                 optimal_path_y_local_list.append(path_local[:, 1].tolist())
@@ -533,6 +527,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
         if best_traj_ego is None or len(best_traj_ego.x) < 2:
             print(f"Planning failed at time step {i}")
+            stats.termination = "failed"
             stats.time_step_have_to_break = i
             stats.rear_end_failure = rear_end_threat(
                 obstacles_array, obstacles_num_vertices, i, inital_state, vehicle,
@@ -578,24 +573,21 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         state_list.append(next_state)
         time_list.append(end_time - start_time)
 
-        # break when goal is reached
-        if goal_position_available:
-            if goal_region.is_reached(next_state):
-                print("Goal Reached")
-                goal_reached = True
-                stats.success = True
-                break
-            # if goal_polygon.contains_properly()
-            elif np.hypot(next_state.position[0] - goal_center[0], next_state.position[1] - goal_center[1]) <= vehicle.l/2:
-                print("Goal Reached")
-                stats.success = True
-                goal_reached = True
-                break
-            elif current_frenet_state.s >= route_end_s - 3.0:
-                print("Reaching End of the Map, Stopping, Goal Not Reached")
-                goal_reached = True
-                stats.success = True
-                break
+        # break when the goal is reached: the ego position in the goal region (CommonRoad's own position test,
+        # as in GoalRegion.is_reached, without its time window, velocity and orientation conditions), or the
+        # end of the route / map (counts as reached, also in scenarios without a goal position)
+        if goal_position_available and goal_position_reached(goal_region, next_state.position):
+            print("Goal Reached")
+            goal_reached = True
+            stats.success = True
+            stats.termination = "goal"
+            break
+        elif current_frenet_state.s >= route_end_s - 3.0:
+            print("Reaching End of the Map, Stopping (counts as goal reached)")
+            goal_reached = True
+            stats.success = True
+            stats.termination = "map_end"
+            break
         
         # Standstill is allowed (the C++ planners switch to the low-speed lateral model d(s)
         # and can wait or start again); only the time spent standing is recorded.
@@ -629,16 +621,16 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         if i == final_time_step-1:
             stats.success = True
             goal_reached = True
+            stats.termination = "time_limit"
 
     if method == 'CVAE_FOP' and planner.cycle_log:
         os.makedirs(os.path.join(output_dir, "cvae_cycles"), exist_ok=True)
         pd.DataFrame(planner.cycle_log).to_csv(
             os.path.join(output_dir, "cvae_cycles", f"{os.path.splitext(file)[0]}.csv"), index=False)
     if collect_ml_data and global_coordination_state_list:
-        scenario_name = os.path.splitext(file)[0]
         if method == 'CEM_CPP':
             save_cem_data(os.path.join(output_dir, "cem_data"), scenario_name, cem_cycles, stats, planner,
-                          ego_lane_pts[:, :2])
+                          ego_lane_pts[:, :2], wm_rows, ml_data_cfg)
         drawer = ScenarioDrawer(
             scenario_name=scenario_name,
             scenario_dir=input_dir,
@@ -682,6 +674,14 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
 
     return goal_reached, ego_vehicle_traj, avg_processing_time, time_list, stats, all_trajs_accumulated, best_trajs_all_time_steps
+
+
+def goal_position_reached(goal_region, position) -> bool:
+    """True if the position lies in the shape of one of the goal states (shape.contains_point, the position
+    test of CommonRoad's GoalRegion.is_reached); the goal's time step, velocity and orientation are not
+    checked: the planners do not plan towards a goal time."""
+    return any(gs.has_value("position") and gs.position.contains_point(np.asarray(position))
+               for gs in goal_region.state_list)
 
 
 def timeout_handler(signum, frame):
@@ -802,7 +802,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 number_threads, runtime_measurement, collect_data_for_ml,
                 sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI'), 'CVAE_FOP': cfg.get('CVAE_FOP')},
                 safety_cfg=cfg.get('SAFETY'),
-                motion_model_cfg=cfg.get('MOTION_MODEL'))
+                motion_model_cfg=cfg.get('MOTION_MODEL'),
+                ml_data_cfg=cfg.get('ML_DATA'))
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
@@ -934,8 +935,9 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 #             color='#1d7eea', alpha=0.8,  zorder=25, lw=0.6)
             time_list.append(0)
 
-            plt.title("{method}: {time}s".format(
-                method=method, time=round(time_list[i], 3)))
+            stage = getattr(best_trajs[i], "stage", "") if i < len(best_trajs) and best_trajs[i] is not None else ""
+            plt.title("{method}{stage}: {time}s".format(
+                method=method, stage=f" [{stage}]" if stage else "", time=round(time_list[i], 3)))
             plt.suptitle(f'Scenario ID: {scenario_id}',
                          fontsize=20, x=0.59, y=0.06)
 
@@ -1087,6 +1089,61 @@ def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: 
     return {"context": context, "reference": reference, "best_trajectory": best_trajectory, **tables}
 
 
+# World-model trajectory data (CEM_CPP with Collect_Data_For_ML): candidates per cycle besides the executed
+# plan, temperature of the cost weight (CVAE v1: 0.25) and seed of the draw
+ML_DATA_DEFAULTS = {"samples": 16, "tau": 0.25, "seed": 0}
+WM_COLUMNS = ["scenario", "time_step", "x", "y", "path_length", "yaw", "sample", "J", "weight", "d", "v", "T"]
+
+
+def wm_samples(planner, record: dict, scenario: str, frenet_state: FrenetState, best: FrenetTrajectory,
+               ego_pos: np.ndarray, ego_yaw: float, samples: int, tau: float, seed: int) -> list:
+    """Rows of sampled_vars.parquet of one CEM cycle, the world-model CVAE data (CVAE_trajectory_planning; the
+    format of save_data plus yaw and the sample's parameters), points in the ego frame of the cycle:
+        sample 0        the executed plan (CEM's best feasible candidate);
+        sample 1..K     other feasible candidates (distinct z), drawn without replacement with probability
+                        exp(-J~ / tau) / q(z): the target of the cost-aware CVAE (cem_cache / cem_dataset),
+                        J~ = (J - J_min) / (J_90 - J_min) within the cycle, q = CEM's sampling density
+                        (mixture of the iterations' proposals), which removes CEM's concentration near the optimum.
+    weight = that normalised probability. The trajectories come from the planner's own generator
+    (generate_trajectory, as rebuilt by scripts/cem_trajectories.py), at their CEM length T / tick_t + 1."""
+    cand, prop, ctx = record["candidates"], record["proposals"], record["context"]
+    feasible = cand[cand.feasible == 1]
+    z = feasible[["d", "v", "T"]].to_numpy(np.float64)
+    j = feasible["J_total"].to_numpy(np.float64)
+    lo = np.array([ctx["d_min"], ctx["v_min"], ctx["T_min"]])
+    hi = np.array([ctx["d_max"], ctx["v_max"], ctx["T_max"]])
+    jn = (j - j.min()) / (np.percentile(j, J_SCALE_QUANTILE) - j.min() + EPS)
+    logq = log_mixture_density(unit(z, lo, hi), prop[["mean_d", "mean_v", "mean_T"]].to_numpy(),
+                               np.maximum(prop[["std_d", "std_v", "std_T"]].to_numpy(), 1e-6))
+    logw = -jn / tau - logq
+    w = np.exp(logw - logw.max())
+    w /= w.sum()
+    # one entry per distinct z (repeated samples, e.g. the warm start), the executed plan apart
+    uz, inv = np.unique(z, axis=0, return_inverse=True)
+    inv = inv.ravel()
+    uw = np.bincount(inv, weights=w, minlength=len(uz))
+    uj = np.full(len(uz), np.inf)
+    np.minimum.at(uj, inv, j)
+    best_z = np.array([best.sampling_param.d, best.sampling_param.s_d, best.sampling_param.t])
+    is_best = np.all(uz == best_z, axis=1)
+    pool = np.flatnonzero(~is_best)
+    k = min(samples, len(pool))
+    rng = np.random.default_rng((seed, zlib.crc32(scenario.encode()), ctx["time_step"]))
+    drawn = rng.choice(pool, size=k, replace=False, p=uw[pool] / uw[pool].sum()) if k else []
+    start = to_cpp_state(frenet_state)
+    picks = [(best, best_z, best.cost_final, uw[is_best].sum() if is_best.any() else np.nan)]
+    picks += [(planner.cpp_planner.generate_trajectory(start, *uz[u], ctx["time_step"]), uz[u], uj[u], uw[u])
+              for u in drawn]
+    rows = []
+    for sample, (traj, (d, v, T), J, weight) in enumerate(picks):
+        xy = transform_points_to_ego(np.column_stack([traj.x, traj.y]), ego_pos, ego_yaw)
+        yaw = (np.asarray(traj.yaw) - ego_yaw + np.pi) % (2 * np.pi) - np.pi
+        rows.append({"scenario": scenario, "time_step": int(ctx["time_step"]), "x": xy[:, 0].tolist(),
+                     "y": xy[:, 1].tolist(), "path_length": len(xy), "yaw": yaw.tolist(), "sample": sample,
+                     "J": float(J), "weight": float(weight), "d": float(d), "v": float(v), "T": float(T)})
+    return rows
+
+
 # Column types of the CEM tables; every other column is stored as float32. The samples (d, v, T)
 # stay float64, the planner's precision, so their trajectories are rebuilt bit for bit.
 CEM_COLUMN_TYPES = {"time_step": "int16", "pass": "int8", "iteration": "int8", "index": "int16",
@@ -1095,14 +1152,16 @@ CEM_COLUMN_TYPES = {"time_step": "int16", "pass": "int8", "iteration": "int8", "
 
 
 def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, planner,
-                  reference_line: np.ndarray) -> None:
+                  reference_line: np.ndarray, wm_rows: list, ml_data_cfg: dict) -> None:
     """CEM training data of one scenario in root/<scenario>/: contexts.parquet (one row per
     planning cycle), conditions.parquet (reference path ahead in the ego frame per cycle),
     best_trajectory.parquet (executed plan per cycle, ego frame), reference_line.parquet (the
     planner's reference line, global frame; with contexts it rebuilds any candidate, see
     scripts/cem_trajectories.py), candidates.parquet (every candidate of every iteration: all violation
-    components and J terms), proposals.parquet (Gaussian proposal of every iteration) and
-    scenario.json. root/dataset_info.json documents the columns and the planner setup."""
+    components and J terms), proposals.parquet (Gaussian proposal of every iteration), sampled_vars.parquet
+    (world-model data: executed plan + cost-weighted candidates with x, y, yaw, see wm_samples; merged into the
+    WorldModel layout by scripts/merge_wm_data.py) and scenario.json. root/dataset_info.json documents the
+    columns and the planner setup."""
     out = os.path.join(root, scenario_name)
     os.makedirs(out, exist_ok=True)
     pd.DataFrame([c["context"] for c in cycles]).to_parquet(os.path.join(out, "contexts.parquet"), index=False)
@@ -1113,22 +1172,25 @@ def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, pla
                                                                     index=False, compression="zstd")
     pd.DataFrame(np.asarray(reference_line, dtype=np.float64), columns=["x", "y"]).to_parquet(
         os.path.join(out, "reference_line.parquet"), index=False)
+    pd.DataFrame(wm_rows, columns=WM_COLUMNS).to_parquet(os.path.join(out, "sampled_vars.parquet"), index=False,
+                                                         compression="zstd")
     for name in ("candidates", "proposals"):
         table = pd.concat([c[name] for c in cycles], ignore_index=True)
         table = table.astype({col: CEM_COLUMN_TYPES.get(col, "float32") for col in table.columns})
         table.to_parquet(os.path.join(out, f"{name}.parquet"), index=False, compression="zstd")
     with open(os.path.join(out, "scenario.json"), "w") as fh:
         json.dump({"success": bool(stats.success), "rear_end_failure": bool(stats.rear_end_failure),
+                   "termination": stats.termination,
                    "cycles": len(cycles), "failed_at_time_step": stats.time_step_have_to_break if not stats.success else None},
                   fh, indent=1)
     try:
         with open(os.path.join(root, "dataset_info.json"), "x") as fh:  # first scenario writes it
-            json.dump(cem_dataset_info(planner), fh, indent=1)
+            json.dump(cem_dataset_info(planner, ml_data_cfg), fh, indent=1)
     except FileExistsError:
         pass
 
 
-def cem_dataset_info(planner) -> dict:
+def cem_dataset_info(planner, ml_data_cfg: dict) -> dict:
     """Planner setup and column documentation of the CEM training data."""
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     git = lambda *args: subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
@@ -1138,6 +1200,7 @@ def cem_dataset_info(planner) -> dict:
         "git_dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
         "planner_settings": {k: v for k, v in vars(planner.settings).items() if isinstance(v, (bool, int, float, str))},
         "cem_settings": planner.cem_cfg,
+        "ml_data": ml_data_cfg,
         "cost_weights": {k: getattr(weights, k) for k in dir(weights) if k.startswith("w_")},
         "vehicle": {k: getattr(planner.vehicle, k) for k in ("l", "w", "max_speed", "max_accel")},
         "rejection_codes": {0: "none", 1: "transform", 2: "dynamic", 3: "offroad", 4: "clearance", 5: "collision"},
@@ -1162,6 +1225,12 @@ def cem_dataset_info(planner) -> dict:
             "route centerline extended past its end). With the start state of contexts (s, s_d, s_dd, d, "
             "d_d, d_dd, d_s, d_ss) and a candidate's (d, v, T), FrenetPlanner.generate_trajectory "
             "rebuilds that candidate's trajectory exactly (scripts/cem_trajectories.py).",
+            "sampled_vars: world-model CVAE data (CVAE_trajectory_planning), per cycle with a plan 1 + samples "
+            "rows: sample 0 = the executed plan, 1..samples = other feasible candidates drawn without replacement "
+            "with probability exp(-J~/tau)/q(z) (weight; J~ = (J - J_min)/(J_90 - J_min) in the cycle, q = CEM's "
+            "sampling density); x, y, yaw in the ego frame of the cycle (float64, CEM length T / tick_t + 1 "
+            "points, from t = 0), J = J_total, d, v, T = sampling parameters. scripts/merge_wm_data.py merges "
+            "all scenarios into the WorldModel layout (OUTPUT_DIR/sampled_vars.parquet, conditions.parquet).",
         ],
     }
 

@@ -49,6 +49,9 @@ class Stats(object):
         self.num_clearance_fallbacks = 0
         self.standstill_time = 0.0       # [s] executed time with |v| < 0.01 m/s
         self.rear_end_failure = False    # planning failed while a follower drives into the ego (rear_end_threat)
+        # How the closed-loop run ended: goal (position in the goal region, CommonRoad contains_point, no time
+        # window), map_end (end of the route / map, also counts as reached), time_limit (scenario over), failed
+        self.termination = ""
         self.timing_ms = {}              # per-stage time, summed over cycles
         self.final_cost_terms = {}       # Eq. (7)+(8) terms of the executed trajectory
 
