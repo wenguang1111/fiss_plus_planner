@@ -50,7 +50,8 @@ from fiss_plus_planner.planners.MPPI_cpp_wrapper import MPPI_CPP_Wrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
 from fiss_plus_planner.SMP.motion_planner.utility import create_trajectory_from_list_states
-from fiss_plus_planner.planners.common.utils import configure_numba_threads, transform_points_to_ego
+from fiss_plus_planner.planners.common.utils import (configure_numba_threads, reference_ahead_local,
+                                                     transform_points_to_ego)
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
@@ -417,11 +418,24 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
 
+    # DAgger (Ross et al. 2011): CVAE_FOP with Collect_Data_For_ML drives, and the CEM of the data collection
+    # (same settings, every candidate recorded) plans in every state the CVAE reaches. Its plan is the label
+    # (saved as the CEM data, see save_cem_data) and is never executed.
+    expert = None
+    if collect_data_for_ml and method == 'CVAE_FOP':
+        expert_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        apply_settings(expert_settings, safety_cfg)
+        apply_settings(expert_settings, motion_model_cfg)
+        expert = CEM_CPP_Wrapper(expert_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                 runtime_measurement, cem_cfg={**(sampler_cfg.get('CEM') or {}), 'record_candidates': True})
+
     # The map ends with the scenario: continue the reference straight beyond the route end, so the
     # trajectories near the end do not run off the reference line; the run stops at the route end.
     num_route_pts = len(ego_lane_pts)
     ego_lane_pts = extend_centerline(ego_lane_pts, vehicle.max_speed * planner_settings.max_t)
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
+    if expert is not None:
+        expert.generate_frenet_frame(ego_lane_pts)
     route_end_s = csp_ego.s[num_route_pts - 1]
 
     # Initial state
@@ -451,8 +465,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     # ML data (Collect_Data_For_ML): the planner works in the global frame (CEM keeps its warm
     # start); planned and reference paths are stored in the ego frame of each cycle (ego at the
     # origin, yaw 0), a rigid transform of the global result.
-    collect_ml_data = collect_data_for_ml and method in ('FOP_CPP', 'CEM_CPP')
-    cem_cycles = []  # CEM_CPP: context and candidate records of every planned cycle
+    collect_ml_data = collect_data_for_ml and method in ('FOP_CPP', 'CEM_CPP', 'CVAE_FOP')
+    labeler = expert if expert is not None else planner  # the CEM whose candidates are recorded
+    cem_cycles = []  # CEM_CPP / DAgger: context and candidate records of every planned cycle
     wm_rows = []     # CEM_CPP: executed plan + cost-weighted candidates with x, y, yaw per cycle (wm_samples)
     all_trajs_accumulated = []
     reference_path_lookahead_m = ScenarioDrawer.VIEW_SIZE_DEFAULT / 2.0
@@ -501,12 +516,19 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             found = best_traj_ego is not None and len(best_traj_ego.x) >= 2
             path_local = transform_points_to_ego(np.column_stack([best_traj_ego.x, best_traj_ego.y]),
                                                  ego_pos, ego_yaw) if found else np.zeros((0, 2))
-            if method == 'CEM_CPP':
-                cem_cycles.append(cem_cycle_record(planner, i, current_frenet_state, inital_state,
-                                                   desired_speed, max_speed, best_traj_ego, ref_local, path_local))
-                if found:
-                    wm_rows += wm_samples(planner, cem_cycles[-1], scenario_name, current_frenet_state,
-                                          best_traj_ego, ego_pos, ego_yaw, **ml_data_cfg)
+            if method in ('CEM_CPP', 'CVAE_FOP'):
+                label = best_traj_ego
+                if expert is not None:  # DAgger: the expert's plan from the state the CVAE reached
+                    label = expert.plan(current_frenet_state, max_speed, obstacles_all, i, next_state,
+                                        desired_speed=desired_speed)
+                found_label = label is not None and len(label.x) >= 2
+                label_local = transform_points_to_ego(np.column_stack([label.x, label.y]), ego_pos, ego_yaw) \
+                    if found_label else np.zeros((0, 2))
+                cem_cycles.append(cem_cycle_record(labeler, i, current_frenet_state, inital_state,
+                                                   desired_speed, max_speed, label, ref_local, label_local))
+                if found_label:
+                    wm_rows += wm_samples(labeler, cem_cycles[-1], scenario_name, current_frenet_state,
+                                          label, ego_pos, ego_yaw, **ml_data_cfg)
             if found:
                 optimal_path_x_local_list.append(path_local[:, 0].tolist())
                 optimal_path_y_local_list.append(path_local[:, 1].tolist())
@@ -628,9 +650,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         pd.DataFrame(planner.cycle_log).to_csv(
             os.path.join(output_dir, "cvae_cycles", f"{os.path.splitext(file)[0]}.csv"), index=False)
     if collect_ml_data and global_coordination_state_list:
-        if method == 'CEM_CPP':
-            save_cem_data(os.path.join(output_dir, "cem_data"), scenario_name, cem_cycles, stats, planner,
-                          ego_lane_pts[:, :2], wm_rows, ml_data_cfg)
+        if method in ('CEM_CPP', 'CVAE_FOP'):
+            save_cem_data(os.path.join(output_dir, "cem_data"), scenario_name, cem_cycles, stats, labeler,
+                          ego_lane_pts[:, :2], wm_rows, ml_data_cfg,
+                          learner=sampler_cfg.get('CVAE_FOP') if expert is not None else None)
         drawer = ScenarioDrawer(
             scenario_name=scenario_name,
             scenario_dir=input_dir,
@@ -682,6 +705,18 @@ def goal_position_reached(goal_region, position) -> bool:
     checked: the planners do not plan towards a goal time."""
     return any(gs.has_value("position") and gs.position.contains_point(np.asarray(position))
                for gs in goal_region.state_list)
+
+
+def draw_goal_region(ax, goal_region) -> None:
+    """Outline of the goal positions (the shapes goal_position_reached tests) in the GIF frames."""
+    for gs in goal_region.state_list:
+        if not gs.has_value("position"):
+            continue
+        for shape in getattr(gs.position, "shapes", [gs.position]):  # a ShapeGroup holds several shapes
+            geom = shape.shapely_object
+            if hasattr(geom, "exterior"):
+                ax.add_patch(MplPolygon(np.asarray(geom.exterior.coords), closed=True, facecolor="red", alpha=0.3,
+                                        edgecolor="red", linewidth=2, zorder=18))
 
 
 def timeout_handler(signum, frame):
@@ -774,9 +809,10 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     number_threads = cfg['Num_Threads_For_CollisionChecker']
     runtime_measurement = cfg.get('Runtime_Measurement')
     collect_data_for_ml = cfg.get('Collect_Data_For_ML')
-    if collect_data_for_ml and method == 'CEM_CPP' and not getattr(fop_cpp.frenet_planner_cpp, "DATA_COLLECTION", False):
+    if collect_data_for_ml and method in ('CEM_CPP', 'CVAE_FOP') and \
+            not getattr(fop_cpp.frenet_planner_cpp, "DATA_COLLECTION", False):
         # Checked here, outside the "not feasible" handler below, so a wrong build cannot pass silently
-        raise ImportError("Collect_Data_For_ML with CEM_CPP needs C_Planner/build compiled with "
+        raise ImportError(f"Collect_Data_For_ML with {method} needs C_Planner/build compiled with "
                           "-DENABLE_DATA_COLLECTION=ON")
     configure_numba_threads(number_threads)
 
@@ -855,6 +891,7 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             v_min, v_max = 0, 200
             norm = mpl.colors.Normalize(vmin=v_min, vmax=v_max)
             rnd.render()
+            draw_goal_region(rnd.ax, planning_problem.goal)
             if show_sampled_trajs:
                 costs = []
                 xs = []
@@ -936,8 +973,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
             time_list.append(0)
 
             stage = getattr(best_trajs[i], "stage", "") if i < len(best_trajs) and best_trajs[i] is not None else ""
-            plt.title("{method}{stage}: {time}s".format(
-                method=method, stage=f" [{stage}]" if stage else "", time=round(time_list[i], 3)))
+            plt.title("{method}{stage}: {time}s, cycle {cycle}".format(
+                method=method, stage=f" [{stage}]" if stage else "", time=round(time_list[i], 3), cycle=i))
             plt.suptitle(f'Scenario ID: {scenario_id}',
                          fontsize=20, x=0.59, y=0.06)
 
@@ -1048,16 +1085,6 @@ def save_data(scenario_name: str, optimal_path_x_list: list, optimal_path_y_list
         print(f"Saved {len(optimal_path_x_list)} time steps for scenario {scenario_name}")
 
 
-def reference_ahead_local(ref_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: float, lookahead: float) -> np.ndarray:
-    """Reference path in the ego frame from the point nearest to the ego onward, up to `lookahead` m."""
-    ref_local = transform_points_to_ego(ref_xy, ego_pos, ego_yaw)
-    ahead = ref_local[int(np.argmin(np.linalg.norm(ref_local, axis=1))):]
-    if len(ahead) > 1:
-        dist = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(ahead, axis=0), axis=1))])
-        ahead = ahead[dist <= lookahead]
-    return ahead
-
-
 def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: InitialState,
                      v_des: float, max_speed: float, best: FrenetTrajectory, ref_local: np.ndarray,
                      best_local: np.ndarray) -> dict:
@@ -1127,7 +1154,7 @@ def wm_samples(planner, record: dict, scenario: str, frenet_state: FrenetState, 
     best_z = np.array([best.sampling_param.d, best.sampling_param.s_d, best.sampling_param.t])
     is_best = np.all(uz == best_z, axis=1)
     pool = np.flatnonzero(~is_best)
-    k = min(samples, len(pool))
+    k = min(samples, np.count_nonzero(uw[pool]))  # weights below the float range (exp underflow) are never drawn
     rng = np.random.default_rng((seed, zlib.crc32(scenario.encode()), ctx["time_step"]))
     drawn = rng.choice(pool, size=k, replace=False, p=uw[pool] / uw[pool].sum()) if k else []
     start = to_cpp_state(frenet_state)
@@ -1152,7 +1179,7 @@ CEM_COLUMN_TYPES = {"time_step": "int16", "pass": "int8", "iteration": "int8", "
 
 
 def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, planner,
-                  reference_line: np.ndarray, wm_rows: list, ml_data_cfg: dict) -> None:
+                  reference_line: np.ndarray, wm_rows: list, ml_data_cfg: dict, learner: dict = None) -> None:
     """CEM training data of one scenario in root/<scenario>/: contexts.parquet (one row per
     planning cycle), conditions.parquet (reference path ahead in the ego frame per cycle),
     best_trajectory.parquet (executed plan per cycle, ego frame), reference_line.parquet (the
@@ -1161,7 +1188,9 @@ def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, pla
     components and J terms), proposals.parquet (Gaussian proposal of every iteration), sampled_vars.parquet
     (world-model data: executed plan + cost-weighted candidates with x, y, yaw, see wm_samples; merged into the
     WorldModel layout by scripts/merge_wm_data.py) and scenario.json. root/dataset_info.json documents the
-    columns and the planner setup."""
+    columns and the planner setup. With learner (DAgger, CVAE_FOP config) the states are those the CVAE-FOP
+    reached, the candidates and the executed plan fields those of the expert CEM in these states, and
+    scenario.json the outcome of the CVAE-FOP run."""
     out = os.path.join(root, scenario_name)
     os.makedirs(out, exist_ok=True)
     pd.DataFrame([c["context"] for c in cycles]).to_parquet(os.path.join(out, "contexts.parquet"), index=False)
@@ -1185,7 +1214,7 @@ def save_cem_data(root: str, scenario_name: str, cycles: list, stats: Stats, pla
                   fh, indent=1)
     try:
         with open(os.path.join(root, "dataset_info.json"), "x") as fh:  # first scenario writes it
-            json.dump(cem_dataset_info(planner, ml_data_cfg), fh, indent=1)
+            json.dump(cem_dataset_info(planner, ml_data_cfg) | ({"dagger_learner": learner} if learner else {}), fh, indent=1)
     except FileExistsError:
         pass
 

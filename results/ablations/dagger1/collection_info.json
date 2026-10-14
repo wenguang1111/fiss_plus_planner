@@ -1,0 +1,84 @@
+{
+ "git_commit": "c721c9b390356ba6c2991773082705e687b2a980",
+ "git_dirty": true,
+ "planner_settings": {
+  "tick_t": 0.1,
+  "max_road_width": 3.5,
+  "num_width": 10,
+  "highest_speed": 14,
+  "lowest_speed": 0.0,
+  "num_speed": 10,
+  "min_t": 3.0,
+  "max_t": 5.0,
+  "num_t": 10,
+  "low_speed_threshold": 4.0,
+  "low_speed_min_lateral_length": 5.0,
+  "check_obstacle": true,
+  "check_boundary": true,
+  "check_clearance": true,
+  "clearance_time_gap": 2.0,
+  "clearance_min_gap": 3.0,
+  "clearance_lateral_margin": 0.2,
+  "clearance_grace_time": 1.0,
+  "clearance_recovery_time": 3.0,
+  "clearance_fallback": true
+ },
+ "cem_settings": {
+  "num_iterations": 8,
+  "population": 250,
+  "elite_fraction": 0.1,
+  "smoothing": 0.7,
+  "init_std": 0.3,
+  "seed": 0,
+  "record_candidates": true
+ },
+ "ml_data": {
+  "samples": 16,
+  "tau": 0.25,
+  "seed": 0
+ },
+ "cost_weights": {
+  "w_A": 0.1,
+  "w_D": 1.0,
+  "w_J": 0.1,
+  "w_LC": 10.0,
+  "w_T": 0.1,
+  "w_V": 0.01,
+  "w_dist": 0.1
+ },
+ "vehicle": {
+  "l": 4.569,
+  "w": 1.844,
+  "max_speed": 41.7,
+  "max_accel": 11.5
+ },
+ "rejection_codes": {
+  "0": "none",
+  "1": "transform",
+  "2": "dynamic",
+  "3": "offroad",
+  "4": "clearance",
+  "5": "collision"
+ },
+ "notes": [
+  "candidates: one row per sample; d, v, T = terminal lateral offset, terminal speed, horizon.",
+  "pass 1 = re-plan without the clearance requirement (only when pass 0 found nothing feasible).",
+  "rank: rank in its iteration by (feasible, V, J) of the early-exit view, as used by CEM; elites are rank < round(elite_fraction * population).",
+  "V_*: share of the horizon from the first violation on, (N - k) / N, every check run (kFullViolation); feasible / rejection as in a normal run.",
+  "J_*: weighted cost terms, NaN without a Cartesian trajectory.",
+  "proposals: mean / std of the diagonal Gaussian each iteration was drawn from, in unit coordinates of the search space (contexts d_min..T_max); samples are clipped to [0, 1]; index 0 of iteration 0 is the proposal mean itself.",
+  "conditions: per cycle the route's reference path in the ego frame of that cycle (ego at the origin, x forward, y left, as the BEV image), from its point nearest to the ego up to ScenarioDrawer.VIEW_SIZE_DEFAULT / 2 = 43.75 m ahead, points every 0.1 m (ref_x, ref_y); the format of the FOP path data and of the world-model CVAE (CVAE_trajectory_planning).",
+  "best_trajectory: per cycle the executed plan (best candidate) in the ego frame of that cycle, points every tick_t from t = 0 (x, y; empty when the cycle found no trajectory).",
+  "reference_line: the points the planner's reference spline was built from (global frame, route centerline extended past its end). With the start state of contexts (s, s_d, s_dd, d, d_d, d_dd, d_s, d_ss) and a candidate's (d, v, T), FrenetPlanner.generate_trajectory rebuilds that candidate's trajectory exactly (scripts/cem_trajectories.py).",
+  "sampled_vars: world-model CVAE data (CVAE_trajectory_planning), per cycle with a plan 1 + samples rows: sample 0 = the executed plan, 1..samples = other feasible candidates drawn without replacement with probability exp(-J~/tau)/q(z) (weight; J~ = (J - J_min)/(J_90 - J_min) in the cycle, q = CEM's sampling density); x, y, yaw in the ego frame of the cycle (float64, CEM length T / tick_t + 1 points, from t = 0), J = J_total, d, v, T = sampling parameters. scripts/merge_wm_data.py merges all scenarios into the WorldModel layout (OUTPUT_DIR/sampled_vars.parquet, conditions.parquet)."
+ ],
+ "dagger_learner": {
+  "run": "data/output/cvae_local/runs/v3_attn_tau0.25_beta0.1",
+  "num_samples": 16,
+  "sampler": "cvae",
+  "seed": 0,
+  "warm_start": true,
+  "log_cycles": false,
+  "regret": false
+ }
+}

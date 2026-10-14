@@ -1,0 +1,33 @@
+972 scenarios in every run (dagger1: 972, v3_img: 972)
+
+         scenarios  success  success_rate  rear_end_failures  other_failures  fop_fallback_share  runtime_mean_ms  runtime_median_ms  runtime_p95_ms  reached  end_goal  end_map_end  end_time_limit  end_failed
+planner                                                                                                                                                                                                         
+dagger1        972      871        0.8961                 39              62              0.1161           6.0524             3.5733         24.3477   0.7058    0.7058        0.000          0.1903      0.1029
+v3_img         972      870        0.8951                 40              62              0.1178           6.1183             3.5735         23.8665   0.6831    0.6821        0.001          0.2119      0.1039 
+
+J_total on the 869 scenarios solved by all planners (difference to v3_img):
+  dagger1      mean   11.115 | diff -0.214 ± 0.111 (95 % CI), median +0.000, Wilcoxon p 0.00039, lower than v3_img in 48.1%
+  v3_img       mean   11.329
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1  0.726  6.083  1.258  0.753  0.473  1.822
+v3_img   0.733  6.253  1.259  0.748  0.497  1.839
+
+J_total on the 660 scenarios where every planner reached the goal (difference to v3_img):
+  dagger1      mean    9.330 | diff -0.140 ± 0.126 (95 % CI), median +0.000, Wilcoxon p 0.11, lower than v3_img in 43.9%
+  v3_img       mean    9.469
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1  0.560  5.006  1.087  0.661  0.469  1.547
+v3_img   0.566  5.122  1.089  0.652  0.478  1.562
+
+J_total on the 841 scenarios where every planner ended the same way (all reached / all timed out) (difference to v3_img):
+  dagger1      mean   10.613 | diff -0.139 ± 0.104 (95 % CI), median +0.000, Wilcoxon p 0.0095, lower than v3_img in 47.0%
+  v3_img       mean   10.752
+mean cost terms on these scenarios:
+         J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1  0.701  5.730  1.217  0.733  0.476  1.756
+v3_img   0.706  5.845  1.215  0.728  0.490  1.767
+
+
+(compare_planners.py --run dagger1=data/measurements/cvae_dagger1 --run v3_img=data/measurements/cvae_v3_img --ref v3_img; paired_costs_vs_v3_img.csv)

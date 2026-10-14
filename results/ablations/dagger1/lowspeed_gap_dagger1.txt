@@ -1,0 +1,20 @@
+cvae_dagger1: 852 scenarios solved by both | check: per-cycle J_V sum vs measured J_V, corr CVAE 0.9970, CEM 1.0000, ratio 0.985 / 1.000
+total gap J 1126 (mean 1.32), of it J_V 804 (71%)
+cycles below 1.0 m/s: CVAE 5524 (8.9% of its cycles), CEM 3338 (5.7%); extra 2186 cycles vs total extra 3747
+J_V accumulated below 1.0 m/s: CVAE 1085, CEM 639 -> difference 446 = 40% of the J gap; with its time term 468 = 42%
+CVAE low-speed cycles: clearance not limiting (all samples pass clearance, samples stage) 4135 (75%), J_V 837; limited by clearance / grid 1389, J_V 247
+concentration: the top 10 % of scenarios hold 98% of the low-speed J_V difference
+                                dJ  d_low  n_low_e  n_low_c  n_free  n_held
+scenario                                                                   
+POL_Krakow-62_1_T-8          30.34  25.58       22      155     124      31
+USA_Phoenix-75_10_T-1        30.16  24.96        0       33      33       0
+GRC_NeaSmyrni-73_1_T-1       26.34  21.49        2      113      10     103
+DEU_Bonn-11_2_T-1            22.63  17.59       20      111      10     101
+DEU_Bremen-7_1_T-1           21.37  15.48        0       21      19       2
+FRA_Dijon-14_23_T-1           1.06  11.65        0       16       8       8
+USA_Phoenix-3_29_T-1         13.34  10.31       34       47      43       4
+CAN_Ottawa-44_1_T-13         12.41   9.71        1       53      50       3
+DEU_Herzogenaurach-98_1_T-7  11.39   8.91        0       48      35      13
+DEU_Herzogenaurach-57_1_T-9  13.40   8.70       12       58      56       2
+POL_Poznan-60_1_T-9           9.85   8.59       73      118     117       1
+POL_Srodmiescie-17_1_T-11     9.97   7.83        0       42      42       0

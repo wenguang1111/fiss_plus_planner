@@ -30,6 +30,17 @@ def transform_points_to_ego(points_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw:
     return (hom @ transform.T)[:, :2]
 
 
+def reference_ahead_local(ref_xy: np.ndarray, ego_pos: np.ndarray, ego_yaw: float, lookahead: float) -> np.ndarray:
+    """Reference path in the ego frame from the point nearest to the ego onward, up to `lookahead` m
+    (the route condition of the CVAE: conditions.parquet of the CEM collection, CVAE-FOP)."""
+    ref_local = transform_points_to_ego(ref_xy, ego_pos, ego_yaw)
+    ahead = ref_local[int(np.argmin(np.linalg.norm(ref_local, axis=1))):]
+    if len(ahead) > 1:
+        dist = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(ahead, axis=0), axis=1))])
+        ahead = ahead[dist <= lookahead]
+    return ahead
+
+
 def transform_points_from_ego(points_xy_local: np.ndarray, ego_pos: np.ndarray, ego_yaw: float) -> np.ndarray:
     """Inverse of transform_points_to_ego: ego-local (x, y) points -> global frame."""
     pts = np.asarray(points_xy_local, dtype=float)

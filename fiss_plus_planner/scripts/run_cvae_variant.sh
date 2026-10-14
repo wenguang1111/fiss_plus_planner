@@ -1,12 +1,13 @@
 #!/bin/bash
-# One CVAE-FOP variant on data/10k/Test, compared with the stored CVAE v1, CEM and FOP results
-# (results/cvae_v1; CEM and FOP are deterministic and unchanged, so they are not rerun).
+# One CVAE-FOP variant on data/10k/Test, compared with stored results of the current code (BASE, default
+# the goalpos round of 2026-10-12: CEM, FOP, FISS+, CVAE v1 + warm start; the planners are deterministic,
+# so they are not rerun) and paired against REF (default CVAE_warm, the reference CVAE-FOP).
 #     bash fiss_plus_planner/scripts/run_cvae_variant.sh NAME [KEY=VALUE ...]
 #     bash fiss_plus_planner/scripts/run_cvae_variant.sh warm CVAE_FOP.warm_start=true
 #     bash fiss_plus_planner/scripts/run_cvae_variant.sh k32 CVAE_FOP.num_samples=32
 # KEY is a (dotted) key of cfgs/cvae_fop.yaml, VALUE is parsed as YAML. The variant runs from scratch
 # into data/output/cvae_NAME and data/measurements/cvae_NAME (config.yaml of the run is kept there).
-# Report: data/measurements/compare_NAME/report.txt (differences to CEM and to CVAE v1).
+# Report: data/measurements/compare_NAME/report.txt (differences to CEM and to REF).
 # EXTRA="warm=../results/ablations/warm_start/measurements ..." adds stored runs to the comparison.
 set -u
 cd "$(dirname "$0")/.." || exit 1   # fiss_plus_planner/
@@ -20,7 +21,8 @@ SHARDS=${SHARDS:-22}
 NAME=${1:?usage: run_cvae_variant.sh NAME [KEY=VALUE ...]}
 shift
 [[ "$NAME" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "NAME must be a plain word: $NAME"; exit 1; }
-V1=../results/cvae_v1/measurements
+BASE=${BASE:-data/measurements/goalpos}
+REF=${REF:-CVAE_warm}
 MDIR=data/measurements/cvae_$NAME
 ODIR=data/output/cvae_$NAME
 LOGS=logs_test
@@ -66,12 +68,13 @@ crashed=$(grep -l "Traceback" "$LOGS/cvae_${NAME}"_*.log | wc -l)
 
 OUT=data/measurements/compare_$NAME
 mkdir -p "$OUT"
-RUNS=(--run "$NAME=$MDIR" --run "CVAE_v1=$V1/cvae_fop_test" --run "CEM=$V1/cem_test" --run "FOP=$V1/fop_test")
+RUNS=(--run "$NAME=$MDIR")
+for b in CEM FOP FISS+ "$REF"; do RUNS+=(--run "$b=$BASE/$b"); done
 for r in ${EXTRA:-}; do RUNS+=(--run "$r"); done
 {
     "$PY" scripts/compare_planners.py "${RUNS[@]}" --ref CEM --out "$OUT"
-    echo; echo "---- paired against CVAE v1 ----"
-    "$PY" scripts/compare_planners.py --run "$NAME=$MDIR" --run "CVAE_v1=$V1/cvae_fop_test" --ref CVAE_v1 \
+    echo; echo "---- paired against $REF ----"
+    "$PY" scripts/compare_planners.py --run "$NAME=$MDIR" --run "$REF=$BASE/$REF" --ref "$REF" \
         | sed -n '/^J_total/,$p'
 } 2>&1 | grep -v Warning | tee "$OUT/report.txt"
 echo "== $(date '+%F %T') ALL DONE, report: $(pwd)/$OUT/report.txt"

@@ -1,0 +1,87 @@
+972 scenarios in every run (dagger1: 972, CEM: 972, FOP: 972, FISS+: 972, CVAE_warm: 972, v3_img: 972)
+
+           scenarios  success  success_rate  rear_end_failures  other_failures  fop_fallback_share  runtime_mean_ms  runtime_median_ms  runtime_p95_ms  reached  end_goal  end_map_end  end_time_limit  end_failed
+planner                                                                                                                                                                                                           
+dagger1          972      871        0.8961                 39              62              0.1161           6.0524             3.5733         24.3477   0.7058    0.7058        0.000          0.1903      0.1029
+CEM              972      861        0.8858                 44              67              0.0000          40.7815            34.0321         88.8577   0.7397    0.7397        0.000          0.1461      0.1132
+FOP              972      872        0.8971                 40              60              0.0000          15.1900            11.8833         33.0640   0.6646    0.6646        0.000          0.2325      0.1019
+FISS+            972      865        0.8899                 43              64              0.0000           2.5500             0.5647         13.8785   0.7387    0.7377        0.001          0.1512      0.1091
+CVAE_warm        972      871        0.8961                 40              61              0.1196           6.4066             3.8980         25.3386   0.7099    0.7099        0.000          0.1862      0.1029
+v3_img           972      870        0.8951                 40              62              0.1178           6.1183             3.5735         23.8665   0.6831    0.6821        0.001          0.2119      0.1039 
+
+J_total on the 846 scenarios solved by all planners (difference to CEM):
+  dagger1      mean   10.935 | diff +1.321 ± 0.193 (95 % CI), median +0.412, Wilcoxon p 5.2e-97, lower than CEM in 11.0%
+  CEM          mean    9.615
+  FOP          mean   12.268 | diff +2.654 ± 1.021 (95 % CI), median +0.223, Wilcoxon p 5.4e-83, lower than CEM in 16.8%
+  FISS+        mean    9.843 | diff +0.228 ± 0.097 (95 % CI), median +0.007, Wilcoxon p 3.5e-11, lower than CEM in 36.3%
+  CVAE_warm    mean   10.855 | diff +1.241 ± 0.208 (95 % CI), median +0.358, Wilcoxon p 1.3e-91, lower than CEM in 13.1%
+  v3_img       mean   11.156 | diff +1.542 ± 0.225 (95 % CI), median +0.399, Wilcoxon p 1.5e-97, lower than CEM in 11.7%
+mean cost terms on these scenarios:
+           J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1    0.717  5.995  1.244  0.741  0.478  1.760
+CEM        0.673  5.052  1.168  0.584  0.433  1.705
+FOP        0.754  6.753  1.255  1.176  0.438  1.893
+FISS+      0.679  5.197  1.190  0.591  0.456  1.730
+CVAE_warm  0.715  5.947  1.225  0.729  0.473  1.768
+v3_img     0.725  6.172  1.243  0.735  0.503  1.778
+
+J_total on the 603 scenarios where every planner reached the goal (difference to CEM):
+  dagger1      mean    8.194 | diff +0.866 ± 0.143 (95 % CI), median +0.327, Wilcoxon p 2.1e-66, lower than CEM in 10.4%
+  CEM          mean    7.328
+  FOP          mean    8.646 | diff +1.318 ± 0.349 (95 % CI), median +0.154, Wilcoxon p 3.7e-57, lower than CEM in 16.9%
+  FISS+        mean    7.362 | diff +0.035 ± 0.061 (95 % CI), median +0.001, Wilcoxon p 0.0045, lower than CEM in 38.0%
+  CVAE_warm    mean    8.132 | diff +0.805 ± 0.164 (95 % CI), median +0.278, Wilcoxon p 8.7e-61, lower than CEM in 13.3%
+  v3_img       mean    8.274 | diff +0.947 ± 0.175 (95 % CI), median +0.285, Wilcoxon p 6.6e-65, lower than CEM in 12.1%
+mean cost terms on these scenarios:
+           J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1    0.495  4.296  0.956  0.611  0.478  1.358
+CEM        0.466  3.733  0.890  0.493  0.443  1.302
+FOP        0.514  4.683  0.970  0.592  0.451  1.436
+FISS+      0.466  3.752  0.898  0.491  0.449  1.306
+CVAE_warm  0.494  4.274  0.940  0.599  0.472  1.353
+v3_img     0.499  4.369  0.958  0.601  0.486  1.362
+
+J_total on the 735 scenarios where every planner ended the same way (all reached / all timed out) (difference to CEM):
+  dagger1      mean    9.044 | diff +0.848 ± 0.125 (95 % CI), median +0.357, Wilcoxon p 1.5e-80, lower than CEM in 11.4%
+  CEM          mean    8.196
+  FOP          mean    9.866 | diff +1.669 ± 1.101 (95 % CI), median +0.167, Wilcoxon p 8.5e-67, lower than CEM in 17.7%
+  FISS+        mean    8.269 | diff +0.072 ± 0.092 (95 % CI), median +0.002, Wilcoxon p 0.0015, lower than CEM in 39.0%
+  CVAE_warm    mean    8.988 | diff +0.792 ± 0.140 (95 % CI), median +0.300, Wilcoxon p 2.7e-75, lower than CEM in 13.6%
+  v3_img       mean    9.135 | diff +0.938 ± 0.154 (95 % CI), median +0.309, Wilcoxon p 1e-79, lower than CEM in 12.7%
+mean cost terms on these scenarios:
+           J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1    0.611  4.743  1.023  0.666  0.497  1.503
+CEM        0.587  4.185  0.959  0.524  0.458  1.483
+FOP        0.626  5.016  1.028  1.164  0.460  1.571
+FISS+      0.587  4.210  0.974  0.528  0.483  1.486
+CVAE_warm  0.610  4.722  1.007  0.657  0.492  1.501
+v3_img     0.614  4.827  1.020  0.658  0.508  1.508
+
+
+written to data/measurements/compare_dagger1
+
+---- paired against CVAE_warm ----
+J_total on the 868 scenarios solved by all planners (difference to CVAE_warm):
+  dagger1      mean   11.096 | diff +0.079 ± 0.120 (95 % CI), median +0.002, Wilcoxon p 2.6e-07, lower than CVAE_warm in 36.8%
+  CVAE_warm    mean   11.018
+mean cost terms on these scenarios:
+           J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1    0.725  6.071  1.260  0.753  0.469  1.819
+CVAE_warm  0.723  6.021  1.241  0.741  0.466  1.825
+
+J_total on the 677 scenarios where every planner reached the goal (difference to CVAE_warm):
+  dagger1      mean    9.870 | diff +0.139 ± 0.109 (95 % CI), median +0.002, Wilcoxon p 5.3e-08, lower than CVAE_warm in 33.2%
+  CVAE_warm    mean    9.731
+mean cost terms on these scenarios:
+           J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1    0.583  5.402  1.136  0.685  0.464  1.599
+CVAE_warm  0.579  5.312  1.119  0.673  0.458  1.590
+
+J_total on the 850 scenarios where every planner ended the same way (all reached / all timed out) (difference to CVAE_warm):
+  dagger1      mean   10.897 | diff +0.115 ± 0.090 (95 % CI), median +0.001, Wilcoxon p 6.3e-07, lower than CVAE_warm in 36.8%
+  CVAE_warm    mean   10.782
+mean cost terms on these scenarios:
+           J_ter    J_V    J_A    J_J   J_LC    J_D
+dagger1    0.710  5.949  1.246  0.750  0.467  1.775
+CVAE_warm  0.707  5.874  1.228  0.739  0.462  1.773
+

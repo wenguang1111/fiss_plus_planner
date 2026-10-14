@@ -69,7 +69,7 @@ changing planner, cost or training code.
 - **Collection:** `Collect_Data_For_ML` + `PLANNER: CEM_CPP` on data/10k/Train, run with
   `demo_cr.py --shard k --num_shards n`.
   - Needs C_Planner built with `-DENABLE_DATA_COLLECTION=ON`; rebuild OFF before timing runs
-    (the build is OFF since 2026-10-11).
+    (the build is OFF again since 2026-10-14, after the DAgger round-1 collection).
   - Recording evaluates every check (kFullViolation) but ranks the early-exit view, so its
     decisions are bitwise identical to a normal run.
   - Guide: README.md "Collecting CVAE training data with CEM".
@@ -107,6 +107,14 @@ changing planner, cost or training code.
     - `scripts/merge_wm_data.py` merges these into the WorldModel-branch layout
       (OUT/sampled_vars.parquet, conditions.parquet).
     - The CEM data are identical to v2 up to the changed episode ends.
+    - **State 2026-10-13 (collected on the local PC despite the RAM fault):** Train 6808 scenarios
+      (439,094 cycles with a plan, 7.44 M trajectories), Verification 1947 (127,508 cycles). Checked:
+      no empty / unreadable files, CEM files byte-identical to v2 for equal episode lengths and row-identical
+      on the common cycles otherwise; 316 / 79 scenarios fail at cycle 0 and have no sampled_vars.
+    - Crashes of that run left completed scenarios with 0-byte scenario.json / truncated PNGs (kernel crash
+      right after they finished); scan every file, not only the `completed` count, before packaging.
+    - Fixed in `wm_samples`: draw at most as many candidates as have a non-zero weight (exp underflow made
+      `rng.choice` fail in near-failure cycles; those cycles now have fewer than 17 rows).
   - **v1** (2026-10-08/09) had no reference paths. It was moved off this PC (Train.zip).
   - **v2** is a full recollection with reference paths, best trajectories, reference line and
     d_ss, planned with the same code. The CEM data
@@ -117,7 +125,7 @@ changing planner, cost or training code.
   (18 without a global route, 6 without an ego trajectory) and have no data.
   - The missing ones were recollected with `cfgs/rerun_missing.yaml` (not committed).
   - An integrity scan of all PNG and parquet files was clean.
-  - **RAM fault on the local PC (confirmed 2026-10-11; non-ECC DDR5, no kernel reports):** pages in
+  - **RAM fault on the local PC (confirmed 2026-10-11; non-ECC DDR5, no MCE/EDAC reports):** pages in
     the page cache get corrupted, so a process can read wrong bytes from a correct file.
     - It broke 10 files inside Train.zip (the zip's CRCs match the bad data; fixed on alex).
     - It showed 6 wrong d values in one Verification file until the cache was evicted.
@@ -125,6 +133,10 @@ changing planner, cost or training code.
       `scripts/check_cem_data.py` finds only gross corruption.
     - Compare sha256 of every copy, also against direct-from-disk reads (O_DIRECT).
     - Advise memtest86+ / JEDEC memory speed before trusting large data jobs on this PC.
+    - The kernel log (journalctl, needs the user; `/proc/vmstat` oom_kill is readable) shows it too:
+      kernel crash 2026-10-11 14:32, `BUG: Bad page state` and random python segfaults / general
+      protection faults since 2026-10-05. On 2026-10-12, 5 of 16 shards of the Train v3 collection died
+      this way (not OOM, oom_kill 0), and one input XML was read as corrupt.
 - **v1 statistics:** 86.1 % success; 945 failures (419 rear-end, 316 failing at cycle 0);
   519,001 cycles; 826 M feasible candidates; 54 GB cem_data plus 5.2 GB images. The cache
   (cem_cache.py) is 48 GB, built in 73 s with nothing skipped.
@@ -137,6 +149,11 @@ changing planner, cost or training code.
       149,326 cycles;
     - checksums (read directly from disk) in `cem_verif_R8x250_v2.sha256`;
     - cache `data/output/cvae_local/cem_verif_cache`. Not used for training or model selection.
+  - **From v3 on (user's choice, 2026-10-13):** Verification v3 is the validation set of the training
+    (`--val_cache`: val loss, model_best, per-epoch generation check) and of the offline evaluation; the
+    model trains on all Train scenarios. The independent test is the closed loop on data/10k/Test.
+    Local v3 baseline: `data/output/cvae_local/train_v3.sh` (caches `cem_{train,verif}_cache_v3`, run
+    `runs/v3_attn_tau0.25_beta0.1`).
 
 ## Cost-aware CVAE (CVAE_efficient_sampling, branch `cost-aware`)
 
@@ -272,15 +289,77 @@ changing planner, cost or training code.
     - torch is limited to `Num_Threads_For_CollisionChecker` CPU threads. Its default pool made 12
       parallel CVAE processes reach load 200.
   - Next: the comparison above, then single-process timing and FISS+ with the same SAFETY settings.
-- **Planned: route condition (`--nav`)**, taken from Giovanni's world-model CVAE.
-  - The BEV images do not show the route, so at intersections the CVAE cannot see which branch is
-    planned.
-  - Add a navigation tokenizer (MLP + position embedding over the resampled reference path:
-    2 m, 20 points, deltas). Add cross-attention to these tokens in the encoder and decoder, and
-    condition the prior on them.
-  - Compare image-only vs image + route.
-  - Needs the v2 data (`conditions.parquet`) in the cache (`ref_path.bin`). The inference interface
-    gets `generate_samples(frames, k, ref_path=...)`, computed with the same `reference_ahead_local`.
+- **Route condition (`--route`, implemented 2026-10-13; closed-loop result 2026-10-14: no effect)**, taken from
+  Giovanni's world-model CVAE.
+  - Test (972, vs goalpos baselines, `data/measurements/compare_v3_{img,route}`): v3_route vs v3_img paired
+    J +0.008 ± 0.128 (p 0.55), success 89.4 vs 89.5 %, reached 69.3 vs 68.3 %; offline also equal.
+  - Reason: z = [d, v, T] is in the Frenet frame of the reference line, so the branch at intersections is
+    already chosen by the reference line; the route can only inform the speed (curvature ahead), and J_V did
+    not change (6.23 vs 6.25). It matters for Giovanni's Cartesian (x, y) outputs, not for ours.
+  - v3 image-only baseline (`runs/v3_attn_tau0.25_beta0.1`, CVAE v1 setting on v3 data) vs CVAE v1 + warm
+    start: J +0.29 ± 0.13 paired (lower in 36 %), success 89.5 vs 89.6 %, reached 68.3 vs 71.0 %, J_V 6.25 vs
+    6.03. One training seed each, so this may be seed noise; not checked yet.
+  - **Where the CVAE loses to CEM (v3_img, Test, 851 scenarios solved by both, 2026-10-14):** J gap 1.54 per
+    scenario, 73 % J_V. Below 1 m/s the CVAE spends 10.2 % of its cycles (CEM 5.7 %); the J_V accumulated there
+    is 47 % of the J gap (50 % with the time term); in 80 % of these cycles no sample was rejected by clearance
+    (not held back); the top 10 % of scenarios hold 94 % of it (e.g. HRV_Centar-51: goal rectangle right behind
+    a standing car, the CVAE stops ~6 m back and creeps). Another 16 % of the gap is CEM in the clearance
+    fallback (no clearance, drives close: POL_Krakow-62, GRC_NeaSmyrni-73, DEU_Bonn-11).
+  - Offline at CEM's own states (Verification, per ego-speed bin) the CVAE is not slower at low speed (v bias
+    +0.26 m/s below 1 m/s, -0.37 m/s above 8 m/s); its v spread is about half the target's in every bin.
+    So the creeping comes from states the CVAE reaches itself and CEM rarely visits (compounding error /
+    distribution shift, Ross et al. 2011): DAgger with CEM as the expert is the literature remedy.
+  - K = 32 (v3_img, `compare_v3_k32`): vs K = 16 J -0.077 ± 0.071 (small), vs CEM +1.46 (K16 +1.54, CVAE_warm
+    +1.24); low-speed cycles 10.0 vs 10.2 %, so more samples barely touch the creeping -> not mainly sample
+    concentration. v3 Train has a third fewer cycles below 1 m/s than v2 (25.7k vs 38.5k: the episodes end at
+    the goal), a candidate cause of v3 < v1 (untested).
+  - `data/output/cvae_warm/cvae_cycles` belongs to an older run (before goalpos), not to goalpos/CVAE_warm.
+  - GIF tools: `scripts/compare_gifs.sh SCEN...` (CEM, CVAE_warm, v3_img; goal region drawn, cycle in the title).
+  - The BEV images do not show the route (`ScenarioDrawer._render_frame` draws all lanes in one gray), so at
+    intersections the image-only CVAE cannot see which branch is planned.
+  - Input: the reference path ahead (conditions.parquet; planner: `planners.common.utils.reference_ahead_local`,
+    43.75 m) -> `cem_dataset.route_features`: resampled every 2 m by arc length, 20 points (0-38 m), straight
+    extension past the end, deltas (first from the ego), divided by 2 m.
+  - Model: `attnCVAE(route_points=20)`, `PointTokenizer` (shared MLP + position embedding, Giovanni's
+    cond_n); the 20 route tokens are appended to the condition tokens (as `--ego`), so encoder cross-attention,
+    prior and decoder see them. Giovanni uses FiLM for them instead.
+  - Cache: raw paths in `route_xy.bin` + `route_offsets.bin` (about 1.5 GB for Train), converted when read.
+    Storing the resampled points is not equivalent (resampling again moves points up to 0.15 m on curves).
+    `cem_cache.py --add_route` adds them to an existing cache.
+  - Tests (30 scenarios): build == add_route, cache == conditions.parquet, the planner's path at cycle 0
+    equals the data (1e-6 m), smoke trainings with / without --route, cvae_v1 still loads.
+  - Trained by `data/output/cvae_local/train_v3.sh` after the baseline (run `v3_attn_route_tau0.25_beta0.1`);
+    compare image-only vs image + route in closed loop on Test.
+- **DAgger (Ross, Gordon & Bagnell, AISTATS 2011; round 1 done 2026-10-14, positive; user's choice: on the v3
+  data):**
+  - Collection: `PLANNER: CVAE_FOP` + `Collect_Data_For_ML: True` (planning.py `expert`): CVAE-FOP drives, the
+    CEM of the collection (CEM section, record_candidates) plans in every state it reaches; the CEM data
+    (candidates, contexts best_*, best_trajectory, sampled_vars) are the expert's, scenario.json and the images
+    are the learner's run. Config `cfgs/collect_dagger1.yaml` (learner = v3_img, K 16, warm start;
+    Runtime_Measurement True), run with `scripts/run_collection.sh`; needs the ON build (rebuilt OFF after the
+    round-1 collection, 2026-10-14). The script does not notice dead shards: check that every shard log ends at
+    its last scenario (3 of 12 died silently in round 1, RAM fault); a rerun skips completed scenarios, use a
+    different SHARDS so the rest spreads over all processes (scenarios are assigned by index mod SHARDS).
+  - Training on the aggregate: `train_cost_cvae.py --cache <v3 cache> <dagger cache> --val_cache <verif v3>`
+    (`CEMCycleConcat`; cache k > 0 draws with seed + 1000 k; one cache trains as before).
+  - Tests (3 Train scenarios): the learner's run is identical with and without the expert; the expert's cycle-0
+    candidates equal the v3 CEM data byte for byte; images = cycles; cache build + 2-cache training work.
+  - Rule B (user's choice): DAgger caches (`CEMCache.dagger`, from dataset_info `dagger_learner`) keep the cycles
+    before a learner failure (no drop_tail, failed scenarios kept); the CEM data keep the 2.5 s rule.
+  - Analysis tools: `scripts/lowspeed_gap.py` (share of the gap below 1 m/s), `scripts/speed_bins_offline.py`.
+  - **Round 1 result (2026-10-14, `results/ablations/dagger1/README.md`; frozen model `data/models/dagger1`,
+    archive `data/results/dagger1`):**
+    - Data: 6808 scenarios, 474,877 learner cycles (learner on Train: reached 4501 vs CEM 4930, time limit 1557
+      vs 1048); training on 909,499 cycles (v3 + DAgger), 4 h 22 min.
+    - Offline on Verification v3 equal to v3_img (best_cost@16 0.176 vs 0.182): expected, those are CEM's states.
+    - Test vs v3_img paired: J **-0.214 ± 0.111** (p 4e-4), mostly J_V; reached 68.3 -> 70.6 %, success 89.6 %;
+      gap to CEM +1.54 -> +1.32 (CVAE_warm +1.24: equal to dagger1, +0.08 ± 0.12). Cycles below 1 m/s 10.2 ->
+      8.9 % (CEM 5.7 %), low-speed J_V excess -28 % (47 -> 40 % of the gap).
+    - Caveats: one seed; twice the training items. Next: control v3 + `--draws_per_cycle 2`, 2nd seed, round 2
+      (learner = dagger1), as the user decides.
+    - The paired comparison against v3_img is not in run_cvae_variant's report: `compare_planners.py --run
+      dagger1=... --run v3_img=data/measurements/cvae_v3_img --ref v3_img`.
+  - Design, results and commands of all ablations: memory cvae-ablations (overview table + entries 4-7).
 - **Later ideas** (user wants them after V1): use feasible / V labels for the CVAE. Independent
   CEM restarts and a curvature constraint are not planned.
 

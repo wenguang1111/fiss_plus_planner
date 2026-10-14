@@ -30,6 +30,7 @@ import torch
 
 from CVAE_efficient_sampling.CVAE import CostAwareCVAE
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper, to_cpp_state, to_py_trajectory
+from fiss_plus_planner.planners.common.utils import reference_ahead_local
 from fiss_plus_planner.planners.frenet_optimal_planner import Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 
@@ -62,7 +63,8 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         self.cycle_log = []
         self.cpp_settings = self.cpp_planner.settings  # clearance_fallback is switched off for the samples
         self.cvae.generate_samples([np.zeros((self.cvae.img_size,) * 2, np.uint8)], self.k,  # CUDA warm-up
-                                   ego=np.zeros(8) if self.cvae.uses_ego else None)
+                                   ego=np.zeros(8) if self.cvae.uses_ego else None,
+                                   ref_path=np.zeros((1, 2)) if self.cvae.uses_route else None)
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         csp, ref_pts = super().generate_frenet_frame(centerline_pts)
@@ -75,12 +77,12 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
     def get_stats(self) -> Stats:
         return self.cycle_stats
 
-    def draw_samples(self, space, time_step_now: int, ego=None) -> np.ndarray:
+    def draw_samples(self, space, time_step_now: int, ego=None, ref_path=None) -> np.ndarray:
         """K samples [d, v, T] of the configured sampler (before clipping); ego: the raw ego state for a CVAE
-        trained with --ego."""
+        trained with --ego, ref_path: the reference path ahead in the ego frame for one trained with --route."""
         if self.sampler == "cvae":
             torch.manual_seed(self.seed + time_step_now)
-            return self.cvae.generate_samples(self.frames, self.k, ego=ego)
+            return self.cvae.generate_samples(self.frames, self.k, ego=ego, ref_path=ref_path)
         rng = np.random.default_rng(self.seed + time_step_now)
         if self.sampler == "uniform":
             lo, hi = np.array(space[0::2]), np.array(space[1::2])
@@ -109,7 +111,11 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
                 initial_state.velocity, initial_state.acceleration, frenet_state.s_d, frenet_state.s_dd,
                 frenet_state.d, frenet_state.d_d, frenet_state.d_dd,
                 max_target_speed if desired_speed is None else desired_speed]
-            z = self.draw_samples(space, time_step_now, ego)
+            # Route as in the training data (planning.py: conditions.parquet, half the BEV view ahead)
+            ref_path = None if not self.cvae.uses_route else reference_ahead_local(
+                self.drawer.ref_ego_lane_pts[:, :2], np.asarray(initial_state.position, dtype=float),
+                float(initial_state.orientation), ScenarioDrawer.VIEW_SIZE_DEFAULT / 2.0)
+            z = self.draw_samples(space, time_step_now, ego, ref_path)
             if self.warm_start and self.prev_z is not None:
                 z = np.vstack([z, self.prev_z])
             n_outside = int(np.any((z < lo) | (z > hi), axis=1).sum())
