@@ -12,6 +12,9 @@ from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlann
 class FopPlusPlanner(FrenetOptimalPlanner):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle,
                  obstacles_array=None, obstacles_num_vertices=None):
+        planner_settings.min_t = 3.0
+        planner_settings.max_t = 5.0
+        planner_settings.tick_t = 0.2
         super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices)
         self.candidate_trajs = PriorityQueue()
 

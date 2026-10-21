@@ -42,7 +42,7 @@ class CostFunction:
         obstacles_num_vertices: np.ndarray,
         traj: FrenetTrajectory, 
         time_step_now: int = 0
-    ) -> float:
+        ) -> float:
         num_traj_points = len(traj.x)
         num_time_steps = obstacles_array.shape[0]
         num_obstacles = obstacles_array.shape[1]

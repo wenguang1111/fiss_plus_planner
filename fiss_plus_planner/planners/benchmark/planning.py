@@ -34,6 +34,8 @@ from fiss_plus_planner.planners.commonroad_interface.global_planner import Globa
 from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSettings
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
+from fiss_plus_planner.planners.fop_plus_random_planner import FopPlusRandomPlanner
+from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner, FopPlusWMSelectionSettings
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
@@ -49,6 +51,11 @@ from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioD
 from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOptimizedSettings, SparsePlannerOptimized
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
 from fiss_plus_planner.planners.sparse_planner_CVAE import SparsePlannerCVAESettings, SparsePlannerCVAE
+from fiss_plus_planner.planners.sparse_planner_CVAE_rl import SparsePlannerWorldModelSettings, SparsePlannerWorldModel
+from fiss_plus_planner.planners.sparse_planner_CVAE_rl_offline import SparsePlannerRLoffline, SparsePlannerRLofflineSettings
+from fiss_plus_planner.planners.sparse_planner_CVAE_wm_selection import SparsePlannerWMSelection, SparsePlannerWMSelectionSettings
+from fiss_plus_planner.planners.sparse_planner_CVAE_rnd_selection import SparsePlannerCVAERandomSelection, SparsePlannerCVAERandomSettings
+
 
 # === IEEE-like font family and sizes (10pt doc) ===
 S = {
@@ -270,6 +277,17 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             num_width, num_speed, num_t)
         planner = FopPlusPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
+    elif method == 'FOP+_random':
+        planner_settings = FrenetOptimalPlannerSettings(
+            num_width, num_speed, num_t)
+        planner = FopPlusRandomPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method == 'FOP+_WM':
+        planner_settings = FopPlusWMSelectionSettings(
+            num_width, num_speed, num_t, input_dir, file)
+        planner = FopPlusWMSelectionPlanner(
+            planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     elif method == 'FISS':
         planner_settings = FissPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
@@ -290,9 +308,25 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = SparsePlannerFOPSettings(num_width, num_speed, num_t, input_dir, file)
         planner = SparsePlannerFOP(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
-    elif method in ('Sparse_WorldModel', 'Sparse_CVAE'):
-        planner_settings = SparsePlannerCVAESettings(num_width, num_speed, num_t, input_dir, file)
-        planner = SparsePlannerCVAE(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+    elif method == 'Sparse_CVAE':
+            planner_settings = SparsePlannerCVAESettings(num_width, num_speed, num_t, input_dir, file)
+            planner = SparsePlannerCVAE(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+            use_cpp_planner = False
+    elif method == 'Sparse_WorldModel':
+            planner_settings = SparsePlannerWorldModelSettings(num_width, num_speed, num_t, input_dir, file)
+            planner = SparsePlannerWorldModel(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+            use_cpp_planner = False
+    elif method == 'Sparse_RLoffline':
+            planner_settings = SparsePlannerRLofflineSettings(num_width, num_speed, num_t, input_dir, file)
+            planner = SparsePlannerRLoffline(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+            use_cpp_planner = False
+    elif method == 'Sparse_WM_selection':
+            planner_settings = SparsePlannerWMSelectionSettings(num_width, num_speed, num_t, input_dir, file)
+            planner = SparsePlannerWMSelection(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+            use_cpp_planner = False
+    elif method == 'Sparse_CVAE_random':
+        planner_settings = SparsePlannerCVAERandomSettings(num_width, num_speed, num_t, input_dir, file)
+        planner = SparsePlannerCVAERandomSelection(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
     elif method == 'FOP_CPP':
         # Use C++ Frenet Optimal Planner with pybind11
@@ -457,6 +491,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         state_list.append(next_state)
         time_list.append(end_time - start_time)
 
+        # Track full-horizon completion independently of whether the goal was reached.
+        if i == final_time_step - 1:
+            stats.reached_final_time = True
+
         if ego_centered_fop_cpp:
             optimal_path_x_local_list.append(optimal_path_x_local)
             optimal_path_y_local_list.append(optimal_path_y_local)
@@ -478,15 +516,15 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 break
             elif np.hypot(next_state.position[0] - ref_ego_lane_pts[-1, 0], next_state.position[1] - ref_ego_lane_pts[-1, 1]) <= 3.0:
                 print("Reaching End of the Map, Stopping, Goal Not Reached")
-                goal_reached = True
-                stats.success = True
+                goal_reached = False
+                stats.success = False
                 break
         
         #break when the speed is close to zero, this is a simple model with out standstill feature.
-        if abs(next_state.velocity) < 0.01:
-            goal_reached = True
-            stats.success = False
-            break
+        # if abs(next_state.velocity) < 0.01:
+        #     goal_reached = True
+        #     stats.success = False
+        #     break
 
         if show_animation:  # pragma: no cover
             plt.cla()
@@ -513,9 +551,25 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 plt.pause(0.0001)
 
         if i == final_time_step-1:
-            stats.success = True
-            goal_reached = True
+            stats.success = False
+            goal_reached = False
             
+    if method == 'FOP+_WM' and not stats.success:
+        planner.print_failure_candidate_costs()
+        failure_plot_path = (
+            os.path.join(output_dir, "world_model_failure_rollouts")
+            + os.sep
+            + f"{os.path.splitext(os.path.basename(file))[0]}_rollout5.png"
+        )
+        try:
+            saved = planner.save_failure_rollout_plot(failure_plot_path)
+            if saved:
+                print(f"Saved five world-model rollout images: {failure_plot_path}")
+            else:
+                print("No selected world-model rollout is available to plot for this failure")
+        except Exception as exc:
+            print(f"Warning: failed to save world-model failure rollout plot: {exc}")
+
     # construct the final frenet trajectory and calculate the final cost
     final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list, global_state_list)
     final_trajectory.cost_final = planner.cost_function.final_trajectory_cost(

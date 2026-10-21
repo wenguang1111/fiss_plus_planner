@@ -38,7 +38,7 @@ if __name__ == '__main__':
             with open(csv_path, 'w', newline='', encoding='utf-8') as csv_file:
                 csv_file.write(
                     'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                    'num_collision_checks,average_cost,max_cost, step_number_for_break, success\n'
+                    'num_collision_checks,average_cost,max_cost, step_number_for_break, success, reached_final_time\n'
                 )
     
     if cfg['FILES']:
@@ -57,7 +57,7 @@ if __name__ == '__main__':
                     csv_file.write(
                         f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
                         f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-                        f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success}\n'
+                        f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success},{measurement.reached_final_time}\n'
                     )
     else:
         for i, file in enumerate(os.listdir(input_dir)):
@@ -74,5 +74,5 @@ if __name__ == '__main__':
                     csv_file.write(
                         f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
                         f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-                        f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success}\n'
+                        f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success},{measurement.reached_final_time}\n'
                     )

@@ -38,6 +38,7 @@ class Stats(object):
         self.runtime_history = []
         self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
         self.success = False
+        self.reached_final_time = False
         self.num_FOP_intervention = 0 # only for sparse_planner_fop
         self.last_cycle_num_rejected_dynamic = 0
         self.last_cycle_num_rejected_offroad = 0
@@ -80,8 +81,8 @@ class FrenetOptimalPlannerSettings(object):
         self.lowest_speed = 0.0             # lowest sampling speed [m/s]
         self.num_speed = num_speed          # speed sampling number
         
-        self.min_t = 3.0                    # min prediction time [m]
-        self.max_t = 5.0                   # max prediction time [m]
+        self.min_t = 3                    # min prediction time [m]
+        self.max_t = 5                   # max prediction time [m]
         self.num_t = num_t                  # time sampling number
 
         self.check_obstacle = True          # True if check collison with obstacles
@@ -235,19 +236,22 @@ class FrenetOptimalPlanner(object):
         for i, traj in enumerate(trajs):
             # Max curvature check
             # if any([abs(c) > self.vehicle.max_curvature for c in traj.c]):
+            #     self.stats.num_rejected_dynamic += 1
             #     continue
             # if any([abs(c_d) > self.vehicle.max_kappa_d for c_d in traj.c_d]):
+            #     self.stats.num_rejected_dynamic += 1
             #     continue
             # if any([abs(c_dd) > self.vehicle.max_kappa_dd for c_dd in traj.c_dd]):
+            #     self.stats.num_rejected_dynamic += 1
             #     continue
             # Max speed check
-            if any([v > self.vehicle.max_speed for v in traj.s_d]):
-                self.stats.num_rejected_dynamic += 1
-                continue
+            # if any([v > self.vehicle.max_speed for v in traj.s_d]):
+            #     self.stats.num_rejected_dynamic += 1
+            #     continue
             # Max accel check
-            if any([abs(a) > self.vehicle.max_accel for a in traj.s_dd]):
-                self.stats.num_rejected_dynamic += 1
-                continue
+            # if any([abs(a) > self.vehicle.max_accel for a in traj.s_dd]):
+            #     self.stats.num_rejected_dynamic += 1
+            #     continue
             # Road departure check: keep the whole vehicle body on the drivable roadway, evaluated
             # against the road edges at each point's own arc length rather than one width for the whole
             # route. This bounds the road, not the lane, so changing lanes is not a departure.
