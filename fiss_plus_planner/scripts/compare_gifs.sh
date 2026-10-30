@@ -9,7 +9,7 @@ set -u
 cd "$(dirname "$0")/.." || exit 1   # fiss_plus_planner/
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 trap 'echo "stopped"; pkill -P $$; exit 130' INT TERM HUP
-PY=${PY:-$HOME/miniconda3/envs/LUT/bin/python}
+PY=${PY:-$HOME/miniconda3/envs/world-model/bin/python}
 JOBS=${JOBS:-6}
 PLANNERS=${PLANNERS:-"CEM=cfgs/cem_test.yaml CVAE_warm=cfgs/cvae_fop.yaml \
 v3_img=cfgs/cvae_fop.yaml,CVAE_FOP.run=data/output/cvae_local/runs/v3_attn_tau0.25_beta0.1"}

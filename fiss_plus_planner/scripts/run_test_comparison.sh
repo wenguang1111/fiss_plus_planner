@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.." || exit 1   # fiss_plus_planner/
 # jobs of a script ignore Ctrl+C and would keep running without it).
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 trap 'echo "stopped: ending the planner processes"; pkill -P $$; exit 130' INT TERM HUP
-PY=${PY:-$HOME/miniconda3/envs/LUT/bin/python}
+PY=${PY:-$HOME/miniconda3/envs/world-model/bin/python}
 PLANNERS=${PLANNERS:-"CVAE_FOP CEM FOP"}
 SHARDS=${SHARDS:-22}
 LOGS=logs_test

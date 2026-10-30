@@ -77,7 +77,7 @@ merges the world-model data:
 
 ```bash
 tmux new -s collect
-conda activate LUT
+conda activate world-model
 cd fiss_plus_planner
 bash scripts/run_collection.sh cfgs/collect_train_v3.yaml              # SHARDS=22 bash ... for 22 processes
 bash scripts/run_collection.sh cfgs/collect_verification_v3.yaml
@@ -89,7 +89,7 @@ takes about 2 h for the 6832 Train scenarios:
 
 ```bash
 tmux new -s collect
-conda activate LUT
+conda activate world-model
 cd fiss_plus_planner
 mkdir -p logs_collect
 for k in $(seq 0 21); do
