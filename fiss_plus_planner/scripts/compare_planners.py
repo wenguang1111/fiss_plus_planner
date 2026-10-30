@@ -2,8 +2,12 @@
 
 Per planner: success rate (failures split into rear-end and others), how the runs ended (goal region /
 map end / time limit / failed, from the termination column of newer runs; goal region and map end count as
-reached), FOP fallback share (CVAE_FOP)
-and runtime per cycle (from the runtime history). The scenario cost J_total = J_run + J_ter is compared
+reached), FOP fallback share (CVAE_FOP), trajectories evaluated per cycle (the real sample budget, a fallback's
+grid included) and runtime per cycle (from the runtime history). For CVAE-FOP runs with cycle logs (the
+measurement folder's twin under data/output/.../cvae_cycles): the fallback share (cycles in which no CVAE sample
+was feasible and the fallback planner, CEM or the FOP grid, planned, with or without the clearance requirement),
+the scenarios with a fallback, the failed cycles, and the feasible share of the K samples. `interrupted` is the
+share of the scenarios that ended because no plan was found (termination failed). The scenario cost J_total = J_run + J_ter is compared
 pairwise on the scenarios every planner solved and, with the termination column, on the scenarios where
 every planner reached the goal (as CommonRoad compares the costs of valid solutions only) and where every
 planner ended the same way: mean, difference to the reference planner with a 95 % confidence interval and the Wilcoxon
@@ -49,6 +53,23 @@ def runtime_ms(df: pd.DataFrame) -> np.ndarray:
     return 1e3 * np.concatenate([json.loads(h) for h in df["runtime history [s]"] if isinstance(h, str)] or [[]])
 
 
+def cvae_stages(measurement_dir: str, scenarios: list) -> pd.Series:
+    """Stage shares of a CVAE-FOP run's cycles on the given scenarios, from its cycle logs (log_cycles) in the
+    output folder of the run (data/measurements/X -> data/output/X); empty if there are none."""
+    out_dir = os.path.join(measurement_dir.replace("measurements", "output", 1), "cvae_cycles")
+    files = [os.path.join(out_dir, s.removesuffix(".xml") + ".csv") for s in scenarios]
+    files = [f for f in files if os.path.exists(f)]
+    if not files:
+        return pd.Series(dtype=float)
+    c = pd.concat([pd.read_csv(f, usecols=["stage", "num_samples", "num_feasible"]).assign(scenario=f) for f in files],
+                  ignore_index=True)
+    fallback = ~c.stage.isin(["samples", "failed"])  # grid / cem, with or without the clearance requirement
+    return pd.Series({"scenarios": len(files), "fallback": fallback.mean(),
+                      "scenarios_with_fallback": fallback.groupby(c.scenario).any().mean(),
+                      "failed_cycles": (c.stage == "failed").mean(),
+                      "feasible": (c.num_feasible / c.num_samples.clip(lower=1)).mean()})
+
+
 def paired_report(data: dict, names: list, ref: str, scenarios: list, label: str) -> pd.DataFrame:
     paired = pd.DataFrame({n: data[n].loc[scenarios, "J_total"] for n in names})
     print(f"J_total on the {len(scenarios)} scenarios {label} (difference to {ref}):")
@@ -92,14 +113,19 @@ def main():
             "success_rate": d.success.mean(), "rear_end_failures": int((fails & d.rear_end_failure).sum()),
             "other_failures": int((fails & ~d.rear_end_failure).sum()),
             "fop_fallback_share": (d["num_FOP_intervence_for_SP"].sum() / d["steps"].sum()) if len(d) else np.nan,
+            "trajs_per_cycle": (d.num_trajs_generated * d.steps).sum() / d.steps.sum() if len(d) else np.nan,
             "runtime_mean_ms": rt.mean() if rt.size else np.nan, "runtime_median_ms": np.median(rt) if rt.size else np.nan,
             "runtime_p95_ms": np.percentile(rt, 95) if rt.size else np.nan,
-            **({"reached": d.termination.isin(REACHED).mean(),
+            **({"interrupted": (d.termination == "failed").mean(), "reached": d.termination.isin(REACHED).mean(),
                 **{f"end_{k}": (d.termination == k).mean() for k in ("goal", "map_end", "time_limit", "failed")}}
                if "termination" in d else {}),
         })
     summary = pd.DataFrame(rows).set_index("planner")
     print(summary.round(4).to_string(), "\n")
+    stages = pd.DataFrame({n: cvae_stages(runs[n], common) for n in names}).T.dropna(how="all")
+    if len(stages):
+        print("CVAE-FOP cycles: fallback = share of the cycles without a feasible CVAE sample (planned by the fallback "
+              "planner); feasible = share of the K samples that passed every check:\n" + stages.round(4).to_string() + "\n")
 
     solved = [s for s in common if all(data[n].at[s, "success"] for n in names)]
     paired = paired_report(data, names, ref, solved, "solved by all planners")
