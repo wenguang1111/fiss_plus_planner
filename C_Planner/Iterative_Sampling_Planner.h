@@ -61,6 +61,11 @@ public:
                           int num_threads = 1,
                           double desired_speed = -1.0);
 
+    // Warm start of the next plan(), as after a cycle that executed `param`; for a planner that only plans some
+    // cycles (the CEM fallback of CVAE-FOP), so it starts from the executed plan as when it plans every cycle.
+    void set_warm_start(const SamplingParam& param) { prev_best_ = param; has_prev_best_ = true; }
+    void clear_warm_start() { has_prev_best_ = false; }
+
 #ifdef ENABLE_DATA_COLLECTION
     CycleRecord last_record;  // filled when iteration_settings().record_candidates
 #endif

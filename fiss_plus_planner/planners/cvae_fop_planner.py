@@ -1,11 +1,13 @@
-"""CVAE-FOP: FOP with learned sampling parameters and a dense FOP fallback.
+"""CVAE-FOP: FOP with learned sampling parameters and a dense FOP or a CEM fallback.
 
 Per planning cycle the cost-aware CVAE (CVAE_efficient_sampling/CVAE.py: CostAwareCVAE) proposes K
 samples z = [d, v, T] from the last three BEV frames; they are clipped to the cycle's search space and
 evaluated by the shared C++ backend (same generator, checks, cost and ranking as FOP), with the
-clearance requirement. If none is feasible, the dense FOP grid (num_width x num_speed x num_t) is planned
-instead (num_FOP_intervention), with the clearance requirement and, if allowed (SAFETY:
-clearance_fallback) and nothing keeps it, without it, as every other planner does.
+clearance requirement. If none is feasible, the fallback plans instead (num_FOP_intervention): the dense FOP
+grid (num_width x num_speed x num_t) or the CEM of the CEM section (the teacher of the training data), with the
+clearance requirement and, if allowed (SAFETY: clearance_fallback) and nothing keeps it, without it, as every
+other planner does. The CEM fallback is warm-started from the previous cycle's executed plan, as the CEM that
+plans every cycle.
 
 Config section CVAE_FOP:
     run          run directory of train_cost_cvae.py (config.json, normalizer/, model_best.pth)
@@ -16,12 +18,13 @@ Config section CVAE_FOP:
     warm_start   add the previous cycle's executed z as sample K + 1 (as CEM starts from its previous best)
     log_cycles   keep per-cycle diagnostics in cycle_log (written to OUTPUT_DIR/cvae_cycles)
     regret       also plan the dense grid in cycles solved by the samples, for the regret (untimed)
+    fallback     fop (the dense grid, default) | cem
 
 time_untimed is the part of the last plan() call that is not planning: rendering the BEV frame (in a
 vehicle the raster comes from perception) and the regret diagnostics. cycle_log rows: stage (samples /
 grid / failed: what produced the plan), counts and rejections of the K samples, J of the samples' best,
-of the grid and of the plan, the chosen z and the stage times. Stages: samples, grid, grid_no_clearance
-(the grid without the clearance requirement), failed.
+of the grid and of the plan, the chosen z and the stage times. Stages: samples, grid / cem (the fallback),
+grid_no_clearance / cem_no_clearance (the fallback without the clearance requirement), failed.
 """
 import time
 
@@ -29,6 +32,7 @@ import numpy as np
 import torch
 
 from CVAE_efficient_sampling.CVAE import CostAwareCVAE
+from fiss_plus_planner.planners.CEM_cpp_wrapper import CEM_CPP_Wrapper
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper, to_cpp_state, to_py_trajectory
 from fiss_plus_planner.planners.common.utils import reference_ahead_local
 from fiss_plus_planner.planners.frenet_optimal_planner import Stats
@@ -38,7 +42,8 @@ from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioD
 class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
 
     def __init__(self, planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices, number_threads=1,
-                 runtime_measurement=False, cvae_cfg: dict = None, scenario_dir: str = "", scenario_file: str = ""):
+                 runtime_measurement=False, cvae_cfg: dict = None, scenario_dir: str = "", scenario_file: str = "",
+                 cem_cfg: dict = None):
         super().__init__(planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                          runtime_measurement)
         cfg = cvae_cfg or {}
@@ -48,6 +53,11 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
         self.log_cycles = bool(cfg.get("log_cycles", False))
         self.regret = bool(cfg.get("regret", False))
         self.warm_start = bool(cfg.get("warm_start", False))
+        if cfg.get("fallback", "fop") not in ("fop", "cem"):
+            raise ValueError(f"CVAE_FOP.fallback must be fop or cem, not {cfg['fallback']}")
+        self.cem = None if cfg.get("fallback", "fop") == "fop" else CEM_CPP_Wrapper(
+            planner_settings, ego_vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+            runtime_measurement, cem_cfg=cem_cfg)
         self.prev_z = None   # z of the previous cycle's plan (warm start)
         self.scenario_dir, self.scenario_name = scenario_dir, scenario_file.removesuffix(".xml")
         # The CPU work of the sampler is small; torch's default pool (one thread per core) only
@@ -68,6 +78,8 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
 
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         csp, ref_pts = super().generate_frenet_frame(centerline_pts)
+        if self.cem is not None:
+            self.cem.generate_frenet_frame(centerline_pts)
         # As the drawer that rendered the training images (planning.py, Collect_Data_For_ML)
         self.drawer = ScenarioDrawer(self.scenario_name, self.scenario_dir, ref_ego_lane_pts=ref_pts,
                                      vehicle_params=self.vehicle, obstacles_array=self.obstacles_array,
@@ -130,17 +142,23 @@ class CVAE_FOP_Wrapper(FOP_CPP_Wrapper):
             self.cycle_stats += Stats.from_cpp(sample_stats)
         t3 = time.perf_counter()
 
-        # 2. Fallback: the dense FOP grid with the clearance requirement, then without it (if allowed)
+        # 2. Fallback: the dense FOP grid or the CEM, with the clearance requirement, then without it (if allowed)
         stage = "samples"
         if best is None or not best.is_generated:
-            stage, self.num_FOP_intervention = "grid", 1
-            best = self.cpp_planner.plan(cpp_state, max_target_speed, time_step_now, self.number_threads, v_des)
-            grid_stats = self.cpp_planner.get_stats()
+            self.num_FOP_intervention = 1
+            fallback, stage = (self.cpp_planner, "grid") if self.cem is None else (self.cem.cpp_planner, "cem")
+            if self.cem is not None:  # warm start from the executed plan, as the CEM that plans every cycle
+                if self.prev_z is None:
+                    fallback.clear_warm_start()
+                else:
+                    fallback.set_warm_start(*map(float, self.prev_z))
+            best = fallback.plan(cpp_state, max_target_speed, time_step_now, self.number_threads, v_des)
+            grid_stats = fallback.get_stats()
             self.cycle_stats += Stats.from_cpp(grid_stats)
             if not best.is_generated:
                 stage = "failed"
             elif grid_stats.num_clearance_fallbacks:
-                stage = "grid_no_clearance"
+                stage += "_no_clearance"
         t4 = time.perf_counter()
 
         j_grid = best.cost_final if stage.startswith("grid") else np.nan

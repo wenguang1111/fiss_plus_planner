@@ -407,7 +407,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         apply_settings(planner_settings, motion_model_cfg)
         planner = CVAE_FOP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                    runtime_measurement, cvae_cfg=sampler_cfg.get('CVAE_FOP'),
-                                   scenario_dir=input_dir, scenario_file=file)
+                                   scenario_dir=input_dir, scenario_file=file, cem_cfg=sampler_cfg.get('CEM'))
         use_cpp_planner = True
     elif method == 'Sparse_CPP':
         # Use C++ Sparse Planner with pybind11

@@ -70,3 +70,4 @@ CVAE_FOP:
   warm_start: True     # add the previous cycle's executed z as sample K + 1 (CVAE v1: False)
   log_cycles: True     # per-cycle diagnostics -> OUTPUT_DIR/cvae_cycles/<scenario>.csv
   regret: False        # also plan the dense grid in cycles solved by the samples (untimed, slower)
+  fallback: "cem"      # fop (the dense grid of N_*_SAMPLE) | cem (the CEM section = the teacher), when no sample is feasible

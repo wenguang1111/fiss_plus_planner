@@ -470,7 +470,11 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
             py::arg("settings"), py::arg("cem_settings"), py::arg("vehicle"),
             py::arg("obstacles_array"), py::arg("num_vertices_array"),
             py::arg("num_time_steps"), py::arg("num_obstacles"), py::arg("max_vertices"))
-        .def_readwrite("cem_settings", &CEM_Planner::cem_settings);
+        .def_readwrite("cem_settings", &CEM_Planner::cem_settings)
+        .def("set_warm_start", [](CEM_Planner& self, double d, double s_d, double t) {
+                 self.set_warm_start(SamplingParam(d, s_d, t));
+             }, py::arg("d"), py::arg("s_d"), py::arg("t"))
+        .def("clear_warm_start", &CEM_Planner::clear_warm_start);
     def_plan<CEM_Planner>(cem);
 
     py::class_<MPPI_Planner, Frenet_Planner> mppi(m, "MPPIPlanner");
