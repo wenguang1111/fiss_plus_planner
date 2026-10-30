@@ -241,10 +241,11 @@ def evaluate_scenario_cost(executed: FrenetTrajectory, v_des: list, dt: float,
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
                             sampler_cfg: dict = None, safety_cfg: dict = None, motion_model_cfg: dict = None,
-                            ml_data_cfg: dict = None) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
+                            ml_data_cfg: dict = None, shadow_cvae: bool = False) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
     """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}}.
     safety_cfg / motion_model_cfg: SAFETY / MOTION_MODEL config sections of the C++ planners.
-    ml_data_cfg: ML_DATA config section (trajectories of the world-model data, see wm_samples)."""
+    ml_data_cfg: ML_DATA config section (trajectories of the world-model data, see wm_samples).
+    shadow_cvae: with CEM_CPP, the CVAE-FOP of the CVAE_FOP section plans in every state the CEM reaches."""
     sampler_cfg = sampler_cfg or {}
     ml_data_cfg = {**ML_DATA_DEFAULTS, **(ml_data_cfg or {})}
     scenario_name = os.path.splitext(file)[0]
@@ -428,6 +429,18 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         apply_settings(expert_settings, motion_model_cfg)
         expert = CEM_CPP_Wrapper(expert_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
                                  runtime_measurement, cem_cfg={**(sampler_cfg.get('CEM') or {}), 'record_candidates': True})
+    # Gap diagnosis, the reverse of DAgger (SHADOW_CVAE): CEM_CPP drives, the CVAE-FOP plans in every state the
+    # CEM reaches and is never executed; it is warm-started from the CEM's executed z, as if it had driven so far.
+    shadow = None
+    if shadow_cvae and method == 'CEM_CPP':
+        shadow_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        apply_settings(shadow_settings, safety_cfg)
+        apply_settings(shadow_settings, motion_model_cfg)
+        shadow = CVAE_FOP_Wrapper(shadow_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                  runtime_measurement, cvae_cfg={**sampler_cfg['CVAE_FOP'], 'log_cycles': True},
+                                  scenario_dir=input_dir, scenario_file=file, cem_cfg=sampler_cfg.get('CEM'))
+    # The CVAE-FOP whose cycle_log also gets the CEM's plan in the same state (DAgger expert or shadow driver)
+    cvae_logger = planner if method == 'CVAE_FOP' else shadow
 
     # The map ends with the scenario: continue the reference straight beyond the route end, so the
     # trajectories near the end do not run off the reference line; the run stops at the route end.
@@ -436,6 +449,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
     if expert is not None:
         expert.generate_frenet_frame(ego_lane_pts)
+    if shadow is not None:
+        shadow.generate_frenet_frame(ego_lane_pts)
     route_end_s = csp_ego.s[num_route_pts - 1]
 
     # Initial state
@@ -508,6 +523,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         else:
             best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
         end_time = time.time()
+        cem_plan, cem_stats = None, None  # the CEM's plan in this state, for the CVAE's cycle_log
+        if shadow is not None:
+            cem_plan, cem_stats = best_traj_ego, planner.get_stats()
+            shadow.plan(current_frenet_state, max_speed, obstacles_all, i, next_state, desired_speed=desired_speed)
+            shadow.prev_z = None if best_traj_ego is None else np.array(
+                [best_traj_ego.sampling_param.d, best_traj_ego.sampling_param.s_d, best_traj_ego.sampling_param.t])
 
         if collect_ml_data:
             ego_pos, ego_yaw = np.asarray(inital_state.position, dtype=float), float(inital_state.orientation)
@@ -521,6 +542,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 if expert is not None:  # DAgger: the expert's plan from the state the CVAE reached
                     label = expert.plan(current_frenet_state, max_speed, obstacles_all, i, next_state,
                                         desired_speed=desired_speed)
+                    cem_plan, cem_stats = label, expert.get_stats()
                 found_label = label is not None and len(label.x) >= 2
                 label_local = transform_points_to_ego(np.column_stack([label.x, label.y]), ego_pos, ego_yaw) \
                     if found_label else np.zeros((0, 2))
@@ -534,6 +556,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 optimal_path_y_local_list.append(path_local[:, 1].tolist())
                 ref_path_x_local_list.append(ref_local[:, 0].tolist())
                 ref_path_y_local_list.append(ref_local[:, 1].tolist())
+
+        if cem_stats is not None and cvae_logger.log_cycles:
+            cvae_logger.cycle_log[-1].update(cem_log_columns(cem_plan, cem_stats))
 
         if planner.all_trajs:
             all_trajs_accumulated.append(planner.all_trajs[-1])
@@ -645,9 +670,9 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             goal_reached = True
             stats.termination = "time_limit"
 
-    if method == 'CVAE_FOP' and planner.cycle_log:
+    if cvae_logger is not None and cvae_logger.cycle_log:
         os.makedirs(os.path.join(output_dir, "cvae_cycles"), exist_ok=True)
-        pd.DataFrame(planner.cycle_log).to_csv(
+        pd.DataFrame(cvae_logger.cycle_log).to_csv(
             os.path.join(output_dir, "cvae_cycles", f"{os.path.splitext(file)[0]}.csv"), index=False)
     if collect_ml_data and global_coordination_state_list:
         if method in ('CEM_CPP', 'CVAE_FOP'):
@@ -839,7 +864,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI'), 'CVAE_FOP': cfg.get('CVAE_FOP')},
                 safety_cfg=cfg.get('SAFETY'),
                 motion_model_cfg=cfg.get('MOTION_MODEL'),
-                ml_data_cfg=cfg.get('ML_DATA'))
+                ml_data_cfg=cfg.get('ML_DATA'),
+                shadow_cvae=bool(cfg.get('SHADOW_CVAE')))
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
@@ -1083,6 +1109,16 @@ def save_data(scenario_name: str, optimal_path_x_list: list, optimal_path_y_list
         df_conditions.to_parquet(conditions_path, index=False)
 
         print(f"Saved {len(optimal_path_x_list)} time steps for scenario {scenario_name}")
+
+
+def cem_log_columns(plan: FrenetTrajectory, stats: Stats) -> dict:
+    """The CEM's plan in a state the CVAE-FOP also planned (DAgger expert or shadow driver), for its cycle_log:
+    J and z of the plan (NaN if none) and whether it was planned without the clearance requirement."""
+    found = plan is not None and len(plan.x) >= 2
+    p = plan.sampling_param if found else None
+    return {"J_cem": plan.cost_final if found else np.nan, "cem_d": p.d if found else np.nan,
+            "cem_v_end": p.s_d if found else np.nan, "cem_T": p.t if found else np.nan,
+            "cem_no_clearance": int(stats.num_clearance_fallbacks > 0)}
 
 
 def cem_cycle_record(planner, time_step: int, frenet_state: FrenetState, state: InitialState,

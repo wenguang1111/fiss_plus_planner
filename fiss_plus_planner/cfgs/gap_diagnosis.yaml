@@ -1,0 +1,71 @@
+# Gap diagnosis (E1): the CVAE-FOP and the CEM plan in the same states, on two state distributions.
+#   learner: CVAE-FOP (section CVAE_FOP) drives, the CEM of the data collection plans in every state it reaches
+#            (DAgger collection, needs C_Planner built with -DENABLE_DATA_COLLECTION=ON); the CEM's candidates are
+#            in OUTPUT_DIR/cem_data
+#   expert:  CEM_CPP drives, the CVAE-FOP plans in every state it reaches (SHADOW_CVAE), warm-started from the
+#            CEM's executed z; the CEM's candidates in these states are those of the CEM collection of the same
+#            scenarios (the CEM is deterministic, see scripts/gap_decomposition.py)
+# In both, OUTPUT_DIR/cvae_cycles has the CVAE-FOP's cycle_log with the CEM's plan in the same state (J_cem, cem_*).
+# scripts/run_gap_diagnosis.sh sets PLANNER, Collect_Data_For_ML, SHADOW_CVAE, the paths and CVAE_FOP.run.
+OUTPUT_DIR: "data/output/gap_learner/"
+MEASUREMENTS_DIR: "data/measurements/gap_learner"
+INPUT_DIR: "data/10k/Verification"
+FILES: []
+PLANNER: "CVAE_FOP"
+N_W_SAMPLE: 10 # dense FOP fallback grid of the CVAE-FOP
+N_S_SAMPLE: 10
+N_T_SAMPLE: 10
+SAVE_GIF: False
+SAVE_MEASUREMENTS: True
+Num_Threads_For_CollisionChecker: 1 # one thread per process (parallel shards)
+Runtime_Measurement: True
+Collect_Data_For_ML: True
+SHADOW_CVAE: False
+ML_DATA:
+  samples: 16
+  tau: 0.25
+  seed: 0
+SHOW_SAMPLED_TRAJECTORIES: False
+SAFETY:
+  check_clearance: True
+  clearance_time_gap: 2.0        # [s]
+  clearance_min_gap: 3.0         # [m]
+  clearance_lateral_margin: 0.2  # [m] added on each ego side for the in-path test
+  clearance_grace_time: 1.0      # [s] start of the horizon without the requirement
+  clearance_recovery_time: 3.0   # [s] time to restore a gap below the target
+  clearance_fallback: True       # plan without it if no candidate keeps the gap
+
+# Lateral motion model of the C++ planners: below low_speed_threshold the lateral motion is a
+# quintic in the travelled arc length d(s) (Werling's thesis Sec. 3.5.1, as in the CommonRoad
+# reactive planner), so the vehicle can stop, wait and start again without moving sideways.
+MOTION_MODEL:
+  low_speed_threshold: 4.0           # [m/s] start speed below which d(s) is used
+  low_speed_min_lateral_length: 5.0  # [m] lower bound of the lateral arc length
+
+# Iterative sampling planners (FOP backend, Gaussian sampler over d, v, T). Trajectories per
+# planning cycle = num_iterations * population; N_*_SAMPLE above are not used by them.
+CEM:
+  num_iterations: 8    # proposal updates per cycle (8 x 250 for the CVAE data collection, see cem_tune_test)
+  population: 250      # samples per iteration
+  elite_fraction: 0.1  # share of the population refitted as elite set
+  smoothing: 0.7       # weight of the elite fit vs. the previous proposal
+  init_std: 0.3        # initial std in unit coordinates of the search space
+  seed: 0
+MPPI:
+  num_iterations: 4
+  population: 250
+  temperature: 0.1     # gamma on the per-iteration normalized cost
+  learning_rate: 0.7   # eta of the mean / covariance update
+  init_std: 0.3
+  seed: 0
+
+# The CVAE-FOP (as cfgs/cvae_fop.yaml: K 16, warm start)
+CVAE_FOP:
+  run: "data/output/cvae_local/runs/v3_attn_tau0.25_beta0.1"
+  num_samples: 16
+  sampler: "cvae"
+  seed: 0
+  warm_start: True
+  log_cycles: True
+  regret: False
+  fallback: "cem"
