@@ -5,7 +5,7 @@ from fiss_plus_planner.planners.iterative_sampling_planner import IterativeSampl
 
 
 class MPPIPlannerSettings(IterativeSamplingSettings):
-    def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, num_iterations: int = 4):
+    def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, num_iterations: int = 8):
         super().__init__(num_width, num_speed, num_t, num_iterations)
         self.temperature = 0.1    # gamma, applied to the per-iteration normalized score
         self.learning_rate = 0.7  # eta of the mean / covariance update
