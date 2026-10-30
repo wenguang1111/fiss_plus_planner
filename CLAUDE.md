@@ -5,6 +5,7 @@ FOP, FISS+, CEM and MPPI share one C++ backend, and a cost-aware CVAE is trained
 propose the sampling parameters (CVAE-FOP with a dense-FOP fallback).
 This file holds the decisions and state from the work so far (until 2026-10-09). Read it before
 changing planner, cost or training code.
+A self-contained summary of all CVAE findings for external readers is `results/cvae_findings.md` (keep it updated).
 
 ## Working with the user
 
@@ -69,7 +70,7 @@ changing planner, cost or training code.
 - **Collection:** `Collect_Data_For_ML` + `PLANNER: CEM_CPP` on data/10k/Train, run with
   `demo_cr.py --shard k --num_shards n`.
   - Needs C_Planner built with `-DENABLE_DATA_COLLECTION=ON`; rebuild OFF before timing runs
-    (the build is OFF again since 2026-10-14, after the DAgger round-1 collection).
+    (the build is ON since 2026-10-14 23:30, for the gap diagnosis E1).
   - Recording evaluates every check (kFullViolation) but ranks the early-exit view, so its
     decisions are bitwise identical to a normal run.
   - Guide: README.md "Collecting CVAE training data with CEM".
@@ -239,6 +240,14 @@ changing planner, cost or training code.
     - `regret`: also plan the grid in cycles solved by the samples (untimed);
     - `warm_start` (default true since 2026-10-11, CVAE v1: false): the previous cycle's executed z
       is sample K + 1.
+    - `fallback` fop | cem (2026-10-15; cfgs/cvae_fop.yaml and gap_diagnosis.yaml: cem, code default fop for the
+      older configs): when no sample keeps the clearance requirement, the teacher CEM of the CEM section plans (with
+      clearance, then without if `clearance_fallback`, as the teacher), warm-started from the previous executed z
+      (C++ `CEMPlanner.set_warm_start`). Stages cem / cem_no_clearance. Test: with no samples at all, CVAE+CEM
+      reproduces the CEM baseline bit for bit (3 scenarios, J to 12 digits). User's evaluation route (2026-10-15):
+      CVAE + CEM fallback vs CEM, reporting (compare_planners.py) **fallback** = share of the cycles without a
+      feasible CVAE sample (CEM planned, whatever it did inside about clearance), **interrupted** = share of the
+      scenarios that ended because no plan was found (termination failed), and the paired J_total of the whole run.
   - **Warm start result** (`results/ablations/warm_start/README.md`, Test):
     - success unchanged at 87.6 %; the FOP fallback share drops from 22.4 % to 11.6 %;
     - J_total 13.21 vs 13.86 (v1) and 11.84 (CEM); paired vs v1 -0.63 ± 0.20, lower in 66 %;
@@ -277,6 +286,9 @@ changing planner, cost or training code.
     - Then `scripts/compare_planners.py --ref CEM` writes `data/measurements/compare_test/`
       (report.txt, summary.csv, paired_costs.csv):
       - success (rear-end / other failures), FOP fallback share, runtime per cycle;
+      - `trajs_per_cycle` (trajectories evaluated per cycle, fallback grids included: the real budget) and, for
+        CVAE-FOP runs with cycle logs, the stage shares samples / grid / grid_no_clearance / failed and the
+        feasible share of the K samples (since 2026-10-15; `grid` is the coverage signal of the CVAE);
       - J_total paired on the scenarios all planners solve: diff with 95 % CI, Wilcoxon p, share
         lower, cost terms.
     - Logs are in `logs_test/`. Every planner run starts from scratch: the script deletes its
@@ -347,6 +359,18 @@ changing planner, cost or training code.
   - Rule B (user's choice): DAgger caches (`CEMCache.dagger`, from dataset_info `dagger_learner`) keep the cycles
     before a learner failure (no drop_tail, failed scenarios kept); the CEM data keep the 2.5 s rule.
   - Analysis tools: `scripts/lowspeed_gap.py` (share of the gap below 1 m/s), `scripts/speed_bins_offline.py`.
+- **Gap diagnosis E1 (implemented 2026-10-14, defines the paper's problem: P1 target / P2 shift / P3 cost):**
+  - `scripts/run_gap_diagnosis.sh NAME RUN [KEY=VALUE]` on data/10k/Verification (`cfgs/gap_diagnosis.yaml`):
+    learner mode = DAgger collection with `log_cycles` (ON build); expert mode = `SHADOW_CVAE: True` with CEM_CPP
+    (CEM drives, CVAE-FOP plans every state, never executed, warm-started from the CEM's executed z).
+  - Both write the CVAE-FOP cycle_log with the CEM's plan in the same state (`J_cem`, `cem_d/v_end/T`,
+    `cem_no_clearance`; planning.py `cem_log_columns`).
+  - `scripts/gap_decomposition.py NAME`: per cycle r = J_plan - J_cem and rT = exact E[best of K target draws] -
+    J_cem (with / without /q), per speed bin and mode; low-speed check (cem_v_end vs v_end); closed-loop Spearman.
+    Expert states are checked against cem_verif_R8x250_v3 (smoke: 100 % identical).
+  - Offline result on all 127,508 Verification v3 states (perfect CVAE = target, tau 0.25): best-of-K regret per
+    cycle K 1/4/16/64 with /q 0.86/0.41/0.23/0.14, without /q 0.18/0.055/0.021/0.009 (J_cem ~5). The density
+    correction makes the target ~10x worse for best-of-16 (P1 candidate; closed-loop test: `--no_density_correction`).
   - **Round 1 result (2026-10-14, `results/ablations/dagger1/README.md`; frozen model `data/models/dagger1`,
     archive `data/results/dagger1`):**
     - Data: 6808 scenarios, 474,877 learner cycles (learner on Train: reached 4501 vs CEM 4930, time limit 1557
@@ -359,7 +383,25 @@ changing planner, cost or training code.
       (learner = dagger1), as the user decides.
     - The paired comparison against v3_img is not in run_cvae_variant's report: `compare_planners.py --run
       dagger1=... --run v3_img=data/measurements/cvae_v3_img --ref v3_img`.
-  - Design, results and commands of all ablations: memory cvae-ablations (overview table + entries 4-7).
+  - **Control draws2 (2026-10-15, run `runs/v3_draws2_tau0.25_beta0.1`: v3 only, `--draws_per_cycle 2`):** Test vs
+    v3_img -0.149 ± 0.092 (p 0.006), vs dagger1 +0.066 ± 0.093 (p 0.29). ~70 % of DAgger's gain is the doubled
+    training items; the on-policy part is within one-seed noise (memory cvae-ablations entry 9).
+  - **E4 A no /q (2026-10-15, run `runs/v3_draws2_noq_tau0.25_beta0.1`, = draws2 + `--no_density_correction`):** Test
+    vs draws2 -0.281 ± 0.152 (p 4e-11), vs CVAE_warm -0.134 ± 0.110: new best CVAE (gap to CEM 1.10); low-speed J_V
+    excess halved; FOP fallback 11.7 -> 13.0 % (coverage cost). P1 confirmed (memory cvae-ablations entry 10).
+  - **Success-only data (2026-10-29/30, `results/ablations/success_only/README.md`):** scenario folders
+    `data/10k/{Train,Verification,Test}_cem_success` (5984 / 1711 / 861 scenarios CEM completes; outcome lists in
+    `data/10k/cem_outcomes/`). `train_cost_cvae.py --success_only` restricts the v3 caches to them (no recollection).
+    Run `runs/succ_draws2_tau0.05_beta0.1` (B settings), frozen `data/models/succ_draws2_tau005`. Test_cem_success with
+    `scripts/run_test_set.sh` (CEM / FOP / FISS+ / B_v3 / B_succ, each from its earlier config; results in
+    `data/measurements/cem_success/`): J vs CEM FISS+ +0.23, B_succ +0.68, B_v3 +0.75, FOP +2.66; interrupted
+    2 / 5 / 7 / 8; B_succ vs B_v3 -0.075 ± 0.058 (p 0.001, one seed). FISS+ stays ahead of every CVAE.
+  - **Python env (2026-10-29/30):** the user works in conda `world-model`; all scripts default to it. That env has
+    another checkout (`~/workspace/CVPR/fiss_plus_planner`) installed as `fiss_plus_planner`; `scripts/demo_cr.py` now
+    puts this repository first on sys.path. Other scripts importing the package need
+    `PYTHONPATH=~/workspace/fiss_plus_planner` there.
+  - Design, results and commands of all ablations: memory cvae-ablations (overview table + entries 4-14) and
+    `results/ablations/CLAUDE.md`.
 - **Later ideas** (user wants them after V1): use feasible / V labels for the CVAE. Independent
   CEM restarts and a curvature constraint are not planned.
 
