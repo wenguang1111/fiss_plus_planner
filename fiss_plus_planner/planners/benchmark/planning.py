@@ -36,6 +36,8 @@ from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPl
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.fop_plus_random_planner import FopPlusRandomPlanner
 from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner, FopPlusWMSelectionSettings
+from fiss_plus_planner.planners.cem_planner import CEMPlanner, CEMPlannerSettings
+from fiss_plus_planner.planners.mppi_planner import MPPIPlanner, MPPIPlannerSettings
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
@@ -287,6 +289,14 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             num_width, num_speed, num_t, input_dir, file)
         planner = FopPlusWMSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method == 'CEM':
+        planner_settings = CEMPlannerSettings(num_width, num_speed, num_t)
+        planner = CEMPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method == 'MPPI':
+        planner_settings = MPPIPlannerSettings(num_width, num_speed, num_t)
+        planner = MPPIPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
     elif method == 'FISS':
         planner_settings = FissPlannerSettings(num_width, num_speed, num_t)
