@@ -1,0 +1,39 @@
+OUTPUT_DIR: data/output/cem_success/CEM/
+MEASUREMENTS_DIR: data/measurements/cem_success/CEM
+INPUT_DIR: data/10k/Test_cem_success
+FILES: []
+PLANNER: CEM_CPP
+N_W_SAMPLE: 10
+N_S_SAMPLE: 10
+N_T_SAMPLE: 10
+SAVE_GIF: false
+SAVE_MEASUREMENTS: true
+Num_Threads_For_CollisionChecker: 1
+Runtime_Measurement: true
+Collect_Data_For_ML: false
+SHOW_SAMPLED_TRAJECTORIES: false
+SAFETY:
+  check_clearance: true
+  clearance_time_gap: 2.0
+  clearance_min_gap: 3.0
+  clearance_lateral_margin: 0.2
+  clearance_grace_time: 1.0
+  clearance_recovery_time: 3.0
+  clearance_fallback: true
+MOTION_MODEL:
+  low_speed_threshold: 4.0
+  low_speed_min_lateral_length: 5.0
+CEM:
+  num_iterations: 8
+  population: 250
+  elite_fraction: 0.1
+  smoothing: 0.7
+  init_std: 0.3
+  seed: 0
+MPPI:
+  num_iterations: 4
+  population: 250
+  temperature: 0.1
+  learning_rate: 0.7
+  init_std: 0.3
+  seed: 0

@@ -1,0 +1,85 @@
+861 scenarios in every run (CEM: 861, FOP: 861, FISS+: 861, B_v3: 861, B_succ: 861)
+
+         scenarios  success  success_rate  rear_end_failures  other_failures  fop_fallback_share  trajs_per_cycle  runtime_mean_ms  runtime_median_ms  runtime_p95_ms  interrupted  reached  end_goal  end_map_end  end_time_limit  end_failed
+planner                                                                                                                                                                                                                                       
+CEM            861      861        1.0000                  0               0              0.0000        2159.8660          44.3690            37.2849         95.8233       0.0000   0.8351    0.8351       0.0000          0.1649      0.0000
+FOP            861      853        0.9907                  0               8              0.0000        1072.5053          16.6872            13.1474         36.3050       0.0093   0.7329    0.7329       0.0000          0.2578      0.0093
+FISS+          861      859        0.9977                  0               2              0.0000         231.4690           2.6775             0.5963         16.5424       0.0023   0.8269    0.8258       0.0012          0.1707      0.0023
+B_v3           861      854        0.9919                  1               6              0.2045         579.6004          11.5832             3.8156         50.7189       0.0081   0.7991    0.7979       0.0012          0.1928      0.0081
+B_succ         861      856        0.9942                  4               1              0.2170         608.4693          12.0522             3.7695         52.1671       0.0058   0.8037    0.8037       0.0000          0.1905      0.0058 
+
+CVAE-FOP cycles: fallback = share of the cycles without a feasible CVAE sample (planned by the fallback planner); feasible = share of the K samples that passed every check:
+        scenarios  fallback  scenarios_with_fallback  failed_cycles  feasible
+B_v3        861.0    0.2045                   0.6841         0.0001    0.7031
+B_succ      861.0    0.2170                   0.7131         0.0001    0.6936
+
+J_total on the 845 scenarios solved by all planners (difference to CEM):
+  CEM          mean    9.679
+  FOP          mean   12.334 | diff +2.655 ± 1.022 (95 % CI), median +0.223, Wilcoxon p 1.1e-83, lower than CEM in 16.6%
+  FISS+        mean    9.909 | diff +0.230 ± 0.097 (95 % CI), median +0.007, Wilcoxon p 2.4e-11, lower than CEM in 36.2%
+  B_v3         mean   10.432 | diff +0.753 ± 0.104 (95 % CI), median +0.264, Wilcoxon p 2.9e-101, lower than CEM in 9.8%
+  B_succ       mean   10.362 | diff +0.683 ± 0.101 (95 % CI), median +0.217, Wilcoxon p 1.2e-96, lower than CEM in 11.5%
+mean cost terms on these scenarios:
+        J_ter    J_V    J_A    J_J   J_LC    J_D
+CEM     0.672  5.055  1.167  0.584  0.499  1.702
+FOP     0.753  6.757  1.255  1.174  0.504  1.891
+FISS+   0.679  5.201  1.190  0.591  0.523  1.727
+B_v3    0.696  5.541  1.218  0.712  0.529  1.736
+B_succ  0.693  5.480  1.217  0.704  0.538  1.730
+
+J_total on the 618 scenarios where every planner reached the goal (difference to CEM):
+  CEM          mean    7.711
+  FOP          mean    9.174 | diff +1.463 ± 0.366 (95 % CI), median +0.168, Wilcoxon p 2.9e-60, lower than CEM in 16.5%
+  FISS+        mean    7.771 | diff +0.060 ± 0.067 (95 % CI), median +0.001, Wilcoxon p 0.0016, lower than CEM in 37.9%
+  B_v3         mean    8.341 | diff +0.630 ± 0.095 (95 % CI), median +0.199, Wilcoxon p 9.7e-76, lower than CEM in 7.3%
+  B_succ       mean    8.218 | diff +0.508 ± 0.082 (95 % CI), median +0.158, Wilcoxon p 3.1e-69, lower than CEM in 10.7%
+mean cost terms on these scenarios:
+        J_ter    J_V    J_A    J_J   J_LC    J_D
+CEM     0.485  3.994  0.919  0.503  0.440  1.370
+FOP     0.538  5.051  1.005  0.609  0.452  1.519
+FISS+   0.486  4.026  0.933  0.504  0.446  1.377
+B_v3    0.507  4.382  0.965  0.607  0.468  1.412
+B_succ  0.503  4.293  0.959  0.588  0.472  1.403
+
+J_total on the 751 scenarios where every planner ended the same way (all reached / all timed out) (difference to CEM):
+  CEM          mean    8.555
+  FOP          mean   10.332 | diff +1.777 ± 1.083 (95 % CI), median +0.178, Wilcoxon p 4.4e-70, lower than CEM in 17.3%
+  FISS+        mean    8.649 | diff +0.094 ± 0.094 (95 % CI), median +0.002, Wilcoxon p 0.0004, lower than CEM in 38.9%
+  B_v3         mean    9.174 | diff +0.619 ± 0.087 (95 % CI), median +0.205, Wilcoxon p 8.7e-89, lower than CEM in 9.7%
+  B_succ       mean    9.092 | diff +0.537 ± 0.081 (95 % CI), median +0.185, Wilcoxon p 2.6e-82, lower than CEM in 12.1%
+mean cost terms on these scenarios:
+        J_ter    J_V    J_A    J_J   J_LC    J_D
+CEM     0.600  4.385  0.979  0.532  0.525  1.534
+FOP     0.644  5.304  1.054  1.165  0.530  1.635
+FISS+   0.601  4.420  1.000  0.539  0.550  1.540
+B_v3    0.618  4.766  1.024  0.655  0.553  1.558
+B_succ  0.615  4.694  1.027  0.647  0.564  1.546
+
+
+written to data/measurements/cem_success/compare
+
+---- B_succ paired against B_v3 ----
+J_total on the 852 scenarios solved by all planners (difference to B_v3):
+  B_succ       mean   10.507 | diff -0.075 ± 0.058 (95 % CI), median +0.000, Wilcoxon p 0.0011, lower than B_v3 in 45.2%
+  B_v3         mean   10.582
+mean cost terms on these scenarios:
+        J_ter    J_V    J_A    J_J   J_LC    J_D
+B_succ  0.697  5.591  1.222  0.707  0.536  1.753
+B_v3    0.700  5.656  1.224  0.714  0.529  1.759
+
+J_total on the 685 scenarios where every planner reached the goal (difference to B_v3):
+  B_succ       mean    9.477 | diff -0.126 ± 0.051 (95 % CI), median +0.000, Wilcoxon p 7.7e-06, lower than B_v3 in 45.7%
+  B_v3         mean    9.603
+mean cost terms on these scenarios:
+        J_ter    J_V    J_A    J_J   J_LC    J_D
+B_succ  0.575  5.097  1.128  0.643  0.469  1.565
+B_v3    0.579  5.185  1.138  0.661  0.468  1.572
+
+J_total on the 846 scenarios where every planner ended the same way (all reached / all timed out) (difference to B_v3):
+  B_succ       mean   10.444 | diff -0.083 ± 0.049 (95 % CI), median +0.000, Wilcoxon p 0.00097, lower than B_v3 in 45.3%
+  B_v3         mean   10.527
+mean cost terms on these scenarios:
+        J_ter    J_V    J_A    J_J   J_LC    J_D
+B_succ  0.692  5.568  1.210  0.702  0.539  1.733
+B_v3    0.695  5.637  1.211  0.709  0.532  1.743
+
