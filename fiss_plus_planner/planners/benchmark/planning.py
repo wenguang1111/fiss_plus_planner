@@ -39,6 +39,11 @@ from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlann
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
+from fiss_plus_planner.planners.CEM_cpp_wrapper import CEM_CPP_Wrapper
+from fiss_plus_planner.planners.cem_planner import CEMPlanner, CEMPlannerSettings
+from fiss_plus_planner.planners.mppi_planner import MPPIPlanner, MPPIPlannerSettings
+from fiss_plus_planner.planners.common.cost.cost_function import CostFunction
+from fiss_plus_planner.planners.MPPI_cpp_wrapper import MPPI_CPP_Wrapper
 from fiss_plus_planner.planners.fiss_plus_cpp_wrapper import FissPlusCppWrapper
 from fiss_plus_planner.SMP.maneuver_automaton.maneuver_automaton import ManeuverAutomaton
 from fiss_plus_planner.SMP.motion_planner.motion_planner import MotionPlanner, MotionPlannerType
@@ -156,8 +161,11 @@ def prepare_obstacles_polygons_time_series(
 
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
-                            input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool
-                            ) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
+                            input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
+                            sampler_cfg: dict = None) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
+    """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}} (config sections),
+    and 'SP_NUM_SAMPLES' (CVAE samples of Sparse_FOP)."""
+    sampler_cfg = sampler_cfg or {}
     # Plan a global route
     global_planner = GlobalPlanner()
     try:
@@ -269,6 +277,15 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             num_width, num_speed, num_t)
         planner = FopPlusPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
+    elif method in ('CEM', 'MPPI'):
+        # FOP (Python) with an iterative Gaussian sampler; budget per cycle = N_W * N_S * N_T unless the
+        # config section CEM / MPPI sets population
+        settings_cls, planner_cls = {'CEM': (CEMPlannerSettings, CEMPlanner), 'MPPI': (MPPIPlannerSettings, MPPIPlanner)}[method]
+        planner_settings = settings_cls(num_width, num_speed, num_t)
+        for name, value in (sampler_cfg.get(method) or {}).items():
+            setattr(planner_settings, name, value)
+        planner = planner_cls(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
     elif method == 'FISS':
         planner_settings = FissPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlanner(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
@@ -287,6 +304,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         use_cpp_planner = False
     elif method == 'Sparse_FOP':
         planner_settings = SparsePlannerFOPSettings(num_width, num_speed, num_t, input_dir, file)
+        if sampler_cfg.get('SP_NUM_SAMPLES'):
+            planner_settings.num_samples = int(sampler_cfg['SP_NUM_SAMPLES'])  # CVAE samples; FOP fallback = N_W x N_S x N_T
         planner = SparsePlannerFOP(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
     elif method == 'FOP_CPP':
@@ -295,6 +314,18 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner = FOP_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True  # Check if C++ planner was successfully initialized
         # planner.recordObstaclesForDebug("python_obstacle.csv")
+    elif method == 'CEM_CPP':
+        # C++ FOP backend with a cross-entropy sampler (config section CEM)
+        planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        planner = CEM_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                  runtime_measurement, cem_cfg=sampler_cfg.get('CEM'))
+        use_cpp_planner = True
+    elif method == 'MPPI_CPP':
+        # C++ FOP backend with an MPPI sampler (config section MPPI)
+        planner_settings = FrenetOptimalPlannerSettings(num_width, num_speed, num_t)
+        planner = MPPI_CPP_Wrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                                   runtime_measurement, mppi_cfg=sampler_cfg.get('MPPI'))
+        use_cpp_planner = True
     elif method == 'FISS+_CPP':
         # Use C++ FISS+ Planner with pybind11
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
@@ -362,12 +393,12 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.time_step_have_to_break = i
             break
         processing_time = (end_time - start_time)
-        stats.runtime_history.append(processing_time)
         if method == 'Sparse_FOP' or method == 'Sparse' or method == 'Sparse_CPP':
-            stats.average_runtime += processing_time - planner.time_image_generation
+            # the BEV image is an input of the sparse planners, not planning time (also in runtime_history since 2026-11-02)
+            processing_time -= planner.time_image_generation
             stats.num_FOP_intervention += planner.num_FOP_intervention
-        else:
-            stats.average_runtime += processing_time
+        stats.runtime_history.append(processing_time)
+        stats.average_runtime += processing_time
         stats.best_traj_costs.append(best_traj_ego.cost_final)
         if not use_cpp_planner:
             stats += planner.stats
@@ -589,6 +620,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
     runtime_measurement = cfg.get('Runtime_Measurement')
     collect_data_for_ml = cfg.get('Collect_Data_For_ML')
     configure_numba_threads(number_threads)
+    # J_D in the planning cost of the Python planners (False: as in the Sparse Planner paper measurements)
+    CostFunction.planning_obstacle_cost = cfg.get('PLANNING_OBSTACLE_COST', True)
 
     vehicle_type = VehicleType.VW_VANAGON  # FORD_ESCORT, BMW_320i, VW_VANAGON
     vehicle_params = VehicleParameterMapping[vehicle_type.name].value
@@ -609,7 +642,9 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
         else:
             _, ego_vehicle_trajectory, _, time_list, measurment, fplist, best_trajs = frenet_optimal_planning(
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
-                number_threads, runtime_measurement, collect_data_for_ml)
+                number_threads, runtime_measurement, collect_data_for_ml,
+                sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI'),
+                             'SP_NUM_SAMPLES': cfg.get('SP_NUM_SAMPLES')})
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")

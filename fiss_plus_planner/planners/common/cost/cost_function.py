@@ -2,6 +2,12 @@ import numpy as np
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 
 class CostFunction:
+    # J_D in the planning cost (cost_singleTrajectory) of every Python planner; the cost of the executed
+    # trajectory (final_trajectory_cost) always contains it. False reproduces the measurements of the
+    # Sparse Planner paper (Table I, made before J_D was added to the planning cost on 2026-03-04).
+    # Set from the config key PLANNING_OBSTACLE_COST in planning().
+    planning_obstacle_cost = True
+
     def __init__(self, cost_type: str):
         if cost_type is "WX1":
             self.w_T = 1.0
@@ -119,7 +125,8 @@ class CostFunction:
         time_step_now: int
     ) -> float:
         cost_time = self.cost_terminal_time(15.0 - 0.1*len(traj.t)) 
-        cost_obstacle = self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
+        cost_obstacle = (self.cost_dist_obstacle(obstacles_array, obstacles_num_vertices, traj, time_step_now)
+                         if self.planning_obstacle_cost else 0.0)
         cost_speed = self.cost_velocity_offset(np.abs(traj.s_d), self.max_speed)
         cost_accel = self.cost_acceleration(traj.s_dd) + self.cost_acceleration(traj.d_dd)
         cost_jerk = self.cost_jerk(traj.s_ddd) + self.cost_jerk(traj.d_ddd)

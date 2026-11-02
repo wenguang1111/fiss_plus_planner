@@ -1,9 +1,12 @@
 import argparse
 import os
 import json
+import sys
 import yaml
 
-from fiss_plus_planner.planners.benchmark.planning import planning
+# This repository first: a Python env may have another checkout installed as fiss_plus_planner (editable .pth)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from fiss_plus_planner.planners.benchmark.planning import planning  # noqa: E402
 
 
 def readExsistedScenarios(existing_entries):

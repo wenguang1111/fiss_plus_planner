@@ -63,6 +63,7 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         """Plan using CVAE sampled trajectories."""
         # reset stats
         self.stats = Stats()
+        self.num_FOP_intervention = 0  # 1 if this cycle falls back to FOP (was never reset before 2026-11-02)
         self.settings.highest_speed = max_target_speed
         images_last_3_frame: List[Image.Image] = []
 

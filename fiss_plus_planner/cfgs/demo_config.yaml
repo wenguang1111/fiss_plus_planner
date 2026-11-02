@@ -7,7 +7,7 @@ INPUT_DIR: "data/demo/selected_scenarios/Test" # the directory where the scenari
 # INPUT_DIR: "data/demo"
 FILES: [] # empty by default if you want to run all the scenario files under the input directory
 
-PLANNER: "FOP" # the name of the planner to be used, can be: FOP, FOP+, FISS, FISS+, Sparse, Sparse_Optimized, FOP_CPP, FISS+_CPP, Sparse_CPP, Sparse_FOP
+PLANNER: "FOP" # the name of the planner to be used, can be: FOP, FOP+, CEM, MPPI, FISS, FISS+, Sparse, Sparse_Optimized, FOP_CPP, FISS+_CPP, CEM_CPP, MPPI_CPP, Sparse_CPP, Sparse_FOP
 N_W_SAMPLE: 5 #34 # number of lateral offset samples
 N_S_SAMPLE: 5 #28 # number of longitudinal speed samples
 N_T_SAMPLE: 5 #20 # number of time horizon samples
@@ -17,3 +17,24 @@ Num_Threads_For_CollisionChecker: 16 # number of threads to be used in the numba
 Runtime_Measurement: False # keep it False if you need Save GIF
 Collect_Data_For_ML: False # Collect data for ML training, check code in fiss_plus_planner/planners/frenet_optimal_planner.py
 SHOW_SAMPLED_TRAJECTORIES: False # visualize the sampled trajectories in the animation, set it to False, it show only the selected best trajectory of each time step
+
+# J_D (distance to obstacles) in the planning cost of the Python planners. False reproduces the measurements of
+# the Sparse Planner paper (made before J_D was added to the planning cost); the final trajectory cost always has it.
+PLANNING_OBSTACLE_COST: True
+SP_NUM_SAMPLES: 64 # CVAE samples per cycle of Sparse_FOP (SP); its FOP fallback uses the N_W x N_S x N_T grid
+
+# Iterative sampling planners CEM / MPPI (Python FOP) and CEM_CPP / MPPI_CPP (C++ FOP): Gaussian sampler over d, v, T in
+# the sampling ranges of FOP. population (samples per iteration) defaults to N_W * N_S * N_T / num_iterations, the
+# budget of the FOP grid.
+CEM:
+  num_iterations: 8    # proposal updates per cycle
+  elite_fraction: 0.1  # share of the population refitted as elite set
+  smoothing: 0.7       # weight of the elite fit vs. the previous proposal
+  init_std: 0.3        # initial std in unit coordinates of the sampling ranges
+  seed: 0
+MPPI:
+  num_iterations: 8
+  temperature: 0.1     # gamma on the per-iteration normalized cost
+  learning_rate: 0.7   # eta of the mean / covariance update
+  init_std: 0.3
+  seed: 0

@@ -111,7 +111,7 @@ public:
                    int n_time_steps,
                    int n_obstacles,
                    int max_verts);
-    ~Frenet_Planner();
+    virtual ~Frenet_Planner();  // virtual: subclasses (FISS+, CEM, MPPI) are used through the base binding
     void recordObstacleArray();
     void recordTrajectory(const FrenetTrajectory& traj);
     

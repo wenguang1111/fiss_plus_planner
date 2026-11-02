@@ -2,9 +2,32 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "Frenet_Planner.h"
+#include "CEM_Planner.h"
+#include "MPPI_Planner.h"
 #include "common/scenario/frenet.h"
 
 namespace py = pybind11;
+
+// Constructor and plan() of an iterative sampling planner (CEM, MPPI); the other methods are
+// inherited from the FrenetPlanner binding.
+template <class Planner, class SamplerSettings>
+void def_iterative_planner(py::class_<Planner, Frenet_Planner>& cls, const char* settings_name) {
+    cls.def(py::init([](const SettingParameters& settings, const SamplerSettings& sampler,
+                        const VehicleParams& vehicle, py::array_t<double> obstacles_array,
+                        py::array_t<int> num_vertices_array, int num_time_steps, int num_obstacles,
+                        int max_vertices) {
+                return new Planner(settings, sampler, vehicle,
+                                   static_cast<double*>(obstacles_array.request().ptr),
+                                   static_cast<int*>(num_vertices_array.request().ptr),
+                                   num_time_steps, num_obstacles, max_vertices);
+            }),
+            py::arg("settings"), py::arg(settings_name), py::arg("vehicle"),
+            py::arg("obstacles_array"), py::arg("num_vertices_array"),
+            py::arg("num_time_steps"), py::arg("num_obstacles"), py::arg("max_vertices"))
+        .def("plan", &Planner::plan,
+             py::arg("frenet_state"), py::arg("max_target_speed"),
+             py::arg("time_step_now") = 0, py::arg("num_threads") = 1);
+}
 
 PYBIND11_MODULE(frenet_planner_cpp, m) {
     m.doc() = "Frenet Optimal Planner C++ extension";
@@ -191,4 +214,30 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("settings", &Frenet_Planner::settings)
         .def_readwrite("vehicle_params", &Frenet_Planner::vehicle_params)
         .def_readwrite("best_traj", &Frenet_Planner::best_traj);
+
+    // Iterative sampling planners: FOP backend, adaptive Gaussian sampler over (d, s_d, t)
+    py::class_<IterativeSamplingSettings>(m, "IterativeSamplingSettings")
+        .def(py::init<>())
+        .def_readwrite("num_iterations", &IterativeSamplingSettings::num_iterations)
+        .def_readwrite("population", &IterativeSamplingSettings::population)
+        .def_readwrite("init_std", &IterativeSamplingSettings::init_std)
+        .def_readwrite("seed", &IterativeSamplingSettings::seed);
+
+    py::class_<CEMSettings, IterativeSamplingSettings>(m, "CEMSettings")
+        .def(py::init<>())
+        .def_readwrite("elite_fraction", &CEMSettings::elite_fraction)
+        .def_readwrite("smoothing", &CEMSettings::smoothing);
+
+    py::class_<MPPISettings, IterativeSamplingSettings>(m, "MPPISettings")
+        .def(py::init<>())
+        .def_readwrite("temperature", &MPPISettings::temperature)
+        .def_readwrite("learning_rate", &MPPISettings::learning_rate);
+
+    py::class_<CEM_Planner, Frenet_Planner> cem(m, "CEMPlanner");
+    def_iterative_planner<CEM_Planner, CEMSettings>(cem, "cem_settings");
+    cem.def_readwrite("cem_settings", &CEM_Planner::cem_settings);
+
+    py::class_<MPPI_Planner, Frenet_Planner> mppi(m, "MPPIPlanner");
+    def_iterative_planner<MPPI_Planner, MPPISettings>(mppi, "mppi_settings");
+    mppi.def_readwrite("mppi_settings", &MPPI_Planner::mppi_settings);
 }

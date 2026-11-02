@@ -57,9 +57,13 @@ set(UTILS_SOURCES
     common/utils/array_utils.cpp
 )
 
-# Source files for the main planner
+# Source files for the main planner and the iterative sampling planners (CEM, MPPI) built on it
 set(PLANNER_SOURCES
     Frenet_Planner.cpp
+    Iterative_Sampling_Planner.cpp
+    CEM_Planner.cpp
+    MPPI_Planner.cpp
+    common/sampling/gaussian_proposal.cpp
     ${GEOMETRY_SOURCES}
     ${COST_SOURCES}
     ${COLLISION_SOURCES}
