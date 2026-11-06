@@ -22,9 +22,13 @@ CubicSpline1D::CubicSpline1D(const std::vector<double>& x_coords, const std::vec
     std::vector<double> A_vec = calc_A(h);
     std::vector<double> B_vec = calc_B(h, a);
     
-    Eigen::MatrixXd A_matrix = Eigen::Map<Eigen::MatrixXd>(A_vec.data(), nx, nx);
+    // calc_A fills A row by row: map it row-major (the default column-major map solved A^T, i.e. with the
+    // wrong natural boundary rows, so the spline was off near both ends of the reference path). LU with
+    // partial pivoting as np.linalg.solve of the Python spline.
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::MatrixXd A_matrix = Eigen::Map<RowMajorMatrix>(A_vec.data(), nx, nx);
     Eigen::VectorXd b_vector = Eigen::Map<Eigen::VectorXd>(B_vec.data(), nx);
-    Eigen::VectorXd c_vector = A_matrix.colPivHouseholderQr().solve(b_vector);
+    Eigen::VectorXd c_vector = A_matrix.partialPivLu().solve(b_vector);
     c.resize(nx);
     for (int i = 0; i < nx; i++) {
         c[i] = c_vector(i);
@@ -40,9 +44,11 @@ CubicSpline1D::CubicSpline1D(const std::vector<double>& x_coords, const std::vec
 }
 
 int CubicSpline1D::search_index(double x_val) {
-    auto it = std::lower_bound(x.begin(), x.end(), x_val);
-    int idx = std::distance(x.begin(), it) - 1;
-    return std::max(0, idx);
+    // bisect.bisect(x, x_val) - 1 as the Python spline (a knot starts its own segment); the last knot uses
+    // the last segment
+    auto it = std::upper_bound(x.begin(), x.end(), x_val);
+    int idx = static_cast<int>(std::distance(x.begin(), it)) - 1;
+    return std::clamp(idx, 0, nx - 2);
 }
 
 double CubicSpline1D::calc_position(double x_val) {

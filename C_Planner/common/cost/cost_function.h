@@ -17,6 +17,9 @@ public:
     double w_LC;  // weight for lane center offset
     double w_dist; // weight for distance to obstacles
     double max_speed; // maximum speed for normalization
+    // J_D in the planning cost (cost_singleTrajectory); false reproduces the Sparse Planner paper (Python:
+    // CostFunction.planning_obstacle_cost, config PLANNING_OBSTACLE_COST). Set from SettingParameters.
+    bool planning_obstacle_cost = true;
     
     CostFunction(const std::string& cost_type = "WX1");
     

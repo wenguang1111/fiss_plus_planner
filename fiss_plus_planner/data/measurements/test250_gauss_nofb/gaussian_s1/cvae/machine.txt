@@ -1,0 +1,272 @@
+2026-11-06 16:01:40
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         109
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:04:49
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      57%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         108
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:07:29
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      93%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         109
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:08:28
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      63%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         109
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:13:20
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      96%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         108
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:14:27
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      55%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         109
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:17:21
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      93%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         108
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-06 16:19:14
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=1 PLANNERS=SP SP_IMPL=Gaussian_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS=/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs/gaussian_s1/epochs/epoch_07.pt SP_SHADOW= ITER_SPLIT=0 CPUS= affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      58%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          13          86           0          23         109
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0

@@ -1,0 +1,23 @@
+train 560 scenarios / 52242 cycles, val 62 / 6185, excluded 0
+gaussian: 11.21 M parameters
+epoch 1 train_loss 2.1770 train_nll 2.1770 val_loss 2.2875 val_nll 2.2875 best_dist@16 0.5539 mean_dist 1.3729 spread 0.5805 out_of_range 0.3593 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 138.1000
+  best epoch 1 (val_loss 2.2875)
+epoch 2 train_loss 0.7456 train_nll 0.7456 val_loss 4.1457 val_nll 4.1457 best_dist@16 0.4999 mean_dist 1.1462 spread 0.4231 out_of_range 0.3955 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 137.1000
+epoch 3 train_loss -0.0016 train_nll -0.0016 val_loss 8.0793 val_nll 8.0793 best_dist@16 0.4819 mean_dist 1.1448 spread 0.4006 out_of_range 0.3706 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.1000
+epoch 4 train_loss -0.6690 train_nll -0.6690 val_loss 20.0705 val_nll 20.0705 best_dist@16 0.4552 mean_dist 1.0086 spread 0.3140 out_of_range 0.4152 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.9000
+epoch 5 train_loss -1.1101 train_nll -1.1101 val_loss 12.7569 val_nll 12.7569 best_dist@16 0.4493 mean_dist 1.0517 spread 0.3477 out_of_range 0.3493 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.4000
+epoch 6 train_loss -2.0323 train_nll -2.0323 val_loss 32.6029 val_nll 32.6029 best_dist@16 0.4523 mean_dist 0.9133 spread 0.2419 out_of_range 0.3696 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 137.0000
+epoch 7 train_loss -2.4780 train_nll -2.4780 val_loss 51.7978 val_nll 51.7978 best_dist@16 0.4693 mean_dist 0.9045 spread 0.2267 out_of_range 0.3552 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 137.0000
+epoch 8 train_loss -2.6402 train_nll -2.6402 val_loss 57.1351 val_nll 57.1351 best_dist@16 0.4772 mean_dist 0.9004 spread 0.2191 out_of_range 0.3477 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.2000
+epoch 9 train_loss -2.8055 train_nll -2.8055 val_loss 56.4881 val_nll 56.4881 best_dist@16 0.4650 mean_dist 0.8822 spread 0.2161 out_of_range 0.3877 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.3000
+epoch 10 train_loss -2.8338 train_nll -2.8338 val_loss 71.0667 val_nll 71.0667 best_dist@16 0.4680 mean_dist 0.8936 spread 0.2168 out_of_range 0.3793 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.4000
+epoch 11 train_loss -2.8405 train_nll -2.8405 val_loss 79.6422 val_nll 79.6422 best_dist@16 0.4784 mean_dist 0.8731 spread 0.2028 out_of_range 0.4422 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 137.0000
+epoch 12 train_loss -2.9997 train_nll -2.9997 val_loss 66.2289 val_nll 66.2289 best_dist@16 0.4636 mean_dist 0.9115 spread 0.2319 out_of_range 0.4506 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.8000
+epoch 13 train_loss -3.0919 train_nll -3.0919 val_loss 87.8860 val_nll 87.8860 best_dist@16 0.4604 mean_dist 0.8961 spread 0.2218 out_of_range 0.3744 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 135.9000
+epoch 14 train_loss -3.0062 train_nll -3.0062 val_loss 74.1441 val_nll 74.1441 best_dist@16 0.4752 mean_dist 0.8733 spread 0.2025 out_of_range 0.3416 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 137.9000
+epoch 15 train_loss -3.1218 train_nll -3.1218 val_loss 109.7771 val_nll 109.7771 best_dist@16 0.4811 mean_dist 0.8785 spread 0.1994 out_of_range 0.3687 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.0000
+epoch 16 train_loss -3.1804 train_nll -3.1804 val_loss 79.6175 val_nll 79.6175 best_dist@16 0.4777 mean_dist 0.9267 spread 0.2362 out_of_range 0.3653 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 135.9000
+epoch 17 train_loss -3.1378 train_nll -3.1378 val_loss 74.6952 val_nll 74.6952 best_dist@16 0.4723 mean_dist 0.8922 spread 0.2118 out_of_range 0.4052 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 136.7000
+epoch 18 train_loss -3.4047 train_nll -3.4047 val_loss 93.3010 val_nll 93.3010 best_dist@16 0.4724 mean_dist 0.8972 spread 0.2158 out_of_range 0.3715 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 135.8000
+epoch 19 train_loss -3.5273 train_nll -3.5273 val_loss 127.9835 val_nll 127.9835 best_dist@16 0.4736 mean_dist 0.8828 spread 0.2049 out_of_range 0.3833 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 135.9000
+epoch 20 train_loss -3.4167 train_nll -3.4167 val_loss 116.6302 val_nll 116.6302 best_dist@16 0.4716 mean_dist 0.9207 spread 0.2265 out_of_range 0.3625 beta 0.0000 lr 0.0001 skipped_batches 0 train_s 135.0000

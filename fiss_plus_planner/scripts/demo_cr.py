@@ -30,7 +30,8 @@ def append_measurement_to_csv(csv_path, file, measurement):
         csv_file.write(
             f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
             f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-            f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},{measurement.num_FOP_intervention},{measurement.num_FOP_intervention/measurement.step_number*100},{measurement.success}\n'
+            f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost},{measurement.final_traj_cost}, {measurement.time_step_have_to_break},{measurement.num_FOP_intervention},{measurement.num_FOP_intervention/measurement.step_number*100},{measurement.success},'
+            f'{getattr(measurement, "num_clearance_fallbacks", 0)}\n'
         )
 
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
         with open(csv_path, 'w', newline='') as csv_file:
             csv_file.write(
                 'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                'num_collision_checks,average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success\n'
+                'num_collision_checks,average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success, num_clearance_fallbacks\n'
             )
 
     if cfg['FILES']:

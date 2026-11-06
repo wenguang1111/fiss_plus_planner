@@ -25,6 +25,7 @@ Frenet_Planner::Frenet_Planner(const SettingParameters& settings_param,
       num_obstacles(n_obstacles),
       max_vertices(max_verts) 
 {
+    cost_function.planning_obstacle_cost = settings.planning_obstacle_cost;
     // recordObstacleArray();
 }
 
@@ -112,8 +113,8 @@ std::vector<FrenetTrajectory> Frenet_Planner::calc_frenet_paths(const FrenetStat
                                  di, 0.0f, 0.0f, Ti);
         
         // Generate time steps
-        for (double t = 0.0; t < Ti; t += settings.tick_t) {
-            fp.t.push_back(t);
+        fp.t = time_grid(Ti, settings.tick_t);
+        for (double t : fp.t) {
             fp.d.push_back(lat_qp.calc_point(t));
             fp.d_d.push_back(lat_qp.calc_first_derivative(t));
             fp.d_dd.push_back(lat_qp.calc_second_derivative(t));
@@ -243,6 +244,16 @@ std::vector<FrenetTrajectory> Frenet_Planner::check_constraints(const std::vecto
     }
     
     return passed;
+}
+
+double Frenet_Planner::constraint_violation(const FrenetTrajectory& traj) const {
+    const size_t n = traj.s_d.size();
+    for (size_t k = 0; k < n; ++k) {
+        if (traj.s_d[k] > vehicle_params.max_speed || std::abs(traj.s_dd[k]) > vehicle_params.max_accel) {
+            return static_cast<double>(n - k) / static_cast<double>(n);
+        }
+    }
+    return 0.0;
 }
 
 //FIXME: may need delete this if not needed in python
@@ -463,6 +474,8 @@ FrenetTrajectory Frenet_Planner::plan(const FrenetState& frenet_state,
                                       double max_target_speed,
                                       int time_step_now,
                                       int num_threads) {
+    // The grid uses this cycle's speed limit (get_samples read the previous one before)
+    settings.highest_speed = max_target_speed;
     std::vector<std::tuple<double, double, double>> samples = get_samples();
     return best_traj_generation(frenet_state, samples, max_target_speed, time_step_now, num_threads);
 }
@@ -504,12 +517,13 @@ FrenetTrajectory Frenet_Planner::best_traj_generation(
     // Get collision-free paths from multithreaded planning
     PlanResult plan_result = plan_multithread(samples_per_thread_vec, frenet_state, time_step_now);
     last_fplist = plan_result.collision_free_paths;
+    last_evals = std::move(plan_result.evals);
 
-    // Find minimum cost path
+    // Find minimum cost path; the last of equal costs, as the Python FOP (min_cost >= fp.cost_final)
     best_traj = FrenetTrajectory();
     best_traj.cost_final = std::numeric_limits<double>::infinity();
-    for (const auto& fp : plan_result.collision_free_paths) {
-        if (fp.cost_final < best_traj.cost_final) {
+    for (const auto& fp : last_fplist) {
+        if (fp.cost_final <= best_traj.cost_final) {
             best_traj = fp;
         }
     }
@@ -534,59 +548,62 @@ PlanResult Frenet_Planner::plan_multithread(
     int num_threads = samples_per_thread_vec.size();
 
     std::vector<std::thread> threads;
-    std::vector<std::vector<FrenetTrajectory>> thread_frenet_paths(num_threads);
     std::vector<std::vector<FrenetTrajectory>> thread_collision_free_paths(num_threads);
+    std::vector<std::vector<SampleEval>> thread_evals(num_threads);
     std::vector<PlanStats> thread_stats(num_threads);  // Statistics for each thread
 
-    // Process samples in parallel
+    // Process samples in parallel; every sample goes through generation, global path, constraint check,
+    // collision check and cost (FrenetOptimalPlanner.plan / IterativeSamplingPlanner.evaluate in Python)
     for (int t = 0; t < num_threads; t++) {
-        threads.emplace_back([this, &samples_per_thread_vec, &thread_frenet_paths, &thread_collision_free_paths, &thread_stats, &frenet_state, t, time_step_now]() {
+        threads.emplace_back([this, &samples_per_thread_vec, &thread_collision_free_paths,
+                              &thread_evals, &thread_stats, &frenet_state, t, time_step_now]() {
             const auto& thread_samples = samples_per_thread_vec[t];
             PlanStats local_stats;
             
-            // Step 1: Generate Frenet paths
+            // Step 1: Generate Frenet paths (one per sample)
             std::vector<FrenetTrajectory> frenet_paths = calc_frenet_paths(frenet_state, thread_samples);
-
-            // Store frenet_paths for this thread
-            thread_frenet_paths[t] = frenet_paths;
             local_stats.num_trajs_generated = frenet_paths.size();
+            std::vector<SampleEval>& evals = thread_evals[t];
+            evals.assign(frenet_paths.size(), SampleEval());
+            std::vector<FrenetTrajectory>& collision_free_paths = thread_collision_free_paths[t];
 
-            // Step 2: Convert to global coordinates
-            std::vector<FrenetTrajectory> global_paths = calc_global_paths(frenet_paths);
+            for (size_t i = 0; i < frenet_paths.size(); ++i) {
+                // Step 2: Convert to global coordinates (dropped: V = 1)
+                std::vector<FrenetTrajectory> global = calc_global_paths({frenet_paths[i]});
+                if (global.empty()) {
+                    continue;
+                }
+                local_stats.num_trajs_validated++;
+                FrenetTrajectory& fp = global[0];
 
-            // Step 3: Check constraints
-            std::vector<FrenetTrajectory> constrained_paths = check_constraints(global_paths);
-            local_stats.num_trajs_validated = constrained_paths.size();
+                // Step 3: Check constraints
+                const double v_constraint = constraint_violation(fp);
+                if (v_constraint > 0.0) {
+                    evals[i].violation = v_constraint;
+                    continue;
+                }
+                fp.constraint_passed = true;
 
-            // Step 4: Check collisions (within each thread for better cache locality)
-            local_stats.num_collision_checks = constrained_paths.size();
-            std::vector<FrenetTrajectory> collision_free_paths = check_collision(
-                constrained_paths,
-                obstacles_array,
-                num_vertices_array,
-                num_time_steps,
-                num_obstacles,
-                max_vertices,
-                vehicle_params.l,
-                vehicle_params.w,
-                time_step_now,
-                1  // check_resolution
-            );
+                // Step 4: Check collisions
+                local_stats.num_collision_checks++;
+                const int first = first_collision_step(fp, obstacles_array, num_vertices_array, num_time_steps,
+                                                       num_obstacles, max_vertices, vehicle_params.l,
+                                                       vehicle_params.w, time_step_now, 1);
+                const int len = static_cast<int>(fp.x.size());
+                if (first < len) {
+                    evals[i].violation = static_cast<double>(len - first) / static_cast<double>(len);
+                    continue;
+                }
+                fp.collision_passed = true;
 
-            // Recompute final cost with obstacle-distance term, matching Python calc_cost flow.
-            cost_function.calc_cost(
-                collision_free_paths,
-                settings.highest_speed,
-                obstacles_array,
-                num_vertices_array,
-                num_time_steps,
-                num_obstacles,
-                max_vertices,
-                time_step_now
-            );
+                // Step 5: Cost with the obstacle-distance term (if enabled), as the Python calc_cost
+                fp.cost_final = cost_function.cost_singleTrajectory(
+                    fp, settings.highest_speed, obstacles_array, num_vertices_array, num_time_steps,
+                    num_obstacles, max_vertices, time_step_now);
+                evals[i] = {true, 0.0, fp.cost_final};
+                collision_free_paths.push_back(std::move(fp));
+            }
 
-            // Store collision_free_paths for this thread
-            thread_collision_free_paths[t] = collision_free_paths;
             
             // Store statistics for this thread
             thread_stats[t] = local_stats;
@@ -598,12 +615,12 @@ PlanResult Frenet_Planner::plan_multithread(
         thread.join();
     }
 
-    // Merge all thread results
-    for (const auto& paths : thread_frenet_paths) {
-        result.frenet_paths.insert(result.frenet_paths.end(), paths.begin(), paths.end());
-    }
-    for (const auto& paths : thread_collision_free_paths) {
-        result.collision_free_paths.insert(result.collision_free_paths.end(), paths.begin(), paths.end());
+    // Merge all thread results (thread t holds a contiguous block of samples, so this keeps sample order).
+    // result.frenet_paths stays empty: nothing reads it, and copying every generated path cost time.
+    for (int t = 0; t < num_threads; t++) {
+        result.collision_free_paths.insert(result.collision_free_paths.end(),
+                                           thread_collision_free_paths[t].begin(), thread_collision_free_paths[t].end());
+        result.evals.insert(result.evals.end(), thread_evals[t].begin(), thread_evals[t].end());
     }
     
     // Aggregate statistics from all threads

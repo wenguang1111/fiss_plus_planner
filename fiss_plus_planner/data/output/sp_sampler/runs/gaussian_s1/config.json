@@ -1,0 +1,40 @@
+{
+ "model": "gaussian",
+ "K": 5,
+ "name": "gaussian_s1",
+ "data_dir": "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/sp_training_2026-02-15",
+ "cache_dir": null,
+ "out_dir": "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/data/output/sp_sampler/runs",
+ "epochs": 20,
+ "batch": 64,
+ "lr": 0.0001,
+ "weight_decay": 0.01,
+ "beta_end": 1.0,
+ "min_std": 0.001,
+ "no_dequant": false,
+ "val_frac": 0.1,
+ "seed": 1,
+ "split_seed": 0,
+ "exclude_dir": [],
+ "max_train": 0,
+ "eval_items": 2000,
+ "eval_n": 16,
+ "workers": 8,
+ "eval_only": false,
+ "weights": null,
+ "no_keep_epochs": false,
+ "n_train_cycles": 52242,
+ "n_val_cycles": 6185,
+ "n_train_scenarios": 560,
+ "n_val_scenarios": 62,
+ "target_mean": [
+  3.769890069961548,
+  -0.001976951491087675,
+  8.928791999816895
+ ],
+ "target_std": [
+  0.9539595246315002,
+  0.1435546725988388,
+  4.872232913970947
+ ]
+}

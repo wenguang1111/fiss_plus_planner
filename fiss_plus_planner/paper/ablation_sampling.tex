@@ -1,0 +1,63 @@
+\subsection{Ablation of the Sampling Distribution}
+\label{sec:ablation}
+
+The sampling distribution of the CVAE relies on two sources of information: the training targets, i.e., the optimal parameters selected by FOP, and the current scene, i.e., the BEV input.
+This section examines which of the two accounts for the advantage of SP.
+Only the sampler of SP is replaced, while the trajectory generation, the constraint and collision checks, the cost function, and the $5\times5\times5$ FOP fallback remain unchanged.
+Two control samplers are used:
+\begin{itemize}
+  \item \textbf{Marginal} draws $N$ parameter sets $(d, \dot{s}, T)$ at random from the training targets. It uses the same targets as the CVAE but ignores the scene, so the difference between the two isolates the contribution of the scene.
+  \item \textbf{Uniform} samples uniformly within the sampling ranges of FOP, i.e., FOP without the lattice. It uses neither the targets nor the scene, so its difference to Marginal isolates the contribution of the targets.
+\end{itemize}
+The ablation is evaluated in closed loop on 26 scenarios, 11 of which are located on maps unseen during training; all other settings follow Section~V-A.
+
+\begin{table}[t]
+  \centering
+  \caption{Ablation of the sampling distribution on 26 scenarios. Feasible denotes the share of single samples that satisfy the constraints and are collision-free at the same states. SP$^*$ and SP denote the number of completed scenarios without and with fallback. $\bar{J}$ is averaged over the 15 scenarios completed by all samplers at all $N$.}
+  \label{tab:ablation}
+  \begin{tabular}{llrrrr}
+    \toprule
+    & & \multicolumn{4}{c}{$N$} \\
+    \cmidrule(lr){3-6}
+    Metric & Sampler & 1 & 8 & 64 & 1024 \\
+    \midrule
+    Feasible (\%) & CVAE     & \textbf{96.6} & & & \\
+                  & Marginal & 73.8 & & & \\
+                  & Uniform  & 77.8 & & & \\
+    \midrule
+    SP$^*$ (/26)  & CVAE     & \textbf{18} & \textbf{21} & \textbf{20} & 19 \\
+                  & Marginal & 4  & 10 & 19 & \textbf{23} \\
+                  & Uniform  & 5  & 12 & 15 & 15 \\
+    \midrule
+    SP (/26)      & CVAE     & \textbf{26} & \textbf{26} & \textbf{26} & \textbf{26} \\
+                  & Marginal & 24 & \textbf{26} & 25 & 24 \\
+                  & Uniform  & \textbf{26} & \textbf{26} & \textbf{26} & 17 \\
+    \midrule
+    $P_{fb}$ (\%) & CVAE     & \textbf{3.2} & \textbf{2.7} & 2.4 & 3.0 \\
+                  & Marginal & 24.9 & 6.4 & \textbf{0.7} & \textbf{0.05} \\
+                  & Uniform  & 27.9 & 9.3 & 4.5 & 1.6 \\
+    \midrule
+    $\bar{J}$     & CVAE     & \textbf{52.4} & 51.5 & 51.0 & 50.0 \\
+                  & Marginal & 97.8 & 52.5 & 51.1 & 49.5 \\
+                  & Uniform  & 71.3 & \textbf{50.4} & \textbf{48.9} & \textbf{48.5} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textit{Contribution of the scene.}
+With few samples, the scene is decisive.
+At $N = 1$, 96.6\,\% of the single CVAE samples are feasible, compared with 73.8\,\% for Marginal; without fallback, the two complete 18 and 4 scenarios, and with fallback, their fallback rates are 3.2\,\% and 24.9\,\%.
+The gap persists on the 11 unseen maps (97.9\,\% vs.\ 67.7\,\%).
+As $N$ increases, the order reverses: without fallback at $N = 1024$, Marginal completes 23 scenarios and the CVAE only 19.
+The CVAE samples are highly concentrated, so additional samples do not help when the concentrated region is infeasible in a cycle, whereas the broader Marginal samples eventually contain a feasible one.
+With fallback, the CVAE completes all 26 scenarios at every $N$, compared with 24 to 26 for Marginal.
+
+\textit{Contribution of the targets.}
+The targets alone, without the scene, do not help at $N = 1$ (feasibility 73.8\,\% vs.\ 77.8\,\% for Uniform).
+With larger $N$ they become useful: at $N = 64$, the fallback rate of Marginal is 0.7\,\% compared with 4.5\,\% for Uniform, and at $N = 1024$, Marginal completes 23 vs.\ 15 scenarios without and 24 vs.\ 17 with fallback.
+Like FOP, Uniform runs into dead ends at large $N$.
+
+\textit{Summary.}
+The scene places even a few samples in the currently feasible region, which is the main advantage of the CVAE at small $N$, while the targets provide the general parameter range and become useful once enough samples are drawn.
+At large $N$, the CVAE samples are too concentrated and, without fallback, the CVAE is outperformed by Marginal; the fallback then ensures that all scenarios are completed.
+Regarding cost, the CVAE is clearly cheaper at $N = 1$, whereas all three samplers are comparable for $N \geq 8$, so the ablation does not support a lower cost at large $N$.

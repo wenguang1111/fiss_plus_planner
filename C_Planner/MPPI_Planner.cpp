@@ -1,6 +1,7 @@
 #include "MPPI_Planner.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 MPPI_Planner::MPPI_Planner(const SettingParameters& settings_param,
                            const MPPISettings& mppi_param,
@@ -15,18 +16,28 @@ MPPI_Planner::MPPI_Planner(const SettingParameters& settings_param,
       mppi_settings(mppi_param) {}
 
 void MPPI_Planner::update_proposal(GaussianProposal& proposal,
-                                   const std::vector<Unit3>& feasible,
-                                   const std::vector<double>& costs) const {
-    const auto [lo, hi] = std::minmax_element(costs.begin(), costs.end());
-    const double range = *hi - *lo;
-    std::vector<double> weights(costs.size());
-    for (size_t i = 0; i < costs.size(); ++i) {
-        const double normalized = range > 1e-12 ? (costs[i] - *lo) / range : 0.0;
+                                   const std::vector<Unit3>& units,
+                                   const std::vector<SampleEval>& evals) const {
+    // Score: J over the feasible samples (infeasible ones get weight 0); V over all samples if none is
+    // feasible. Normalized to [0, 1] per iteration, weights exp(-score / temperature).
+    const bool any_feasible = std::any_of(evals.begin(), evals.end(), [](const SampleEval& e) { return e.feasible; });
+    auto used = [&](size_t i) { return !any_feasible || evals[i].feasible; };
+    auto score = [&](size_t i) { return any_feasible ? evals[i].cost : evals[i].violation; };
+    double lo = std::numeric_limits<double>::infinity(), hi = -std::numeric_limits<double>::infinity();
+    for (size_t i = 0; i < evals.size(); ++i) {
+        if (!used(i)) continue;
+        lo = std::min(lo, score(i));
+        hi = std::max(hi, score(i));
+    }
+    const double range = hi - lo;
+    std::vector<double> weights(evals.size(), 0.0);
+    for (size_t i = 0; i < evals.size(); ++i) {
+        if (!used(i)) continue;
+        const double normalized = range > 1e-12 ? (score(i) - lo) / range : 0.0;
         weights[i] = std::exp(-normalized / mppi_settings.temperature);
     }
-
     Unit3 weighted_mean, weighted_std;
-    GaussianProposal::fit(feasible, weights, weighted_mean, weighted_std);
+    GaussianProposal::fit(units, weights, weighted_mean, weighted_std);
 
     const double eta = mppi_settings.learning_rate;
     for (int dim = 0; dim < 3; ++dim) {

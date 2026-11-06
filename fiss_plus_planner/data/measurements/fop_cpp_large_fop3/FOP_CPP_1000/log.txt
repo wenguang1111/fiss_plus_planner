@@ -1,0 +1,32 @@
+Processing DEU_Weimar-84_1_T-1.xml...
+Planning failed at time step 32
+Cost Distance To Obstacles: 1185.6792980490197
+Cost Time: 3.3000000000000003
+Cost Speed: 30.275520568032892
+Cost Acceleration: 2760.8256509094294
+Cost Jerk: 703.443879963479
+Cost Lane Center Offset: 2.4329764320432052
+len(traj.t): 33
+Total Cost: 145.19870684612135
+Processing ESP_Barcelona-48_3_T-1.xml...
+Planning failed at time step 18
+Cost Distance To Obstacles: 1297.2861281250691
+Cost Time: 1.9000000000000001
+Cost Speed: 132.31536852119638
+Cost Acceleration: 384.9482317167569
+Cost Jerk: 263.62008858848833
+Cost Lane Center Offset: 0.0621153546088717
+len(traj.t): 19
+Total Cost: 111.28062801611156
+Processing AUT_Haag-15_1_T-9.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+Planning failed at time step 36
+Cost Distance To Obstacles: 903.6777167052227
+Cost Time: 3.7
+Cost Speed: 31.30463671149843
+Cost Acceleration: 3222.2943996896397
+Cost Jerk: 636.3262882873325
+Cost Lane Center Offset: 4.951094568657327
+len(traj.t): 37
+Total Cost: 133.39065232330677

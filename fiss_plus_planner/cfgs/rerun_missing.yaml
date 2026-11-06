@@ -1,0 +1,189 @@
+OUTPUT_DIR: data/output/cem_train_R8x250/
+MEASUREMENTS_DIR: data/measurements/10k_rerun
+INPUT_DIR: data/10k/Train
+FILES:
+- BRA_BeloHorizonte-18_1_T-8.xml
+- DEU_Bebra-22_1_T-1.xml
+- DEU_Heilbronn-249_1_T-1.xml
+- DEU_Herzogenaurach-118_1_T-3.xml
+- DEU_Herzogenaurach-182_1_T-4.xml
+- DEU_Kleinmachnow-8_1_T-5.xml
+- DEU_Schwetzingen-76_1_T-4.xml
+- DEU_Wolfsburg-39_1_T-4.xml
+- DEU_Wolfsburg-64_1_T-1.xml
+- ESP_Barcelona-58_9_T-1.xml
+- ESP_Barcelona-61_20_T-1.xml
+- ESP_Barcelona-64_33_T-1.xml
+- ESP_Barcelona-69_25_T-1.xml
+- ESP_Barcelona-70_2_T-1.xml
+- ESP_Barcelona-7_53_T-1.xml
+- ESP_Barcelona-9_2_T-1.xml
+- ESP_Bilbao-14_3_T-1.xml
+- ESP_Bilbao-24_21_T-1.xml
+- ESP_Bilbao-30_8_T-1.xml
+- ESP_Bilbao-3_3_T-1.xml
+- ESP_Bilbao-6_5_T-1.xml
+- ESP_Requena-6_2_T-1.xml
+- ESP_Vigo-12_6_T-1.xml
+- ESP_Vigo-39_1_T-1.xml
+- ESP_Vigo-55_7_T-1.xml
+- ESP_Vigo-59_8_T-1.xml
+- ESP_Vigo-75_11_T-1.xml
+- ESP_Vigo-91_1_T-1.xml
+- ESP_Vigo-99_32_T-1.xml
+- FRA_Dijon-14_11_T-1.xml
+- FRA_Dijon-33_10_T-1.xml
+- FRA_Dijon-46_6_T-1.xml
+- FRA_Dijon-7_6_T-1.xml
+- FRA_Lyon-3_1_T-2.xml
+- FRA_Lyon-40_1_T-14.xml
+- FRA_Miramas-9_1_T-1.xml
+- FRA_Nancy-30_7_T-1.xml
+- GBR_Donington-1_1.xml
+- GRC_ArchaioLimani-101_1_T-3.xml
+- GRC_ArchaioLimani-112_1_T-5.xml
+- GRC_ArchaioLimani-121_1_T-41.xml
+- GRC_ArchaioLimani-130_1_T-2.xml
+- GRC_ArchaioLimani-137_1_T-1.xml
+- GRC_ArchaioLimani-140_1_T-5.xml
+- GRC_ArchaioLimani-151_1_T-40.xml
+- GRC_ArchaioLimani-23_1_T-5.xml
+- GRC_ArchaioLimani-33_1_T-2.xml
+- GRC_ArchaioLimani-44_1_T-15.xml
+- GRC_ArchaioLimani-4_1_T-1.xml
+- GRC_ArchaioLimani-55_1_T-4.xml
+- GRC_ArchaioLimani-60_1_T-48.xml
+- GRC_ArchaioLimani-62_1_T-10.xml
+- GRC_ArchaioLimani-72_1_T-1.xml
+- GRC_ArchaioLimani-7_1_T-4.xml
+- GRC_ArchaioLimani-85_1_T-5.xml
+- GRC_ArchaioLimani-97_1_T-12.xml
+- GRC_NeaSmyrni-116_1_T-5.xml
+- GRC_NeaSmyrni-128_1_T-49.xml
+- GRC_NeaSmyrni-141_1_T-16.xml
+- GRC_NeaSmyrni-15_1_T-2.xml
+- GRC_NeaSmyrni-168_1_T-4.xml
+- GRC_NeaSmyrni-21_1_T-5.xml
+- GRC_NeaSmyrni-31_1_T-10.xml
+- GRC_NeaSmyrni-45_1_T-3.xml
+- GRC_NeaSmyrni-54_1_T-43.xml
+- GRC_NeaSmyrni-6_1_T-4.xml
+- GRC_NeaSmyrni-76_1_T-35.xml
+- GRC_NeaSmyrni-98_1_T-2.xml
+- HRV_Centar-25_1_T-13.xml
+- HRV_Centar-28_1_T-1.xml
+- HRV_Centar-45_1_T-42.xml
+- HRV_Centar-56_1_T-5.xml
+- HRV_Centar-7_1_T-12.xml
+- HRV_Pula-16_1_T-1.xml
+- ITA_CarpiCentro-1_2_T-1.xml
+- ITA_Imola-1_1.xml
+- ITA_Siderno-4_5_T-1.xml
+- POL_Krakow-115_1_T-6.xml
+- POL_Krakow-125_1_T-10.xml
+- POL_Krakow-134_1_T-2.xml
+- POL_Krakow-25_1_T-15.xml
+- POL_Krakow-47_1_T-1.xml
+- POL_Krakow-55_1_T-3.xml
+- POL_Krakow-63_1_T-10.xml
+- POL_Krakow-71_1_T-2.xml
+- POL_Krakow-86_1_T-12.xml
+- POL_Poznan-102_1_T-21.xml
+- POL_Poznan-11_1_T-14.xml
+- POL_Poznan-11_1_T-9.xml
+- POL_Poznan-23_1_T-1.xml
+- POL_Poznan-31_1_T-7.xml
+- POL_Poznan-34_1_T-11.xml
+- POL_Poznan-41_1_T-2.xml
+- POL_Poznan-50_1_T-10.xml
+- POL_Poznan-54_1_T-6.xml
+- POL_Poznan-72_1_T-12.xml
+- POL_Poznan-8_1_T-4.xml
+- POL_Poznan-99_1_T-31.xml
+- POL_Srodmiescie-106_1_T-3.xml
+- POL_Srodmiescie-123_1_T-38.xml
+- POL_Srodmiescie-123_1_T-75.xml
+- POL_Srodmiescie-140_1_T-33.xml
+- POL_Srodmiescie-149_1_T-149.xml
+- POL_Srodmiescie-15_1_T-1.xml
+- POL_Srodmiescie-25_1_T-9.xml
+- POL_Srodmiescie-38_1_T-3.xml
+- POL_Srodmiescie-50_1_T-10.xml
+- POL_Srodmiescie-61_1_T-7.xml
+- POL_Srodmiescie-69_1_T-18.xml
+- POL_Srodmiescie-75_1_T-9.xml
+- POL_Srodmiescie-88_1_T-1.xml
+- POL_Srodmiescie-93_1_T-43.xml
+- PRI_Barceloneta-2_3_T-1.xml
+- TUR_Isparta-131_1_T-2.xml
+- TUR_Isparta-28_1_T-4.xml
+- TUR_Isparta-89_1_T-1.xml
+- USA_Austin-25_15_T-1.xml
+- USA_Austin-48_3_T-1.xml
+- USA_Austin-57_7_T-1.xml
+- USA_Austin-64_2_T-1.xml
+- USA_Austin-75_5_T-1.xml
+- USA_Austin-88_15_T-1.xml
+- USA_CoTA-1_1.xml
+- USA_Lanker-2_17_T-1.xml
+- USA_NewYork-74_11_T-1.xml
+- USA_Phoenix-13_8_T-1.xml
+- USA_Phoenix-17_35_T-1.xml
+- USA_Phoenix-38_31_T-1.xml
+- USA_Phoenix-48_17_T-1.xml
+- USA_Phoenix-64_31_T-1.xml
+- USA_Phoenix-75_13_T-1.xml
+- USA_Phoenix-75_21_T-1.xml
+- USA_Phoenix-8_38_T-1.xml
+- USA_Tyler-36_1_T-4.xml
+- USA_Tyler-66_1_T-7.xml
+- USA_US101-3_5_T-1.xml
+- USA_US101-4_3_T-1.xml
+- USA_Washington-28_17_T-1.xml
+- USA_Washington-32_46_T-1.xml
+- USA_Washington-5_15_T-1.xml
+- ZAF_Kyalami-1_1.xml
+- ZAM_Tjunction-1_160_T-1.xml
+- ZAM_Tjunction-1_244_T-1.xml
+- ZAM_Tjunction-1_328_T-1.xml
+- ZAM_Tjunction-1_374_T-1.xml
+- ZAM_Tjunction-1_41_T-1.xml
+- ZAM_Tjunction-1_503_T-1.xml
+- ZAM_Tjunction-1_94_T-1.xml
+- ZAM_Urban-3_1.xml
+- ZAM_Zip-1_28_T-1.xml
+PLANNER: CEM_CPP
+N_W_SAMPLE: 10
+N_S_SAMPLE: 10
+N_T_SAMPLE: 10
+SAVE_GIF: false
+SAVE_MEASUREMENTS: true
+Num_Threads_For_CollisionChecker: 1
+Runtime_Measurement: true
+Collect_Data_For_ML: true
+SHOW_SAMPLED_TRAJECTORIES: false
+SAFETY:
+  check_clearance: true
+  clearance_time_gap: 2.0
+  clearance_min_gap: 3.0
+  clearance_lateral_margin: 0.2
+  clearance_grace_time: 1.0
+  clearance_recovery_time: 3.0
+  clearance_fallback: true
+MOTION_MODEL:
+  low_speed_threshold: 4.0
+  low_speed_min_lateral_length: 5.0
+CEM:
+  num_iterations: 8
+  population: 250
+  elite_fraction: 0.1
+  smoothing: 0.7
+  init_std: 0.3
+  seed: 0
+MPPI:
+  num_iterations: 4
+  population: 250
+  temperature: 0.1
+  learning_rate: 0.7
+  init_std: 0.3
+  seed: 0

@@ -29,6 +29,7 @@ PYBIND11_MODULE(fiss_plus_planner_cpp, m) {
         .def_readwrite("num_t", &FissPlusPlannerSettings::num_t)
         .def_readwrite("check_obstacle", &FissPlusPlannerSettings::check_obstacle)
         .def_readwrite("check_boundary", &FissPlusPlannerSettings::check_boundary)
+        .def_readwrite("planning_obstacle_cost", &FissPlusPlannerSettings::planning_obstacle_cost)
         .def_readwrite("refine_trajectory", &FissPlusPlannerSettings::refine_trajectory)
         .def_readwrite("max_refine_iters", &FissPlusPlannerSettings::max_refine_iters)
         .def_readwrite("has_time_limit", &FissPlusPlannerSettings::has_time_limit)

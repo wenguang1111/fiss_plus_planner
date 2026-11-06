@@ -60,7 +60,7 @@ class IterativeSamplingPlanner(FrenetOptimalPlanner):
 
     Samples are ranked lexicographically: feasible before infeasible, feasible ones by cost,
     infeasible ones by the violation V = share of the horizon from the first violated state on,
-    (N - k) / N, of the first failed check (speed / acceleration, then collision).
+    (N - k) / N, of the first failed check (speed / acceleration, safe following distance, collision).
     """
 
     def __init__(self, planner_settings: IterativeSamplingSettings, ego_vehicle: Vehicle,
@@ -116,8 +116,11 @@ class IterativeSamplingPlanner(FrenetOptimalPlanner):
         safe_ids = {id(fp) for fp in safe}
         collided = [fp for fp in passed if id(fp) not in safe_ids]
         if collided:
-            for fp, v in zip(collided, self.collision_violation(collided, time_step_now)):
-                violation[index[id(fp)]] = v
+            # rejected by the safe following distance (checked first) or by the polygon collision check
+            clearance_first = self.clearance_first_steps(collided, time_step_now)
+            for fp, k, v in zip(collided, clearance_first, self.collision_violation(collided, time_step_now)):
+                n = len(fp.s)
+                violation[index[id(fp)]] = (n - k) / n if k < n else v
 
         safe = self.cost_function.calc_cost(safe, max_target_speed, self.obstacles_array,
                                             self.obstacles_num_vertices, time_step_now)
@@ -161,7 +164,8 @@ class IterativeSamplingPlanner(FrenetOptimalPlanner):
         cycle_trajs = [fp for trajs in self.all_trajs[num_lists:] for fp in trajs]
         self.all_trajs[num_lists:] = [cycle_trajs]
 
-        self.prev_best = None if self.best_traj is None else self.best_traj.sampling_param
+        if self.best_traj is not None:  # kept on failure: the re-plan without clearance starts from it as well
+            self.prev_best = self.best_traj.sampling_param
         return self.best_traj
 
     @staticmethod

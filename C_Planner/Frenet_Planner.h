@@ -2,6 +2,9 @@
 #define FRENET_PLANNER_H
 
 #include <vector>
+#include <limits>
+#include <cmath>
+#include <algorithm>
 #include <memory>
 #include <tuple>
 #include <thread>
@@ -29,6 +32,7 @@ struct SettingParameters {
 
     bool check_obstacle;        // True if check collision with obstacles
     bool check_boundary;        // True if check collision with road boundaries
+    bool planning_obstacle_cost; // J_D in the planning cost (CostFunction::planning_obstacle_cost)
 
     // Constructor with default values matching Python implementation
     SettingParameters(int num_width_param = 5, int num_speed_param = 5, int num_t_param = 5) 
@@ -42,7 +46,8 @@ struct SettingParameters {
           max_t(5.0),
           num_t(num_t_param),
           check_obstacle(true),
-          check_boundary(true) {}
+          check_boundary(true),
+          planning_obstacle_cost(true) {}
 };
 
 // Vehicle parameters struct
@@ -59,10 +64,29 @@ struct VehicleParams {
     double max_steering_rate;   // maximum steering rate [rad/s]
 };
 
+// Time stamps 0, dt, 2 dt, ... < T, as np.arange(0.0, T, dt) of the Python planners (accumulating t += dt
+// gives one point more for T = 5.0)
+inline std::vector<double> time_grid(double T, double dt) {
+    const int n = std::max(0, static_cast<int>(std::ceil(T / dt)));
+    std::vector<double> t(n);
+    for (int i = 0; i < n; ++i) t[i] = i * dt;
+    return t;
+}
+
+// Evaluation of one sample (d, s_d, t): feasible trajectories have a cost; infeasible ones the violation
+// V = (n - k) / n of the first failed check (k: first violating state of n), 1 if the global path fails
+// (IterativeSamplingPlanner.evaluate of the Python planners)
+struct SampleEval {
+    bool feasible = false;
+    double violation = 1.0;
+    double cost = std::numeric_limits<double>::infinity();
+};
+
 // Result structure for plan_multithread
 struct PlanResult {
-    std::vector<FrenetTrajectory> frenet_paths;       // All generated frenet paths
-    std::vector<FrenetTrajectory> collision_free_paths; // Paths that passed collision check
+    std::vector<FrenetTrajectory> frenet_paths;       // unused (not filled)
+    std::vector<FrenetTrajectory> collision_free_paths; // Paths that passed collision check (sample order)
+    std::vector<SampleEval> evals;                    // One per sample, sample order
 };
 
 // Statistics structure for planning
@@ -93,6 +117,7 @@ public:
     FrenetTrajectory best_traj;
     std::vector<std::vector<FrenetTrajectory>> all_trajs;
     std::vector<FrenetTrajectory> last_fplist;
+    std::vector<SampleEval> last_evals;  // per sample of the last best_traj_generation
     
     // Statistics for the last planning cycle
     PlanStats last_stats;
@@ -127,6 +152,10 @@ public:
     
     // Check trajectory constraints (speed, acceleration, etc.)
     std::vector<FrenetTrajectory> check_constraints(const std::vector<FrenetTrajectory>& trajs);
+
+    // V of the constraints checked by check_constraints: share of the horizon from the first state with
+    // s_d > max_speed or |s_dd| > max_accel (0 if none)
+    double constraint_violation(const FrenetTrajectory& traj) const;
     
     // Multi-threaded collision detection using pre-processed obstacle data
     std::vector<FrenetTrajectory> check_collision_multithread(const std::vector<FrenetTrajectory>& trajs,

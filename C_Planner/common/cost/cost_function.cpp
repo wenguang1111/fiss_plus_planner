@@ -1,4 +1,5 @@
 #include "cost_function.h"
+#include <cmath>
 #include <limits>
 
 CostFunction::CostFunction(const std::string& cost_type) {
@@ -19,7 +20,7 @@ double CostFunction::cost_terminal_time(double terminal_time) {
 double CostFunction::cost_velocity_offset(const std::vector<double>& vels, double v_target) {
     double cost = 0.0;
     for (double vel : vels) {
-        double diff = vel - v_target;
+        double diff = std::abs(vel) - v_target;  // |s_d| as the Python cost (np.abs(traj.s_d))
         cost += diff * diff;
     }
     return w_V * cost;
@@ -119,7 +120,9 @@ double CostFunction::cost_singleTrajectory(const FrenetTrajectory& traj,
     }
 
     double cost_time = cost_terminal_time(15.0 - 0.1 * static_cast<double>(traj.t.size()));
-    double cost_obstacle = cost_dist_obstacle(obstacles_array, num_vertices_array, num_time_steps, num_obstacles, max_vertices, traj, time_step_now);
+    double cost_obstacle = planning_obstacle_cost
+        ? cost_dist_obstacle(obstacles_array, num_vertices_array, num_time_steps, num_obstacles, max_vertices, traj, time_step_now)
+        : 0.0;
     double cost_speed = cost_velocity_offset(traj.s_d, max_speed);
     double cost_accel = cost_acceleration(traj.s_dd) + cost_acceleration(traj.d_dd);
     double cost_jerk_val = cost_jerk(traj.s_ddd) + cost_jerk(traj.d_ddd);

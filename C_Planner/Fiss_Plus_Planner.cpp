@@ -152,10 +152,7 @@ std::pair<bool, double> Fiss_Plus_Planner::generate_trajectory(const std::array<
     
     // Generate time steps
     const auto& end_state = traj.end_state;
-    traj.t.clear();
-    for (double t = 0.0; t < end_state.t; t += fiss_settings.tick_t) {
-        traj.t.push_back(t);
-    }
+    traj.t = time_grid(end_state.t, fiss_settings.tick_t);  // np.arange as the Python FISS+
     
     // Generate lateral quintic polynomial
     QuinticPolynomial lat_qp(start_state.d, start_state.d_d, start_state.d_dd,
@@ -210,10 +207,7 @@ double Fiss_Plus_Planner::generate_trajectory_by_end_state(const FrenetState& en
     traj.is_generated = true;
     
     // Generate time steps
-    traj.t.clear();
-    for (double t = 0.0; t < end_state.t; t += fiss_settings.tick_t) {
-        traj.t.push_back(t);
-    }
+    traj.t = time_grid(end_state.t, fiss_settings.tick_t);  // np.arange as the Python FISS+
     
     // Generate lateral quintic polynomial
     QuinticPolynomial lat_qp(start_state.d, start_state.d_d, start_state.d_dd,
@@ -395,7 +389,9 @@ FrenetTrajectory* Fiss_Plus_Planner::refine_solution(const FrenetTrajectory& tra
         
         auto t_now = std::chrono::high_resolution_clock::now();
         double t_spent = std::chrono::duration<double>(t_now - t_start).count();
-        if (fiss_settings.has_time_limit && t_spent >= time_limit) {
+        // As the Python FISS+: the time left after the coarse search ends the refinement also without
+        // has_time_limit (has_time_limit only decides whether a refinement starts)
+        if (t_spent >= time_limit) {
             break;
         }
     }
@@ -468,7 +464,6 @@ FrenetTrajectory Fiss_Plus_Planner::plan(const FrenetState& frenet_state,
     bool best_traj_found = false;
     
     while (!best_traj_found) {
-        last_stats.num_trajs_validated++;  // Using as iteration counter
         
         // ===================== Initial Guess =====================
         if (candidate_trajs.empty()) {

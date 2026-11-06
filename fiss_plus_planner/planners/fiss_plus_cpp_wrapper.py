@@ -93,6 +93,7 @@ class FissPlusCppWrapper(object):
             cpp_settings.max_t = self.settings.max_t
             cpp_settings.check_obstacle = self.settings.check_obstacle
             cpp_settings.check_boundary = self.settings.check_boundary
+            cpp_settings.planning_obstacle_cost = CostFunction.planning_obstacle_cost  # PLANNING_OBSTACLE_COST
             
             # FISS+ specific settings
             cpp_settings.refine_trajectory = self.settings.refine_trajectory
@@ -182,7 +183,7 @@ class FissPlusCppWrapper(object):
                     py_traj = self._dict_to_frenet_trajectory(cpp_traj_dict)
                     self.best_traj = py_traj
 
-                    if self.doing_runtime_measurement:
+                    if not self.doing_runtime_measurement:  # as FOP_CPP_Wrapper: no conversion while timing
                         py_fplist = []
                         cpp_fplist = self.cpp_planner.getAllSuccessfulTrajectories()  # Returns list of dicts
                         for cpp_fp_dict in cpp_fplist:

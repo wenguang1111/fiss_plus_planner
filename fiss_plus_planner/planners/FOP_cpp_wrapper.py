@@ -122,6 +122,7 @@ class FOP_CPP_Wrapper(object):
             cpp_settings.max_t = self.settings.max_t
             cpp_settings.check_obstacle = self.settings.check_obstacle
             cpp_settings.check_boundary = self.settings.check_boundary
+            cpp_settings.planning_obstacle_cost = CostFunction.planning_obstacle_cost  # PLANNING_OBSTACLE_COST
             
             # Create C++ VehicleParams
             cpp_vehicle = frenet_planner_cpp.VehicleParams()
@@ -407,17 +408,27 @@ class FOP_CPP_Wrapper(object):
                 cpp_state.d_dd = frenet_state.d_dd
                 cpp_state.d_ddd = frenet_state.d_ddd
 
-                cpp_samples = []
-                for sample in sampling_parameters:
-                    cpp_samples.append((float(sample[0]), float(sample[1]), float(sample[2])))
+                if isinstance(sampling_parameters, np.ndarray):
+                    # (N, 3) array of (d, s_d, t): converted in C++
+                    cpp_traj = self.cpp_planner.best_traj_generation_array(
+                        cpp_state,
+                        sampling_parameters,
+                        max_target_speed,
+                        time_step_now,
+                        self.number_threads
+                    )
+                else:
+                    cpp_samples = []
+                    for sample in sampling_parameters:
+                        cpp_samples.append((float(sample[0]), float(sample[1]), float(sample[2])))
 
-                cpp_traj = self.cpp_planner.best_traj_generation(
-                    cpp_state,
-                    cpp_samples,
-                    max_target_speed,
-                    time_step_now,
-                    self.number_threads
-                )
+                    cpp_traj = self.cpp_planner.best_traj_generation(
+                        cpp_state,
+                        cpp_samples,
+                        max_target_speed,
+                        time_step_now,
+                        self.number_threads
+                    )
 
                 if cpp_traj.is_generated:
                     py_traj = FrenetTrajectory()

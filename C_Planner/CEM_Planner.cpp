@@ -16,21 +16,24 @@ CEM_Planner::CEM_Planner(const SettingParameters& settings_param,
       cem_settings(cem_param) {}
 
 void CEM_Planner::update_proposal(GaussianProposal& proposal,
-                                  const std::vector<Unit3>& feasible,
-                                  const std::vector<double>& costs) const {
-    const int population = cem_settings.population;
-    const int n_elite = std::min(
-        std::clamp(static_cast<int>(std::lround(cem_settings.elite_fraction * population)), 1, population),
-        static_cast<int>(feasible.size()));
-
-    std::vector<int> order(feasible.size());
+                                  const std::vector<Unit3>& units,
+                                  const std::vector<SampleEval>& evals) const {
+    // Elite set: the best round(elite_fraction * n) samples ranked by (feasible first, then cost for
+    // feasible / V for infeasible), stable as np.lexsort; std::nearbyint rounds half to even as Python's round
+    const int n = static_cast<int>(units.size());
+    const int n_elite = std::clamp(static_cast<int>(std::nearbyint(cem_settings.elite_fraction * n)), 1, n);
+    std::vector<int> order(n);
     std::iota(order.begin(), order.end(), 0);
-    std::stable_sort(order.begin(), order.end(), [&costs](int a, int b) { return costs[a] < costs[b]; });
+    auto key = [&evals](int i) { return evals[i].feasible ? evals[i].cost : evals[i].violation; };
+    std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
+        if (evals[a].feasible != evals[b].feasible) return evals[a].feasible;
+        return key(a) < key(b);
+    });
 
     std::vector<Unit3> elites;
     elites.reserve(n_elite);
     for (int i = 0; i < n_elite; ++i) {
-        elites.push_back(feasible[order[i]]);
+        elites.push_back(units[order[i]]);
     }
     Unit3 elite_mean, elite_std;
     GaussianProposal::fit(elites, std::vector<double>(n_elite, 1.0), elite_mean, elite_std);

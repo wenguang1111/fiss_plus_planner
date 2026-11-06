@@ -1,0 +1,3369 @@
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [136] cannot #be reached from the start lanelet with ID [511]
+The goal lanelet with ID [136] cannot #be reached from the start lanelet with ID [511]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [136] cannot #be reached from the start lanelet with ID [511]
+The goal lanelet with ID [136] cannot #be reached from the start lanelet with ID [511]
+Processing DEU_Bremen-1_41_T-1.xml...
+Planning failed at time step 51
+Standstill cycles 0 of 52, standing at the end False
+Cost Distance To Obstacles: 3031.3784391876184
+Cost Time: 5.2
+Cost Speed: 476.60463698909047
+Cost Acceleration: 1153.195606966851
+Cost Jerk: 746.0258341213141
+Cost Lane Center Offset: 0.17666349389350194
+len(traj.t): 52
+Total Cost: 109.18809962997629
+Processing POL_Krakow-52_1_T-8.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 41
+Standstill cycles 0 of 42, standing at the end False
+Cost Distance To Obstacles: 536.1158144224255
+Cost Time: 4.2
+Cost Speed: 43.750665000496646
+Cost Acceleration: 2552.2487606772884
+Cost Jerk: 916.9690898573473
+Cost Lane Center Offset: 0.15119009931368216
+len(traj.t): 42
+Total Cost: 100.6103695251636
+Processing CHN_Beijing-7_57_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 93, standing at the end False
+Cost Distance To Obstacles: 2478.264520637547
+Cost Time: 9.3
+Cost Speed: 220.96014225940036
+Cost Acceleration: 1756.1745027278657
+Cost Jerk: 614.5544365515157
+Cost Lane Center Offset: 3.092865168883845
+len(traj.t): 93
+Total Cost: 63.84888674564745
+Processing DEU_Hanover-16_19_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 65.86191060077157
+Cost Time: 0.1
+Cost Speed: 0.098485776
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 9.528994683748402e-05
+len(traj.t): 1
+Total Cost: 66.0604916667184
+No ego vehicle trajectory found
+    DEU_Hanover-16_19_T-1.xml not feasible!
+Processing DEU_Schwetzingen-33_1_T-2.xml...
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 664.5210672618847
+Cost Time: 6.9
+Cost Speed: 231.1685731302191
+Cost Acceleration: 713.515256235821
+Cost Jerk: 951.206096546992
+Cost Lane Center Offset: 5.433207195975694
+len(traj.t): 69
+Total Cost: 44.086147831462206
+Processing BEL_Leuven-45_19_T-1.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 291.48553289115944
+Cost Time: 1.5
+Cost Speed: 36.18488383153485
+Cost Acceleration: 317.11402799905795
+Cost Jerk: 831.4697177808167
+Cost Lane Center Offset: 0.33144664202447777
+len(traj.t): 15
+Total Cost: 99.93904060963956
+Processing DEU_Bremen-30_17_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 114, standing at the end False
+Cost Distance To Obstacles: 5203.1181648577785
+Cost Time: 11.4
+Cost Speed: 255.7555257354275
+Cost Acceleration: 1837.97337392799
+Cost Jerk: 756.2640723546344
+Cost Lane Center Offset: 856.2069059170772
+len(traj.t): 114
+Total Cost: 89.55191265607814
+Processing USA_Phoenix-38_7_T-1.xml...
+Planning failed at time step 104
+Standstill cycles 0 of 105, standing at the end False
+Cost Distance To Obstacles: 4863.8938317440225
+Cost Time: 10.5
+Cost Speed: 403.6526271269328
+Cost Acceleration: 2802.648504764569
+Cost Jerk: 1049.6989723292907
+Cost Lane Center Offset: 2.8033493973291295
+len(traj.t): 105
+Total Cost: 97.38283128916328
+Processing DEU_Darmstadt-37_1_T-5.xml...
+Planning failed at time step 25
+Standstill cycles 0 of 26, standing at the end False
+Cost Distance To Obstacles: 834.8881531085497
+Cost Time: 2.6
+Cost Speed: 223.41810024331772
+Cost Acceleration: 52.54089183545025
+Cost Jerk: 136.59026245885187
+Cost Lane Center Offset: 0.06732970639577521
+len(traj.t): 26
+Total Cost: 50.58095143663713
+Processing CHN_Beijing-7_18_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 83, standing at the end False
+Cost Distance To Obstacles: 2132.37204958386
+Cost Time: 8.3
+Cost Speed: 26.745662121951653
+Cost Acceleration: 274.5429888038304
+Cost Jerk: 205.85077478647355
+Cost Lane Center Offset: 0.32481033193265063
+len(traj.t): 83
+Total Cost: 40.10525645334998
+Processing DEU_Kiel-55_56_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 69.09562555303268
+Cost Time: 0.1
+Cost Speed: 0.04833030399999998
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.03795508458089494
+len(traj.t): 1
+Total Cost: 69.28191094161357
+No ego vehicle trajectory found
+    DEU_Kiel-55_56_T-1.xml not feasible!
+Processing BRA_VilaVelha-72_1_T-8.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [126] cannot #be reached from the start lanelet with ID [980]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [126] cannot #be reached from the start lanelet with ID [980]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/sparse_planning/scenario_drawer.py:185: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=64, facecolor="white")
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 156.10650921892827
+Cost Time: 1.7000000000000002
+Cost Speed: 10.888995587545399
+Cost Acceleration: 258.2280391350332
+Cost Jerk: 276.56827443807435
+Cost Lane Center Offset: 6.971356864627996
+len(traj.t): 17
+Total Cost: 43.39195148495348
+Processing FRA_Dijon-24_2_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 50.646289727078
+Cost Time: 0.1
+Cost Speed: 0.05544291600000002
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0012228409277485611
+len(traj.t): 1
+Total Cost: 50.80295548400574
+No ego vehicle trajectory found
+    FRA_Dijon-24_2_T-1.xml not feasible!
+Processing BEL_Antwerp-59_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 3076.6531309271113
+Cost Time: 10.0
+Cost Speed: 466.2059795133624
+Cost Acceleration: 1161.4992108304116
+Cost Jerk: 1851.8914596177917
+Cost Lane Center Offset: 2.9660884823574323
+len(traj.t): 100
+Total Cost: 75.59215869371035
+Processing ESP_Vigo-73_5_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 88, standing at the end False
+Cost Distance To Obstacles: 629.2529388106665
+Cost Time: 8.8
+Cost Speed: 112.13301847195808
+Cost Acceleration: 706.9562110307764
+Cost Jerk: 181.9528446189819
+Cost Lane Center Offset: 22.872537494404142
+len(traj.t): 88
+Total Cost: 27.585994891213492
+Processing ESP_Barcelona-5_41_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 71, standing at the end False
+Cost Distance To Obstacles: 1668.6031113342199
+Cost Time: 7.1000000000000005
+Cost Speed: 22.505094614810368
+Cost Acceleration: 121.45568535327777
+Cost Jerk: 51.80885520162226
+Cost Lane Center Offset: 0.8521472341218082
+len(traj.t): 71
+Total Cost: 33.37077315124017
+Processing DEU_Kitzingen-7_1_T-3.xml...
+Goal Reached
+Standstill cycles 0 of 90, standing at the end False
+Cost Distance To Obstacles: 5326.198107126164
+Cost Time: 9.0
+Cost Speed: 922.353220503792
+Cost Acceleration: 971.2234427149798
+Cost Jerk: 1511.2350988920084
+Cost Lane Center Offset: 1.5924835093755823
+len(traj.t): 90
+Total Cost: 106.02891503051467
+Processing FRA_Nancy-41_6_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 146.28563355540615
+Cost Time: 1.7000000000000002
+Cost Speed: 9.679918683893874
+Cost Acceleration: 785.7708189687323
+Cost Jerk: 719.875832045329
+Cost Lane Center Offset: 0.13407157559259136
+len(traj.t): 17
+Total Cost: 99.4497808722914
+Processing DEU_Goeppingen-19_1_T-7.xml...
+Goal Reached
+Standstill cycles 0 of 98, standing at the end False
+Cost Distance To Obstacles: 2181.3557951658536
+Cost Time: 9.8
+Cost Speed: 120.6992886645908
+Cost Acceleration: 1217.9139181066982
+Cost Jerk: 3190.098232221494
+Cost Lane Center Offset: 6.374376022294131
+len(traj.t): 98
+Total Cost: 78.33511847123398
+Processing USA_Austin-88_17_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 56, standing at the end False
+Cost Distance To Obstacles: 1555.0178184473398
+Cost Time: 5.6000000000000005
+Cost Speed: 16.32234670979659
+Cost Acceleration: 83.43288814057127
+Cost Jerk: 44.34604655474689
+Cost Lane Center Offset: 0.3468968726014887
+len(traj.t): 56
+Total Cost: 35.947607084376
+Processing DEU_Aschaffenburg-25_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 102, standing at the end False
+Cost Distance To Obstacles: 3653.5496387163234
+Cost Time: 10.200000000000001
+Cost Speed: 239.19847378442378
+Cost Acceleration: 1198.2781594581243
+Cost Jerk: 1952.4083963009807
+Cost Lane Center Offset: 1.3113958188531547
+len(traj.t): 102
+Total Cost: 79.26613788312457
+Processing DEU_Bremen-37_14_T-1.xml...
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 1710.5198010068498
+Cost Time: 15.0
+Cost Speed: 420.0447928951888
+Cost Acceleration: 1281.460506611792
+Cost Jerk: 4730.87252337454
+Cost Lane Center Offset: 3.5384197942010083
+len(traj.t): 150
+Total Cost: 69.30957362455048
+Processing ECU_Quito-6_1_T-3.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: ECU
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: ECU
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [384] cannot #be reached from the start lanelet with ID [1387]
+The goal lanelet with ID [384] cannot #be reached from the start lanelet with ID [1387]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [384] cannot #be reached from the start lanelet with ID [1387]
+The goal lanelet with ID [384] cannot #be reached from the start lanelet with ID [1387]
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 464.36892590911236
+Cost Time: 3.6
+Cost Speed: 228.55669632921087
+Cost Acceleration: 701.5586154095645
+Cost Jerk: 353.512377313045
+Cost Lane Center Offset: 2.5933668835837
+len(traj.t): 36
+Total Cost: 52.22749949568101
+Processing DEU_Memmingen-196_1_T-1.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 765.2398141872849
+Cost Time: 3.6
+Cost Speed: 278.47464187568283
+Cost Acceleration: 121.20977663124548
+Cost Jerk: 336.5861501591671
+Cost Lane Center Offset: 0.13782923644491993
+len(traj.t): 36
+Total Cost: 45.31245033582848
+Processing DEU_Kempten-22_1_T-1.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 1007.2061067163667
+Cost Time: 3.6
+Cost Speed: 80.9468329619832
+Cost Acceleration: 454.50115469431455
+Cost Jerk: 844.6380861981417
+Cost Lane Center Offset: 0.13952903506527373
+len(traj.t): 36
+Total Cost: 69.91754748905197
+Processing DEU_Heilbronn-79_1_T-24.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 197.4539639024606
+Cost Time: 3.6
+Cost Speed: 19.820085920137295
+Cost Acceleration: 1821.117715210944
+Cost Jerk: 622.9715494809485
+Cost Lane Center Offset: 1.083597211761986
+len(traj.t): 36
+Total Cost: 77.55685865906256
+Processing CAN_Ottawa-62_1_T-17.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: CAN
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: CAN
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 7.767595428395488
+Cost Time: 0.1
+Cost Speed: 0.5900526810000001
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.005937784587479047
+len(traj.t): 1
+Total Cost: 8.463585893982966
+No ego vehicle trajectory found
+    CAN_Ottawa-62_1_T-17.xml not feasible!
+Processing AUT_Haag-15_1_T-9.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 2.3286672640473842
+Cost Time: 0.2
+Cost Speed: 1.7880935329073921
+Cost Acceleration: 0.2931161470272558
+Cost Jerk: 27.64511697394483
+Cost Lane Center Offset: 0.04779095416858899
+len(traj.t): 2
+Total Cost: 16.251392436047727
+Processing POL_Srodmiescie-76_1_T-5.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 374.53207703064925
+Cost Time: 0.9
+Cost Speed: 8.293090834192022
+Cost Acceleration: 271.52243257765235
+Cost Jerk: 941.2447350891681
+Cost Lane Center Offset: 0.06047296426477645
+len(traj.t): 9
+Total Cost: 178.1947564995474
+Processing POL_Poznan-102_1_T-74.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 1052.0219767604085
+Cost Time: 1.5
+Cost Speed: 177.3035759635349
+Cost Acceleration: 438.37031051047956
+Cost Jerk: 575.7545310317973
+Cost Lane Center Offset: 0.15917439788523832
+len(traj.t): 15
+Total Cost: 151.0739712442737
+Processing DEU_Nuremberg-2_9_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 80, standing at the end False
+Cost Distance To Obstacles: 442.82829391987696
+Cost Time: 8.0
+Cost Speed: 480.02563024160094
+Cost Acceleration: 3528.396723093865
+Cost Jerk: 973.6812627377282
+Cost Lane Center Offset: 11.831801978561794
+len(traj.t): 80
+Total Cost: 75.95954639964542
+Processing TUR_Isparta-59_1_T-9.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [71] cannot #be reached from the start lanelet with ID [2427]
+The goal lanelet with ID [71] cannot #be reached from the start lanelet with ID [2427]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [71] cannot #be reached from the start lanelet with ID [2427]
+The goal lanelet with ID [71] cannot #be reached from the start lanelet with ID [2427]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+could not find a well oriented route. Perhaps increase distance threshold, returning first route
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+could not find a well oriented route. Perhaps increase distance threshold, returning first route
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 434.2590694928017
+Cost Time: 3.6
+Cost Speed: 19.784220313140356
+Cost Acceleration: 323.8361737249316
+Cost Jerk: 172.62432452470173
+Cost Lane Center Offset: 2.275383717014117
+len(traj.t): 36
+Total Cost: 30.066088104794154
+Processing USA_Austin-65_16_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 3973.9821957665868
+Cost Time: 15.0
+Cost Speed: 31.903759579512368
+Cost Acceleration: 305.53235016766826
+Cost Jerk: 468.5476828545629
+Cost Lane Center Offset: 8.484126116540915
+len(traj.t): 150
+Total Cost: 46.92300076323247
+Processing USA_Washington-38_12_T-1.xml...
+Planning failed at time step 38
+Standstill cycles 0 of 39, standing at the end False
+Cost Distance To Obstacles: 888.5330336969622
+Cost Time: 3.9000000000000004
+Cost Speed: 277.7932750262143
+Cost Acceleration: 386.01544139221534
+Cost Jerk: 391.55153786246376
+Cost Lane Center Offset: 0.33003423695350304
+len(traj.t): 39
+Total Cost: 53.75188005678997
+Processing DEU_Bonn-3_5_T-1.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 947.1011302565424
+Cost Time: 3.6
+Cost Speed: 384.51607123023246
+Cost Acceleration: 347.99304630294756
+Cost Jerk: 257.9843074437059
+Cost Lane Center Offset: 4.23451590405802
+len(traj.t): 36
+Total Cost: 57.53969642048573
+Processing DEU_Wolfsburg-1_1_T-1.xml...
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 3223.6954366734444
+Cost Time: 10.0
+Cost Speed: 9.839671838928112
+Cost Acceleration: 99.55040285702762
+Cost Jerk: 247.25228537992064
+Cost Lane Center Offset: 96.31652315461844
+len(traj.t): 100
+Total Cost: 46.76654319903939
+Processing DEU_Memmingen-152_1_T-4.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 796.9384431247944
+Cost Time: 3.6
+Cost Speed: 428.9513512518128
+Cost Acceleration: 245.68674817114103
+Cost Jerk: 203.0776533913568
+Cost Lane Center Offset: 0.16897605613258093
+len(traj.t): 36
+Total Cost: 50.1228658887566
+Processing CAN_Ottawa-34_1_T-8.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: CAN
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: CAN
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 10.967647077929586
+Cost Time: 0.1
+Cost Speed: 0.7071344640000001
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 4.072596202820163e-06
+len(traj.t): 1
+Total Cost: 11.77478561452579
+No ego vehicle trajectory found
+    CAN_Ottawa-34_1_T-8.xml not feasible!
+Processing ESP_Barcelona-50_14_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 80, standing at the end False
+Cost Distance To Obstacles: 1908.3318058432098
+Cost Time: 8.0
+Cost Speed: 5.374826655711716
+Cost Acceleration: 25.721903879364685
+Cost Jerk: 37.01917191723082
+Cost Lane Center Offset: 0.35148414176748377
+len(traj.t): 80
+Total Cost: 32.70998990546606
+Processing ESP_Barcelona-37_10_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 71, standing at the end False
+Cost Distance To Obstacles: 1673.2251365441175
+Cost Time: 7.1000000000000005
+Cost Speed: 0.9756380623641603
+Cost Acceleration: 23.569488318785943
+Cost Jerk: 78.3899399955298
+Cost Lane Center Offset: 0.2838782530010424
+len(traj.t): 71
+Total Cost: 32.12033917146195
+Processing GRC_ArchaioLimani-74_1_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 2.3362486908475386
+Cost Time: 0.1
+Cost Speed: 0.07485710399999995
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0007986327821346395
+len(traj.t): 1
+Total Cost: 2.5119044276296734
+No ego vehicle trajectory found
+    GRC_ArchaioLimani-74_1_T-1.xml not feasible!
+Processing ZAM_Tjunction-1_420_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 114, standing at the end False
+Cost Distance To Obstacles: 2716.5978384670075
+Cost Time: 11.4
+Cost Speed: 260.5832564108904
+Cost Acceleration: 544.7614964994838
+Cost Jerk: 202.60833741198758
+Cost Lane Center Offset: 2.8857474586780323
+len(traj.t): 114
+Total Cost: 44.09681294954427
+Processing CHN_Beijing-16_9_T-1.xml...
+Planning failed at time step 38
+Standstill cycles 0 of 39, standing at the end False
+Cost Distance To Obstacles: 846.1492137088198
+Cost Time: 3.9000000000000004
+Cost Speed: 244.9201730560798
+Cost Acceleration: 784.6515523762096
+Cost Jerk: 720.6849159008242
+Cost Lane Center Offset: 5.749504382509567
+len(traj.t): 39
+Total Cost: 70.62193229293445
+Processing DEU_Aschaffenburg-3_10_T-1.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 87.39980126559452
+Cost Time: 0.2
+Cost Speed: 0.5936786859458465
+Cost Acceleration: 0.3419216078153144
+Cost Jerk: 31.66378713801291
+Cost Lane Center Offset: 3.0059478802307416
+len(traj.t): 2
+Total Cost: 61.70256828879966
+Processing DEU_Nuremberg-24_6_T-1.xml...
+Planning failed at time step 25
+Standstill cycles 0 of 26, standing at the end False
+Cost Distance To Obstacles: 578.4630213710005
+Cost Time: 2.6
+Cost Speed: 85.88412884043873
+Cost Acceleration: 367.4572643918723
+Cost Jerk: 318.724280543743
+Cost Lane Center Offset: 0.7637500475498364
+len(traj.t): 26
+Total Cost: 54.57278635363864
+Processing CHN_Sha-17_1_T-1.xml...
+Planning failed at time step 28
+Standstill cycles 0 of 29, standing at the end False
+Cost Distance To Obstacles: 1174.4659117040947
+Cost Time: 2.9000000000000004
+Cost Speed: 239.58502011102132
+Cost Acceleration: 999.5814029436549
+Cost Jerk: 355.6126410832682
+Cost Lane Center Offset: 0.002889964427717406
+len(traj.t): 29
+Total Cost: 98.39130571746436
+Processing ESP_Barcelona-58_24_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 85, standing at the end False
+Cost Distance To Obstacles: 1681.7912427654956
+Cost Time: 8.5
+Cost Speed: 4.397467399272133
+Cost Acceleration: 16.26847968933152
+Cost Jerk: 44.201772156291895
+Cost Lane Center Offset: 0.3685670551104498
+len(traj.t): 85
+Total Cost: 29.053265047829427
+Processing ESP_Barcelona-19_28_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 1122.8119136353819
+Cost Time: 1.7000000000000002
+Cost Speed: 6.160573064553505
+Cost Acceleration: 413.2905891750696
+Cost Jerk: 360.0527749542691
+Cost Lane Center Offset: 0.00034934815095100336
+len(traj.t): 17
+Total Cost: 113.60095295161325
+Processing POL_Srodmiescie-52_1_T-20.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 789.2396968518284
+Cost Time: 10.0
+Cost Speed: 5.8210722805579245
+Cost Acceleration: 129.60595857954914
+Cost Jerk: 2717.609418743403
+Cost Lane Center Offset: 7.085337118899092
+len(traj.t): 100
+Total Cost: 46.49361483574237
+Processing USA_Lanker-2_16_T-1.xml...
+Standstill cycles 0 of 90, standing at the end False
+Cost Distance To Obstacles: 4652.199497895207
+Cost Time: 9.0
+Cost Speed: 223.3853096794274
+Cost Acceleration: 631.9216770859387
+Cost Jerk: 2420.3142102162647
+Cost Lane Center Offset: 9.796861934870677
+len(traj.t): 90
+Total Cost: 97.1957506312412
+Processing DEU_Heilbronn-349_1_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 9.788125235849755
+Cost Time: 0.1
+Cost Speed: 2.487116641
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.009541523709045076
+len(traj.t): 1
+Total Cost: 12.3847834005588
+No ego vehicle trajectory found
+    DEU_Heilbronn-349_1_T-1.xml not feasible!
+Processing ESP_Bilbao-24_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 57, standing at the end False
+Cost Distance To Obstacles: 623.2169306141418
+Cost Time: 5.7
+Cost Speed: 77.98475093490633
+Cost Acceleration: 457.8141428634384
+Cost Jerk: 124.2488989986581
+Cost Lane Center Offset: 0.6603095122185256
+len(traj.t): 57
+Total Cost: 28.22500057760286
+Processing TUR_Isparta-133_1_T-2.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Goal Reached
+Standstill cycles 0 of 53, standing at the end False
+Cost Distance To Obstacles: 2232.824534698863
+Cost Time: 5.300000000000001
+Cost Speed: 393.3856651036502
+Cost Acceleration: 1431.9585328066212
+Cost Jerk: 385.8638683772655
+Cost Lane Center Offset: 6.737723372962194
+len(traj.t): 53
+Total Cost: 89.27679857281814
+Processing DEU_Weimar-84_1_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 547.4800916243182
+Cost Time: 1.7000000000000002
+Cost Speed: 2.4661519753318384
+Cost Acceleration: 1037.0357265075131
+Cost Jerk: 951.9467649876201
+Cost Lane Center Offset: 0.44239127003417045
+len(traj.t): 17
+Total Cost: 151.0747721391069
+Processing DEU_Heilbronn-27_1_T-3.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 24.739875000685934
+Cost Time: 0.2
+Cost Speed: 6.2324060167122255
+Cost Acceleration: 0.8879086249396506
+Cost Jerk: 84.29826542795557
+Cost Lane Center Offset: 0.010874058977167459
+len(traj.t): 2
+Total Cost: 58.28466456463528
+Processing POL_Poznan-41_1_T-4.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [432] cannot #be reached from the start lanelet with ID [1063]
+The goal lanelet with ID [431] cannot #be reached from the start lanelet with ID [1064]
+The goal lanelet with ID [432] cannot #be reached from the start lanelet with ID [1064]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [432] cannot #be reached from the start lanelet with ID [1063]
+The goal lanelet with ID [431] cannot #be reached from the start lanelet with ID [1064]
+The goal lanelet with ID [432] cannot #be reached from the start lanelet with ID [1064]
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 71.12060049621705
+Cost Time: 0.9
+Cost Speed: 1.4904114618968056
+Cost Acceleration: 152.8552656977634
+Cost Jerk: 517.6473063843213
+Cost Lane Center Offset: 0.05439120664069857
+len(traj.t): 9
+Total Cost: 83.47421947187102
+Processing GRC_ArchaioLimani-133_1_T-1.xml...
+Planning failed at time step 28
+Standstill cycles 0 of 29, standing at the end False
+Cost Distance To Obstacles: 380.79124938275027
+Cost Time: 2.9000000000000004
+Cost Speed: 69.66026264037127
+Cost Acceleration: 2275.6423647642778
+Cost Jerk: 1946.3638560915222
+Cost Lane Center Offset: 0.06267997034138054
+len(traj.t): 29
+Total Cost: 164.02139354652633
+Processing BEL_Brussels-11_2_T-1.xml...
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 2886.0814186825087
+Cost Time: 6.9
+Cost Speed: 403.88550163454323
+Cost Acceleration: 154.2324505310456
+Cost Jerk: 1481.1883478995478
+Cost Lane Center Offset: 0.2473751043809934
+len(traj.t): 69
+Total Cost: 78.28601585292792
+Processing ESP_Bilbao-49_4_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 130, standing at the end False
+Cost Distance To Obstacles: 1720.6133033403003
+Cost Time: 13.0
+Cost Speed: 372.32430398628605
+Cost Acceleration: 546.7539455131877
+Cost Jerk: 1835.309109058444
+Cost Lane Center Offset: 2.085348927280649
+len(traj.t): 130
+Total Cost: 47.43912316019614
+Processing FRA_Dijon-6_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 109, standing at the end False
+Cost Distance To Obstacles: 5524.988536819626
+Cost Time: 10.9
+Cost Speed: 201.05100920733204
+Cost Acceleration: 1288.9141106752913
+Cost Jerk: 585.0128387729889
+Cost Lane Center Offset: 71.96609730436818
+len(traj.t): 109
+Total Cost: 81.28470268605145
+Processing BEL_Brussels-37_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 57, standing at the end False
+Cost Distance To Obstacles: 792.7206235810385
+Cost Time: 5.7
+Cost Speed: 91.01775196388314
+Cost Acceleration: 541.0172779602584
+Cost Jerk: 143.89050723658724
+Cost Lane Center Offset: 9.034025118502436
+len(traj.t): 57
+Total Cost: 33.37859975193456
+Processing ESP_Barcelona-14_51_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 79, standing at the end False
+Cost Distance To Obstacles: 1553.530182696951
+Cost Time: 7.9
+Cost Speed: 130.8845424703188
+Cost Acceleration: 364.5411929625726
+Cost Jerk: 1025.6936585290205
+Cost Lane Center Offset: 0.8274592727451657
+len(traj.t): 79
+Total Cost: 46.830089062425415
+Processing DEU_Leipzig-7_6_T-1.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 747.2400777366327
+Cost Time: 1.5
+Cost Speed: 1.3561897278382673
+Cost Acceleration: 1.300635036206902
+Cost Jerk: 3.8328182694162436
+Cost Lane Center Offset: 1.2981204376886395
+len(traj.t): 15
+Total Cost: 51.835189413852184
+Processing BEL_Leuven-46_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 107, standing at the end False
+Cost Distance To Obstacles: 1671.5845424437841
+Cost Time: 10.700000000000001
+Cost Speed: 49.85874477973752
+Cost Acceleration: 422.2379232854005
+Cost Jerk: 374.69987189376013
+Cost Lane Center Offset: 280.26976272419233
+len(traj.t): 107
+Total Cost: 36.85561537501752
+Processing DEU_Aschaffenburg-33_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 110, standing at the end False
+Cost Distance To Obstacles: 682.9368793602927
+Cost Time: 11.0
+Cost Speed: 70.93630458653395
+Cost Acceleration: 366.7233368011124
+Cost Jerk: 368.70802632000493
+Cost Lane Center Offset: 7.265691140352175
+len(traj.t): 110
+Total Cost: 24.605183983711783
+Processing DEU_Schwetzingen-174_1_T-8.xml...
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 1356.3053327547318
+Cost Time: 6.9
+Cost Speed: 58.09821941793967
+Cost Acceleration: 369.1379655857597
+Cost Jerk: 508.82834387686466
+Cost Lane Center Offset: 1.9324256959096648
+len(traj.t): 69
+Total Cost: 40.15075778740878
+Processing DEU_Hanover-45_25_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 80, standing at the end False
+Cost Distance To Obstacles: 951.0014633830236
+Cost Time: 8.0
+Cost Speed: 1.8628022949383654
+Cost Acceleration: 28.191012321811833
+Cost Jerk: 55.74536837295621
+Cost Lane Center Offset: 1.1488834218235597
+len(traj.t): 80
+Total Cost: 20.974369122431916
+Processing DEU_Heilbronn-38_1_T-10.xml...
+Planning failed at time step 34
+Standstill cycles 0 of 35, standing at the end False
+Cost Distance To Obstacles: 1218.343967336402
+Cost Time: 3.5
+Cost Speed: 611.6129626041075
+Cost Acceleration: 317.6115442074154
+Cost Jerk: 195.025201143426
+Cost Lane Center Offset: 0.04870266094598252
+len(traj.t): 35
+Total Cost: 70.43263937006562
+Processing GRC_NeaSmyrni-93_1_T-11.xml...
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 77.88365823895478
+Cost Time: 0.9
+Cost Speed: 2.8199315479907248
+Cost Acceleration: 185.98701659302762
+Cost Jerk: 659.528714837023
+Cost Lane Center Offset: 0.005854034457509812
+len(traj.t): 9
+Total Cost: 103.81390836127262
+Processing DEU_Flensburg-73_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 92, standing at the end False
+Cost Distance To Obstacles: 3202.3026340821225
+Cost Time: 9.200000000000001
+Cost Speed: 35.39742228885874
+Cost Acceleration: 196.55307456253806
+Cost Jerk: 223.9900037445413
+Cost Lane Center Offset: 10.832229273551029
+len(traj.t): 92
+Total Cost: 49.08125395599578
+Processing CHN_Qingdao-33_3_T-1.xml...
+Planning failed at time step 76
+Standstill cycles 0 of 77, standing at the end False
+Cost Distance To Obstacles: 2583.822848300184
+Cost Time: 7.7
+Cost Speed: 234.59137031724418
+Cost Acceleration: 1703.934302202189
+Cost Jerk: 562.6847183725466
+Cost Lane Center Offset: 3.230536204694314
+len(traj.t): 77
+Total Cost: 73.78134773242674
+Processing DEU_Heilbronn-147_1_T-7.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 54.52440467692119
+Cost Time: 0.2
+Cost Speed: 0.31583637180090396
+Cost Acceleration: 0.1039636078549048
+Cost Jerk: 9.864460848361743
+Cost Lane Center Offset: 0.10890823611929615
+len(traj.t): 2
+Total Cost: 32.65878687052902
+Processing DEU_Kiel-11_4_T-1.xml...
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 3402.958403308382
+Cost Time: 15.0
+Cost Speed: 557.2191366397327
+Cost Acceleration: 1428.7017234517025
+Cost Jerk: 5728.278247729951
+Cost Lane Center Offset: 3.172006722733094
+len(traj.t): 150
+Total Cost: 89.13553011901666
+Processing GRC_ArchaioLimani-23_1_T-2.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 2.3059096145762936
+Cost Time: 0.1
+Cost Speed: 0.04205522500000004
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.028805694053920212
+len(traj.t): 1
+Total Cost: 2.476770533630214
+No ego vehicle trajectory found
+    GRC_ArchaioLimani-23_1_T-2.xml not feasible!
+Processing DEU_Schwetzingen-102_1_T-1.xml...
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 2801.821858708821
+Cost Time: 6.9
+Cost Speed: 923.4484496053383
+Cost Acceleration: 321.6054074406006
+Cost Jerk: 741.0419685297594
+Cost Lane Center Offset: 0.3194372735933404
+len(traj.t): 69
+Total Cost: 76.29474089214656
+Processing DEU_Flensburg-26_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 53, standing at the end False
+Cost Distance To Obstacles: 2050.7479213295687
+Cost Time: 5.300000000000001
+Cost Speed: 206.82119230570999
+Cost Acceleration: 262.3769027464729
+Cost Jerk: 1401.1093221248343
+Cost Lane Center Offset: 0.7192522025810737
+len(traj.t): 53
+Total Cost: 79.29574699451258
+Processing DEU_Salzwedel-43_1_T-20.xml...
+Planning failed at time step 41
+Standstill cycles 0 of 42, standing at the end False
+Cost Distance To Obstacles: 868.118577738
+Cost Time: 4.2
+Cost Speed: 20.954930808063082
+Cost Acceleration: 62.65709811224951
+Cost Jerk: 411.47557850579744
+Cost Lane Center Offset: 3.8251906075141093
+len(traj.t): 42
+Total Cost: 36.74836608980058
+Processing ESP_Mad-1_7_T-1.xml...
+Planning failed at time step 36
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Standstill cycles 0 of 37, standing at the end False
+Cost Distance To Obstacles: 2598.9166622120943
+Cost Time: 3.7
+Cost Speed: 356.2141182133649
+Cost Acceleration: 52.32740324150681
+Cost Jerk: 272.5268244663268
+Cost Lane Center Offset: 0.016756299319033836
+len(traj.t): 37
+Total Cost: 92.34869633601654
+Processing BEL_Leuven-12_21_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 97, standing at the end False
+Cost Distance To Obstacles: 1753.2418090491149
+Cost Time: 9.700000000000001
+Cost Speed: 295.65994524544266
+Cost Acceleration: 1326.7619146197535
+Cost Jerk: 1012.0790233138897
+Cost Lane Center Offset: 2.8699945616037996
+len(traj.t): 97
+Total Cost: 54.96404831742067
+Processing DEU_Leipzig-13_15_T-1.xml...
+Planning failed at time step 63
+Standstill cycles 0 of 64, standing at the end False
+Cost Distance To Obstacles: 2821.1827203169314
+Cost Time: 6.4
+Cost Speed: 124.44030219463247
+Cost Acceleration: 1292.2010064163053
+Cost Jerk: 927.7236067313928
+Cost Lane Center Offset: 0.21259705172028967
+len(traj.t): 64
+Total Cost: 87.1150036361091
+Processing DEU_Muc-28_1_T-1.xml...
+Planning failed at time step 55
+Standstill cycles 0 of 56, standing at the end False
+Cost Distance To Obstacles: 682.6010515105413
+Cost Time: 5.6000000000000005
+Cost Speed: 259.7025734573826
+Cost Acceleration: 1149.058852430533
+Cost Jerk: 1990.168630103158
+Cost Lane Center Offset: 0.9408667008253966
+len(traj.t): 56
+Total Cost: 78.50128525361501
+Processing GRC_ArchaioLimani-53_1_T-2.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 742.4154288848202
+Cost Time: 1.7000000000000002
+Cost Speed: 15.009966332540692
+Cost Acceleration: 540.8950163826711
+Cost Jerk: 614.0315920540587
+Cost Lane Center Offset: 0.030394404779895995
+len(traj.t): 17
+Total Cost: 114.1930822387571
+Processing DEU_Schwetzingen-15_1_T-7.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 60.938085208778844
+Cost Time: 0.2
+Cost Speed: 23.33316249969064
+Cost Acceleration: 1.3329987207543514
+Cost Jerk: 125.6489184720851
+Cost Lane Center Offset: 0.07960075325375
+len(traj.t): 2
+Total Cost: 105.86638282728134
+Processing TUR_Isparta-103_1_T-9.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [2570] cannot #be reached from the start lanelet with ID [8335]
+The goal lanelet with ID [2570] cannot #be reached from the start lanelet with ID [8335]
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [2570] cannot #be reached from the start lanelet with ID [8335]
+The goal lanelet with ID [2570] cannot #be reached from the start lanelet with ID [8335]
+Goal Reached
+Standstill cycles 0 of 49, standing at the end False
+Cost Distance To Obstacles: 3048.801317301655
+Cost Time: 4.9
+Cost Speed: 165.56323987563297
+Cost Acceleration: 588.2172830463998
+Cost Jerk: 521.8398126899825
+Cost Lane Center Offset: 1.10848463181875
+len(traj.t): 49
+Total Cost: 93.1761252560304
+Processing ESP_Vigo-89_1_T-1.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 452.29395094875116
+Cost Time: 1.5
+Cost Speed: 100.11768007731678
+Cost Acceleration: 17.958327226161934
+Cost Jerk: 290.6246770047156
+Cost Lane Center Offset: 1.4785841968232516
+len(traj.t): 15
+Total Cost: 58.99821463025125
+Processing POL_Srodmiescie-69_1_T-15.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 1.5389303109475223
+Cost Time: 0.1
+Cost Speed: 0.47996046399999975
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.008906886310232339
+len(traj.t): 1
+Total Cost: 2.1277976612577545
+No ego vehicle trajectory found
+    POL_Srodmiescie-69_1_T-15.xml not feasible!
+Processing DEU_Bonn-38_10_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 125, standing at the end False
+Cost Distance To Obstacles: 1875.2817416848106
+Cost Time: 12.5
+Cost Speed: 0.5327190950671383
+Cost Acceleration: 10.831827392874562
+Cost Jerk: 203.2289307015409
+Cost Lane Center Offset: 7.599928801187038
+len(traj.t): 125
+Total Cost: 29.279801181403844
+Processing HRV_Centar-36_1_T-2.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 9.584241852196312
+Cost Time: 0.1
+Cost Speed: 0.5332866490000002
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.028329693469449975
+len(traj.t): 1
+Total Cost: 10.245858194665763
+No ego vehicle trajectory found
+    HRV_Centar-36_1_T-2.xml not feasible!
+Processing DEU_Bremen-19_16_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 58, standing at the end False
+Cost Distance To Obstacles: 1902.2585205495166
+Cost Time: 5.800000000000001
+Cost Speed: 1.0879743360878282
+Cost Acceleration: 17.303160441022452
+Cost Jerk: 38.67108569242623
+Cost Lane Center Offset: 0.2767173205037468
+len(traj.t): 58
+Total Cost: 39.58616307481995
+Processing POL_Poznan-29_1_T-1.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [4044] cannot #be reached from the start lanelet with ID [7404]
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [4044] cannot #be reached from the start lanelet with ID [7404]
+Goal Reached
+Standstill cycles 0 of 49, standing at the end False
+Cost Distance To Obstacles: 1916.3438629551492
+Cost Time: 4.9
+Cost Speed: 187.09401988878756
+Cost Acceleration: 1376.8417214666213
+Cost Jerk: 518.6072334628097
+Cost Lane Center Offset: 0.27849621857336726
+len(traj.t): 49
+Total Cost: 86.51561906106004
+Processing TUR_Isparta-99_1_T-1.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [5192] cannot #be reached from the start lanelet with ID [2306]
+The goal lanelet with ID [6067] cannot #be reached from the start lanelet with ID [2306]
+The goal lanelet with ID [5192] cannot #be reached from the start lanelet with ID [2306]
+The goal lanelet with ID [6067] cannot #be reached from the start lanelet with ID [2306]
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Goal Reached
+Standstill cycles 0 of 48, standing at the end False
+Cost Distance To Obstacles: 2997.7391628182245
+Cost Time: 4.800000000000001
+Cost Speed: 352.9596889635396
+Cost Acceleration: 1081.9844109605147
+Cost Jerk: 577.3053643160455
+Cost Lane Center Offset: 0.1734453773878849
+len(traj.t): 48
+Total Cost: 109.17837650907734
+Processing USA_Phoenix-11_42_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 67, standing at the end False
+Cost Distance To Obstacles: 1338.593078468555
+Cost Time: 6.7
+Cost Speed: 0.3246615417500891
+Cost Acceleration: 1.6404206459830775
+Cost Jerk: 30.919940769356604
+Cost Lane Center Offset: 0.5195095352139606
+len(traj.t): 67
+Total Cost: 27.17757628299789
+Processing DEU_Wolfsburg-7_1_T-4.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 13.17077126207575
+Cost Time: 0.1
+Cost Speed: 1.5719639040000004
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0650626169695863
+len(traj.t): 1
+Total Cost: 14.907797783045336
+No ego vehicle trajectory found
+    DEU_Wolfsburg-7_1_T-4.xml not feasible!
+Processing DEU_Nuremberg-54_2_T-1.xml...
+Planning failed at time step 2
+Standstill cycles 0 of 3, standing at the end False
+Cost Distance To Obstacles: 20.288223396635463
+Cost Time: 0.30000000000000004
+Cost Speed: 1.494866188955709
+Cost Acceleration: 0.15995961395871022
+Cost Jerk: 5.626805029524151
+Cost Lane Center Offset: 0.16759516506753655
+len(traj.t): 3
+Total Cost: 9.545816464713857
+Processing POL_Srodmiescie-41_1_T-2.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 7.122627204654441
+Cost Time: 0.1
+Cost Speed: 0.012524520999999962
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0225633918021371
+len(traj.t): 1
+Total Cost: 7.257715117456578
+No ego vehicle trajectory found
+    POL_Srodmiescie-41_1_T-2.xml not feasible!
+Processing USA_Washington-7_7_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 523.6335067565276
+Cost Time: 1.7000000000000002
+Cost Speed: 3.9792300217391325
+Cost Acceleration: 681.1525009493523
+Cost Jerk: 624.7263648877862
+Cost Lane Center Offset: 0.0011824905653498995
+len(traj.t): 17
+Total Cost: 109.55251677093943
+Processing DEU_Goeppingen-48_1_T-5.xml...
+Goal Reached
+Standstill cycles 0 of 46, standing at the end False
+Cost Distance To Obstacles: 1547.4103486891324
+Cost Time: 4.6000000000000005
+Cost Speed: 146.13155590828708
+Cost Acceleration: 544.3632319773014
+Cost Jerk: 862.9373065716474
+Cost Lane Center Offset: 111.27881284582968
+len(traj.t): 46
+Total Cost: 74.42872295635212
+Processing DEU_Heilbronn-197_1_T-11.xml...
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 418.6150077764863
+Cost Time: 6.9
+Cost Speed: 130.11609832940022
+Cost Acceleration: 1652.1433708321822
+Cost Jerk: 2367.6164271495786
+Cost Lane Center Offset: 0.45284431693156635
+len(traj.t): 69
+Total Cost: 73.11657606383449
+Processing DEU_Heilbronn-93_1_T-4.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 9.292735890851034
+Cost Time: 0.1
+Cost Speed: 0.48285667600000004
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.3397171599244
+len(traj.t): 1
+Total Cost: 10.215309726775434
+No ego vehicle trajectory found
+    DEU_Heilbronn-93_1_T-4.xml not feasible!
+Processing DEU_Aschaffenburg-7_19_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 557.1219098956102
+Cost Time: 1.7000000000000002
+Cost Speed: 179.30270052271757
+Cost Acceleration: 32.18440866669644
+Cost Jerk: 136.93265765522398
+Cost Lane Center Offset: 0.18240765221656904
+len(traj.t): 17
+Total Cost: 54.977887317203816
+Processing DEU_Heilbronn-23_1_T-2.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 10.850392162096968
+Cost Time: 0.1
+Cost Speed: 0.26422502500000017
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0929504522320038
+len(traj.t): 1
+Total Cost: 11.30756763932897
+No ego vehicle trajectory found
+    DEU_Heilbronn-23_1_T-2.xml not feasible!
+Processing ZAM_Tjunction-1_195_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 119, standing at the end False
+Cost Distance To Obstacles: 2110.683864806306
+Cost Time: 11.9
+Cost Speed: 175.1495969578715
+Cost Acceleration: 883.3294542836574
+Cost Jerk: 440.97986547653034
+Cost Lane Center Offset: 8.69830327934629
+len(traj.t): 119
+Total Cost: 42.3104292840648
+Processing DEU_Bonn-16_18_T-1.xml...
+Planning failed at time step 25
+Standstill cycles 0 of 26, standing at the end False
+Cost Distance To Obstacles: 732.8031067820727
+Cost Time: 2.6
+Cost Speed: 184.87004274651105
+Cost Acceleration: 119.37196971693926
+Cost Jerk: 470.28357077889297
+Cost Lane Center Offset: 6.9775153353065225
+len(traj.t): 26
+Total Cost: 60.84254635998933
+Processing POL_Krakow-74_1_T-4.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Planning failed at time step 3
+Standstill cycles 0 of 4, standing at the end False
+Cost Distance To Obstacles: 13.261642565548792
+Cost Time: 0.4
+Cost Speed: 0.080071898949623
+Cost Acceleration: 0.7836504859392823
+Cost Jerk: 59.801602798911134
+Cost Lane Center Offset: 0.014537388635395153
+len(traj.t): 4
+Total Cost: 18.885376284496054
+Processing BRA_VilaVelha-120_1_T-1.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 92.1493355655066
+Cost Time: 0.9
+Cost Speed: 2.4020440135481884
+Cost Acceleration: 220.59791824866934
+Cost Jerk: 764.8409280245011
+Cost Lane Center Offset: 1.0652428523640436
+len(traj.t): 9
+Total Cost: 121.01727430050991
+Processing DEU_Leipzig-44_10_T-1.xml...
+Planning failed at time step 13
+Standstill cycles 0 of 14, standing at the end False
+Cost Distance To Obstacles: 821.4122029882512
+Cost Time: 1.4000000000000001
+Cost Speed: 9.486296372173989
+Cost Acceleration: 60.16497887448934
+Cost Jerk: 108.48868648163955
+Cost Lane Center Offset: 0.011263641328807517
+len(traj.t): 14
+Total Cost: 72.79738773984879
+Processing ESP_Barcelona-38_48_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 96, standing at the end False
+Cost Distance To Obstacles: 6110.2006817115
+Cost Time: 9.600000000000001
+Cost Speed: 75.42299250526888
+Cost Acceleration: 480.33298860603014
+Cost Jerk: 223.02046155072588
+Cost Lane Center Offset: 1.0831154196468826
+len(traj.t): 96
+Total Cost: 81.37146083117887
+Processing DEU_Kiel-51_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 3541.3595032026046
+Cost Time: 6.9
+Cost Speed: 119.40751483376417
+Cost Acceleration: 1117.492547361924
+Cost Jerk: 1531.5186626476939
+Cost Lane Center Offset: 0.2930287596940207
+len(traj.t): 69
+Total Cost: 98.35030806964755
+Processing DEU_Hanover-44_14_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 69.44484482950311
+Cost Time: 0.1
+Cost Speed: 0.7967635289999997
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 9.736658672085795e-05
+len(traj.t): 1
+Total Cost: 70.34170572508982
+No ego vehicle trajectory found
+    DEU_Hanover-44_14_T-1.xml not feasible!
+Processing DEU_Bremen-7_36_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 83, standing at the end False
+Cost Distance To Obstacles: 2736.8711983772196
+Cost Time: 8.3
+Cost Speed: 7.832378212561091
+Cost Acceleration: 147.3307880357765
+Cost Jerk: 244.8560630827571
+Cost Lane Center Offset: 231.18534067732494
+len(traj.t): 83
+Total Cost: 48.879226125128184
+Processing DEU_Heilbronn-182_1_T-1.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 18.066100573383288
+Cost Time: 0.2
+Cost Speed: 2.6544653188005682
+Cost Acceleration: 0.2593770297848238
+Cost Jerk: 24.71012697969941
+Cost Lane Center Offset: 0.004341247143355392
+len(traj.t): 2
+Total Cost: 23.047205574405723
+Processing POL_Poznan-53_1_T-25.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+The goal lanelet with ID [3491] cannot #be reached from the start lanelet with ID [299]
+The goal lanelet with ID [3491] cannot #be reached from the start lanelet with ID [299]
+The goal lanelet with ID [760] cannot #be reached from the start lanelet with ID [981]
+The goal lanelet with ID [760] cannot #be reached from the start lanelet with ID [981]
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 249.8891008209369
+Cost Time: 0.9
+Cost Speed: 0.09913071515053187
+Cost Acceleration: 171.17168272503704
+Cost Jerk: 565.0419854142096
+Cost Lane Center Offset: 0.0007660034640528022
+len(traj.t): 9
+Total Cost: 110.47807396431091
+Processing GRC_ArchaioLimani-84_1_T-12.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 624.6956601474983
+Cost Time: 1.5
+Cost Speed: 257.325800290059
+Cost Acceleration: 480.65134284904764
+Cost Jerk: 758.0338656345712
+Cost Lane Center Offset: 1.1577053265714852
+len(traj.t): 15
+Total Cost: 142.95762494984984
+Processing ZAM_Tjunction-1_353_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 108, standing at the end False
+Cost Distance To Obstacles: 2993.5818506776664
+Cost Time: 10.8
+Cost Speed: 349.57003629260527
+Cost Acceleration: 900.3424986404301
+Cost Jerk: 307.03869367575874
+Cost Lane Center Offset: 2.841264645586086
+len(traj.t): 108
+Total Cost: 52.960873554926366
+Processing ESP_Barcelona-3_41_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 77, standing at the end False
+Cost Distance To Obstacles: 2035.006679661149
+Cost Time: 7.7
+Cost Speed: 0.5698966873022586
+Cost Acceleration: 14.357534071890559
+Cost Jerk: 32.91013105874884
+Cost Lane Center Offset: 0.21383436077340431
+len(traj.t): 77
+Total Cost: 34.7527022836346
+Processing ESP_Vigo-56_42_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 72, standing at the end False
+Cost Distance To Obstacles: 2240.686314600554
+Cost Time: 7.2
+Cost Speed: 21.856153542166783
+Cost Acceleration: 121.9418349245954
+Cost Jerk: 55.17139070173595
+Cost Lane Center Offset: 0.6015946443934153
+len(traj.t): 72
+Total Cost: 41.09246233907564
+Processing DEU_Kleinmachnow-84_1_T-3.xml...
+Planning failed at time step 26
+Standstill cycles 0 of 27, standing at the end False
+Cost Distance To Obstacles: 814.0147521205485
+Cost Time: 2.7
+Cost Speed: 250.4666456170839
+Cost Acceleration: 198.95755929286915
+Cost Jerk: 297.1634406587278
+Cost Lane Center Offset: 0.008655112271011447
+len(traj.t): 27
+Total Cost: 60.50040936301853
+Processing DEU_Heilbronn-151_1_T-22.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 616.9231760712285
+Cost Time: 3.6
+Cost Speed: 277.5323346693276
+Cost Acceleration: 338.9025636131112
+Cost Jerk: 245.99526319715264
+Cost Lane Center Offset: 0.16011822036347606
+len(traj.t): 36
+Total Cost: 44.69759599364398
+Processing GRC_ArchaioLimani-32_1_T-15.xml...
+Planning failed at time step 28
+Standstill cycles 0 of 29, standing at the end False
+Cost Distance To Obstacles: 196.79444650939428
+Cost Time: 2.9000000000000004
+Cost Speed: 17.616248165233156
+Cost Acceleration: 2267.405930280125
+Cost Jerk: 993.2977274000768
+Cost Lane Center Offset: 1.00432983418827
+len(traj.t): 29
+Total Cost: 122.76616145479372
+Processing DEU_Wolfsburg-38_1_T-3.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 1003.8503080183006
+Cost Time: 3.6
+Cost Speed: 337.36004060097525
+Cost Acceleration: 517.5838090066501
+Cost Jerk: 185.43094786734733
+Cost Lane Center Offset: 0.1996331207639105
+len(traj.t): 36
+Total Cost: 60.38957607261215
+Processing DEU_Salzwedel-62_1_T-16.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 791.8126785733009
+Cost Time: 3.6
+Cost Speed: 260.7477557053739
+Cost Acceleration: 405.3011060590374
+Cost Jerk: 259.2951203249865
+Cost Lane Center Offset: 1.8708500285973777
+len(traj.t): 36
+Total Cost: 51.350764185869345
+Processing ESP_Barcelona-29_2_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 52.70210062913366
+Cost Time: 0.1
+Cost Speed: 0.0076950760000000056
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 4.5558030921225134e-05
+len(traj.t): 1
+Total Cost: 52.80984126316458
+No ego vehicle trajectory found
+    ESP_Barcelona-29_2_T-1.xml not feasible!
+Processing DEU_Salzwedel-91_1_T-4.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 1225.9567580688317
+Cost Time: 3.6
+Cost Speed: 445.4879107469943
+Cost Acceleration: 356.8188500085383
+Cost Jerk: 268.67017159093473
+Cost Lane Center Offset: 0.21230499380061596
+len(traj.t): 36
+Total Cost: 67.40961098358609
+Processing USA_Austin-52_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 74, standing at the end False
+Cost Distance To Obstacles: 2116.3671789784403
+Cost Time: 7.4
+Cost Speed: 3.6834390353979267
+Cost Acceleration: 43.84618976048574
+Cost Jerk: 50.282661925815304
+Cost Lane Center Offset: 1.749302972863803
+len(traj.t): 74
+Total Cost: 37.34498341450004
+Processing DEU_Heilbronn-16_1_T-9.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 1.146999941189556
+Cost Time: 0.1
+Cost Speed: 0.2616629759999998
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 1.4481433703706204
+len(traj.t): 1
+Total Cost: 2.9568062875601764
+No ego vehicle trajectory found
+    DEU_Heilbronn-16_1_T-9.xml not feasible!
+Processing BEL_Antwerp-30_3_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 63, standing at the end False
+Cost Distance To Obstacles: 988.5458782176319
+Cost Time: 6.300000000000001
+Cost Speed: 125.55246719408022
+Cost Acceleration: 259.25010527538075
+Cost Jerk: 762.8137103947157
+Cost Lane Center Offset: 9.982032849557266
+len(traj.t): 63
+Total Cost: 40.36578085605342
+Processing BEL_Brussels-51_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 92, standing at the end False
+Cost Distance To Obstacles: 1383.6081816953206
+Cost Time: 9.200000000000001
+Cost Speed: 184.27492188076735
+Cost Acceleration: 1360.4658055516386
+Cost Jerk: 2902.206214951773
+Cost Lane Center Offset: 157.9044971305149
+len(traj.t): 92
+Total Cost: 74.29195240445668
+Processing DEU_BadAibling-28_1_T-1.xml...
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 1156.9148262452045
+Cost Time: 10.0
+Cost Speed: 14.97690908516418
+Cost Acceleration: 137.26382020257444
+Cost Jerk: 1972.6866731291568
+Cost Lane Center Offset: 1.7769198414877603
+len(traj.t): 100
+Total Cost: 42.836191485035876
+Processing CHN_Sha-8_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 79, standing at the end False
+Cost Distance To Obstacles: 1706.6057191534285
+Cost Time: 7.9
+Cost Speed: 146.20344284153776
+Cost Acceleration: 1282.3718985493329
+Cost Jerk: 747.3462054993257
+Cost Lane Center Offset: 162.25035367136496
+len(traj.t): 79
+Total Cost: 59.09971670525303
+Processing DEU_Heilbronn-287_1_T-12.xml...
+Planning failed at time step 44
+Standstill cycles 0 of 45, standing at the end False
+Cost Distance To Obstacles: 787.6921758410506
+Cost Time: 4.5
+Cost Speed: 10.603947712949665
+Cost Acceleration: 629.9703662404673
+Cost Jerk: 800.8859592352139
+Cost Lane Center Offset: 0.029882329475395767
+len(traj.t): 45
+Total Cost: 54.037385141314594
+Processing DEU_Kleinmachnow-58_1_T-9.xml...
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 1775.2354071332295
+Cost Time: 10.0
+Cost Speed: 510.879586624205
+Cost Acceleration: 894.0510155986619
+Cost Jerk: 1723.373506591702
+Cost Lane Center Offset: 1.732256889962167
+len(traj.t): 100
+Total Cost: 59.0527177283776
+Processing DEU_Memmingen-135_1_T-1.xml...
+Planning failed at time step 61
+Standstill cycles 0 of 62, standing at the end False
+Cost Distance To Obstacles: 1480.8022616270584
+Cost Time: 6.2
+Cost Speed: 44.38564454329415
+Cost Acceleration: 854.2026419824749
+Cost Jerk: 1157.5673306871295
+Cost Lane Center Offset: 0.18264066383083907
+len(traj.t): 62
+Total Cost: 63.25065354038367
+Processing ESP_Vigo-23_5_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 114, standing at the end False
+Cost Distance To Obstacles: 1957.5990807955582
+Cost Time: 11.4
+Cost Speed: 342.2019949800241
+Cost Acceleration: 1121.5561015979358
+Cost Jerk: 2209.0910389990186
+Cost Lane Center Offset: 6.113116728259682
+len(traj.t): 114
+Total Cost: 60.84352046579646
+Processing DEU_Kiel-19_2_T-1.xml...
+The goal lanelet with ID [12610] cannot #be reached from the start lanelet with ID [5029]
+The goal lanelet with ID [12610] cannot #be reached from the start lanelet with ID [5029]
+The goal lanelet with ID [12610] cannot #be reached from the start lanelet with ID [5029]
+The goal lanelet with ID [12610] cannot #be reached from the start lanelet with ID [5029]
+The goal lanelet with ID [1464] cannot #be reached from the start lanelet with ID [97]
+The goal lanelet with ID [1464] cannot #be reached from the start lanelet with ID [97]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [270] cannot #be reached from the start lanelet with ID [1450]
+The goal lanelet with ID [270] cannot #be reached from the start lanelet with ID [1450]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [270] cannot #be reached from the start lanelet with ID [1450]
+The goal lanelet with ID [270] cannot #be reached from the start lanelet with ID [1450]
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 25.38050346114975
+Cost Time: 0.2
+Cost Speed: 3.6788430545054625
+Cost Acceleration: 0.06546108140595774
+Cost Jerk: 6.1094061784303335
+Cost Lane Center Offset: 1.170725132913344
+len(traj.t): 2
+Total Cost: 18.402469454202425
+Processing BEL_Leuven-38_1_T-1.xml...
+Planning failed at time step 51
+Standstill cycles 0 of 52, standing at the end False
+Cost Distance To Obstacles: 1603.4241226903184
+Cost Time: 5.2
+Cost Speed: 119.71279864330793
+Cost Acceleration: 71.70779232861712
+Cost Jerk: 1125.7583987027147
+Cost Lane Center Offset: 0.5676532914798597
+len(traj.t): 52
+Total Cost: 61.37636087800843
+Processing ZAM_Tjunction-1_46_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 106, standing at the end False
+Cost Distance To Obstacles: 2744.209158462915
+Cost Time: 10.600000000000001
+Cost Speed: 288.89619260530566
+Cost Acceleration: 766.6006487460867
+Cost Jerk: 284.572225607183
+Cost Lane Center Offset: 7.381980512984746
+len(traj.t): 106
+Total Cost: 49.200567980513924
+Processing DEU_Heilbronn-113_1_T-5.xml...
+Goal Reached
+Standstill cycles 0 of 61, standing at the end False
+Cost Distance To Obstacles: 2277.787449995493
+Cost Time: 6.1000000000000005
+Cost Speed: 795.542138532972
+Cost Acceleration: 1088.514171214745
+Cost Jerk: 826.1236566186329
+Cost Lane Center Offset: 2.6553351199669413
+len(traj.t): 61
+Total Cost: 87.91348772920998
+Processing DEU_Kitzingen-15_1_T-2.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 366.23577495459017
+Cost Time: 1.7000000000000002
+Cost Speed: 86.49123258726976
+Cost Acceleration: 341.1099524935005
+Cost Jerk: 384.6847792882205
+Cost Lane Center Offset: 2.3469668205417276
+len(traj.t): 17
+Total Cost: 71.16286506730133
+Processing DEU_Aschaffenburg-53_4_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 107, standing at the end False
+Cost Distance To Obstacles: 5235.788891676257
+Cost Time: 10.700000000000001
+Cost Speed: 439.36860570080484
+Cost Acceleration: 134.67502222870658
+Cost Jerk: 1750.2749382957652
+Cost Lane Center Offset: 1.705730914765482
+len(traj.t): 107
+Total Cost: 81.37115129734859
+Processing TUR_Isparta-22_1_T-1.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: TUR
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [402] cannot #be reached from the start lanelet with ID [1488]
+The goal lanelet with ID [402] cannot #be reached from the start lanelet with ID [1488]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [402] cannot #be reached from the start lanelet with ID [1488]
+The goal lanelet with ID [402] cannot #be reached from the start lanelet with ID [1488]
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [533] cannot #be reached from the start lanelet with ID [1377]
+The goal lanelet with ID [533] cannot #be reached from the start lanelet with ID [1378]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [533] cannot #be reached from the start lanelet with ID [1377]
+The goal lanelet with ID [533] cannot #be reached from the start lanelet with ID [1378]
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 28.531541939886946
+Cost Time: 0.1
+Cost Speed: 10.081565649000003
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 2.1566429513266313e-05
+len(traj.t): 1
+Total Cost: 38.71312915531646
+No ego vehicle trajectory found
+    TUR_Isparta-22_1_T-1.xml not feasible!
+Processing BEL_Leuven-54_12_T-1.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 295.2556410108554
+Cost Time: 1.5
+Cost Speed: 48.380245151611405
+Cost Acceleration: 367.41765898107815
+Cost Jerk: 630.6754487612413
+Cost Lane Center Offset: 39.60890863851687
+len(traj.t): 15
+Total Cost: 93.58919350288689
+Processing ESP_Barcelona-24_11_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 80, standing at the end False
+Cost Distance To Obstacles: 1750.9244808335723
+Cost Time: 8.0
+Cost Speed: 11.090744834529303
+Cost Acceleration: 58.26348733009737
+Cost Jerk: 45.94903308813158
+Cost Lane Center Offset: 0.3417901802721293
+len(traj.t): 80
+Total Cost: 31.33211920333253
+Processing DEU_Herzogenaurach-142_1_T-15.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 11.223631590291184
+Cost Time: 0.2
+Cost Speed: 0.3551364147337549
+Cost Acceleration: 0.0031110529027616332
+Cost Jerk: 0.2814315910827042
+Cost Lane Center Offset: 0.0015255897817757131
+len(traj.t): 2
+Total Cost: 6.132418119396091
+Processing FRA_Nancy-30_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 70, standing at the end False
+Cost Distance To Obstacles: 1978.6711488522983
+Cost Time: 7.0
+Cost Speed: 444.5280008567178
+Cost Acceleration: 2951.9584738856083
+Cost Jerk: 1161.2857369043547
+Cost Lane Center Offset: 2.052045723983413
+len(traj.t): 70
+Total Cost: 100.40707723175662
+Processing DEU_Herzogenaurach-109_1_T-22.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 210.76072861832654
+Cost Time: 3.6
+Cost Speed: 25.214705711252247
+Cost Acceleration: 1851.9885286828085
+Cost Jerk: 1175.4896344619476
+Cost Lane Center Offset: 0.19077862892170155
+len(traj.t): 36
+Total Cost: 94.25678822509045
+Processing ESP_Barcelona-9_54_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 436.00716442281436
+Cost Time: 1.7000000000000002
+Cost Speed: 3.212845276171624
+Cost Acceleration: 907.5377681206885
+Cost Jerk: 775.794925522203
+Cost Lane Center Offset: 0.010179687545605418
+len(traj.t): 17
+Total Cost: 126.55664017820136
+Processing ESP_Barcelona-61_6_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 8.773081942716235
+Cost Time: 0.1
+Cost Speed: 0.14558835599999997
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0005917475697627967
+len(traj.t): 1
+Total Cost: 9.019262046285997
+No ego vehicle trajectory found
+    ESP_Barcelona-61_6_T-1.xml not feasible!
+Processing DEU_Heilbronn-295_1_T-4.xml...
+Planning failed at time step 28
+Standstill cycles 0 of 29, standing at the end False
+Cost Distance To Obstacles: 182.97565090778386
+Cost Time: 2.9000000000000004
+Cost Speed: 18.147790466547054
+Cost Acceleration: 2122.5335205509646
+Cost Jerk: 804.9139856670771
+Cost Lane Center Offset: 1.140856119908698
+len(traj.t): 29
+Total Cost: 110.82109667973384
+Processing FRA_Lyon-5_1_T-1.xml...
+Planning failed at time step 13
+Standstill cycles 0 of 14, standing at the end False
+Cost Distance To Obstacles: 110.56247441236735
+Cost Time: 1.4000000000000001
+Cost Speed: 3.180860136665771
+Cost Acceleration: 235.15386297539646
+Cost Jerk: 575.3528986575678
+Cost Lane Center Offset: 11.375069953920903
+len(traj.t): 14
+Total Cost: 68.23036900970845
+Processing BEL_Antwerp-10_4_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 19.45177934581836
+Cost Time: 0.1
+Cost Speed: 4.017531456
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.035304548084786884
+len(traj.t): 1
+Total Cost: 23.60461534990315
+No ego vehicle trajectory found
+    BEL_Antwerp-10_4_T-1.xml not feasible!
+Processing ESP_Barcelona-69_11_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 85, standing at the end False
+Cost Distance To Obstacles: 1907.3169047816891
+Cost Time: 8.5
+Cost Speed: 2.196826068842887
+Cost Acceleration: 48.08601120158679
+Cost Jerk: 67.47727237123318
+Cost Lane Center Offset: 0.777367033548883
+len(traj.t): 85
+Total Cost: 32.33358095831648
+Processing DEU_Kiel-42_16_T-1.xml...
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 129.37539356941255
+Cost Time: 0.9
+Cost Speed: 29.669284510403692
+Cost Acceleration: 24.961028565823547
+Cost Jerk: 133.3781728695959
+Cost Lane Center Offset: 0.15560429554125654
+len(traj.t): 9
+Total Cost: 36.1821648678641
+Processing FRA_Dijon-12_10_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 97, standing at the end False
+Cost Distance To Obstacles: 4380.4056042228085
+Cost Time: 9.700000000000001
+Cost Speed: 425.62359475708035
+Cost Acceleration: 2394.0462858071096
+Cost Jerk: 791.0475635300135
+Cost Lane Center Offset: 7.557341724991227
+len(traj.t): 97
+Total Cost: 92.16062257775262
+Processing DEU_Bonn-2_9_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 52, standing at the end False
+Cost Distance To Obstacles: 2590.393415965805
+Cost Time: 5.2
+Cost Speed: 168.134334699828
+Cost Acceleration: 892.4873975578819
+Cost Jerk: 367.10431170018404
+Cost Lane Center Offset: 0.8538665221282542
+len(traj.t): 52
+Total Cost: 82.48794858549668
+Processing USA_Austin-25_14_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 68, standing at the end False
+Cost Distance To Obstacles: 2326.3681370003956
+Cost Time: 6.800000000000001
+Cost Speed: 0.2611458284552251
+Cost Acceleration: 2.0131966222462423
+Cost Jerk: 32.851270831266866
+Cost Lane Center Offset: 2.154896664119341
+len(traj.t): 68
+Total Cost: 41.55953892568357
+Processing ESP_Vigo-93_37_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 148, standing at the end False
+Cost Distance To Obstacles: 4042.199244745183
+Cost Time: 14.8
+Cost Speed: 495.8871405730297
+Cost Acceleration: 1061.4851772778923
+Cost Jerk: 1694.4277417024803
+Cost Lane Center Offset: 4.371663681197665
+len(traj.t): 148
+Total Cost: 64.11331735121475
+Processing DEU_Wolfsburg-53_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 95, standing at the end False
+Cost Distance To Obstacles: 1325.6798889783586
+Cost Time: 9.5
+Cost Speed: 637.4528884684438
+Cost Acceleration: 616.2036801926877
+Cost Jerk: 1062.5745738437804
+Cost Lane Center Offset: 0.48628269141322783
+len(traj.t): 95
+Total Cost: 47.84102435973351
+Processing FRA_Dijon-9_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 118, standing at the end False
+Cost Distance To Obstacles: 3466.283112359887
+Cost Time: 11.8
+Cost Speed: 34.61533066313895
+Cost Acceleration: 140.11677186618124
+Cost Jerk: 1879.1217188127205
+Cost Lane Center Offset: 91.79019843988057
+len(traj.t): 118
+Total Cost: 59.35870450967634
+Processing DEU_Lengede-28_1_T-33.xml...
+Planning failed at time step 85
+Standstill cycles 0 of 86, standing at the end False
+Cost Distance To Obstacles: 5734.5216872137225
+Cost Time: 8.6
+Cost Speed: 278.740248796947
+Cost Acceleration: 1465.2703908993635
+Cost Jerk: 2722.216051097739
+Cost Lane Center Offset: 2.599435837431805
+len(traj.t): 86
+Total Cost: 127.24357923075817
+Processing DEU_Bebra-1_1_T-2.xml...
+Goal Reached
+Standstill cycles 0 of 53, standing at the end False
+Cost Distance To Obstacles: 2286.7923528454116
+Cost Time: 5.300000000000001
+Cost Speed: 529.973216869378
+Cost Acceleration: 2157.552849965546
+Cost Jerk: 868.3648881419823
+Cost Lane Center Offset: 0.40882937393827723
+len(traj.t): 53
+Total Cost: 115.54702145653314
+Processing CHN_Qingdao-5_37_T-1.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 1029.4142898570562
+Cost Time: 1.5
+Cost Speed: 52.296300513672044
+Cost Acceleration: 308.3293575973827
+Cost Jerk: 623.373596122995
+Cost Lane Center Offset: 0.01249737677840432
+len(traj.t): 15
+Total Cost: 135.7284027645256
+Processing POL_Poznan-33_1_T-21.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+The goal lanelet with ID [8195] cannot #be reached from the start lanelet with ID [1314]
+The goal lanelet with ID [8193] cannot #be reached from the start lanelet with ID [1314]
+The goal lanelet with ID [8195] cannot #be reached from the start lanelet with ID [1314]
+The goal lanelet with ID [8193] cannot #be reached from the start lanelet with ID [1314]
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+The goal lanelet with ID [4605] cannot #be reached from the start lanelet with ID [3462]
+The goal lanelet with ID [4605] cannot #be reached from the start lanelet with ID [3462]
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 1272.0734860310495
+Cost Time: 6.9
+Cost Speed: 39.82650579061695
+Cost Acceleration: 258.1642951680516
+Cost Jerk: 2363.1576832265237
+Cost Lane Center Offset: 2.1811636873935076
+len(traj.t): 69
+Total Cost: 63.934828027588914
+Processing GRC_NeaSmyrni-147_1_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 7.484138697821686
+Cost Time: 0.1
+Cost Speed: 3.1708161000000006
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 4.069053463693398e-05
+len(traj.t): 1
+Total Cost: 10.754995488356325
+No ego vehicle trajectory found
+    GRC_NeaSmyrni-147_1_T-1.xml not feasible!
+Processing DEU_Heilbronn-141_1_T-16.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 479.60565275462494
+Cost Time: 1.7000000000000002
+Cost Speed: 17.596570780037712
+Cost Acceleration: 711.8801740024207
+Cost Jerk: 760.2957357703257
+Cost Lane Center Offset: 1.5478067474070452
+len(traj.t): 17
+Total Cost: 117.63682000322447
+Processing DEU_Heilbronn-130_1_T-5.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 102.60994162926514
+Cost Time: 1.5
+Cost Speed: 6.085600275479723
+Cost Acceleration: 89.81138108116735
+Cost Jerk: 149.30697079452062
+Cost Lane Center Offset: 0.004751500871891826
+len(traj.t): 15
+Total Cost: 24.68790968542032
+Processing ESP_Barcelona-12_25_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 65.1781999530616
+Cost Time: 0.1
+Cost Speed: 0.16276656400000009
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0041378544304074205
+len(traj.t): 1
+Total Cost: 65.445104371492
+No ego vehicle trajectory found
+    ESP_Barcelona-12_25_T-1.xml not feasible!
+Processing DEU_Schwetzingen-12_1_T-2.xml...
+Goal Reached
+Standstill cycles 0 of 47, standing at the end False
+Cost Distance To Obstacles: 2258.7339908457584
+Cost Time: 4.7
+Cost Speed: 71.27767986817311
+Cost Acceleration: 398.10349155664704
+Cost Jerk: 891.3424058193822
+Cost Lane Center Offset: 2.994542022003338
+len(traj.t): 47
+Total Cost: 81.77344915131839
+Processing GRC_NeaSmyrni-30_1_T-16.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 627.6611161336612
+Cost Time: 1.7000000000000002
+Cost Speed: 6.266764813227567
+Cost Acceleration: 424.886897268747
+Cost Jerk: 388.5688689428728
+Cost Lane Center Offset: 2.2732438562792394
+len(traj.t): 17
+Total Cost: 86.97393476557575
+Processing GRC_NeaSmyrni-21_1_T-3.xml...
+Goal Reached
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 2683.8651740644714
+Cost Time: 6.9
+Cost Speed: 79.19111863128508
+Cost Acceleration: 343.68617963803774
+Cost Jerk: 189.51836326425763
+Cost Lane Center Offset: 1.603428328464138
+len(traj.t): 69
+Total Cost: 54.695134259804576
+Processing ESP_Barcelona-70_12_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 59, standing at the end False
+Cost Distance To Obstacles: 1863.241411744686
+Cost Time: 5.9
+Cost Speed: 9.775439532530681
+Cost Acceleration: 102.21111937498878
+Cost Jerk: 73.15545996900505
+Cost Lane Center Offset: 0.5292832350661948
+len(traj.t): 59
+Total Cost: 40.627334133157234
+Processing DEU_Herzogenaurach-35_1_T-4.xml...
+Planning failed at time step 17
+Standstill cycles 0 of 18, standing at the end False
+Cost Distance To Obstacles: 37.48080849275026
+Cost Time: 1.8
+Cost Speed: 43.153875173536825
+Cost Acceleration: 324.647792427578
+Cost Jerk: 295.4541958429689
+Cost Lane Center Offset: 0.04584153193933536
+len(traj.t): 18
+Total Cost: 40.7323618593763
+Processing DEU_Herzogenaurach-195_1_T-10.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 6.763661890074159
+Cost Time: 0.1
+Cost Speed: 0.026790975999999984
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.014007170709836522
+len(traj.t): 1
+Total Cost: 6.904460036783996
+No ego vehicle trajectory found
+    DEU_Herzogenaurach-195_1_T-10.xml not feasible!
+Processing DEU_Herzogenaurach-122_1_T-7.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 1.2270511283299468
+Cost Time: 0.1
+Cost Speed: 0.2207304489999999
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.006255145090068111
+len(traj.t): 1
+Total Cost: 1.554036722420015
+No ego vehicle trajectory found
+    DEU_Herzogenaurach-122_1_T-7.xml not feasible!
+Processing ZAM_Tjunction-1_39_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 111, standing at the end False
+Cost Distance To Obstacles: 2776.69026493275
+Cost Time: 11.100000000000001
+Cost Speed: 258.27344260486586
+Cost Acceleration: 535.5510323164714
+Cost Jerk: 293.09801427814193
+Cost Lane Center Offset: 2.349463801750644
+len(traj.t): 111
+Total Cost: 45.92848844985567
+Processing ESP_Vigo-43_20_T-1.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 26.294049888473857
+Cost Time: 0.2
+Cost Speed: 4.714528753456375
+Cost Acceleration: 0.2016291284782433
+Cost Jerk: 18.743289976162192
+Cost Lane Center Offset: 0.019565878695627537
+len(traj.t): 2
+Total Cost: 25.186531812633145
+Processing POL_Srodmiescie-105_1_T-45.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 602.1658138175754
+Cost Time: 0.9
+Cost Speed: 1.8138872240289097
+Cost Acceleration: 100.62776037662555
+Cost Jerk: 332.23564100590096
+Cost Lane Center Offset: 0.00325590873062711
+len(traj.t): 9
+Total Cost: 116.1051509258735
+Processing DEU_Heilbronn-265_1_T-1.xml...
+Planning failed at time step 26
+Standstill cycles 0 of 27, standing at the end False
+Cost Distance To Obstacles: 737.0751057842117
+Cost Time: 2.7
+Cost Speed: 18.87299620212607
+Cost Acceleration: 905.7852774012663
+Cost Jerk: 627.1189167236072
+Cost Lane Center Offset: 13.514250425802473
+len(traj.t): 27
+Total Cost: 87.97283505692643
+Processing DEU_Heilbronn-330_1_T-8.xml...
+Planning failed at time step 25
+Standstill cycles 0 of 26, standing at the end False
+Cost Distance To Obstacles: 679.633944736115
+Cost Time: 2.6
+Cost Speed: 63.25753692503646
+Cost Acceleration: 615.2762127585912
+Cost Jerk: 434.76285313369107
+Cost Lane Center Offset: 0.7469721240735774
+len(traj.t): 26
+Total Cost: 71.58759691067335
+Processing DEU_Aschaffenburg-20_9_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 13.127034524212423
+Cost Time: 0.1
+Cost Speed: 4.611903921000001
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.00027475137755947435
+len(traj.t): 1
+Total Cost: 17.839213196589984
+No ego vehicle trajectory found
+    DEU_Aschaffenburg-20_9_T-1.xml not feasible!
+Processing HRV_Centar-6_1_T-3.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 4.492381854538754
+Cost Time: 0.1
+Cost Speed: 0.0060516000000000215
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.007500139688819745
+len(traj.t): 1
+Total Cost: 4.605933594227574
+No ego vehicle trajectory found
+    HRV_Centar-6_1_T-3.xml not feasible!
+Processing AUT_Haag-42_1_T-17.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 182.45385509145095
+Cost Time: 1.7000000000000002
+Cost Speed: 9.414085822475178
+Cost Acceleration: 601.4548878834556
+Cost Jerk: 552.7971939703247
+Cost Lane Center Offset: 0.041769373262056035
+len(traj.t): 17
+Total Cost: 80.88598777299815
+Processing USA_Washington-20_22_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 110, standing at the end False
+Cost Distance To Obstacles: 2142.4392676408834
+Cost Time: 11.0
+Cost Speed: 1.9016020209399356
+Cost Acceleration: 13.109620115400306
+Cost Jerk: 184.03763659407707
+Cost Lane Center Offset: 9.487323299309384
+len(traj.t): 110
+Total Cost: 32.37250408791464
+Processing DEU_Leipzig-57_6_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 74, standing at the end False
+Cost Distance To Obstacles: 2164.842001521425
+Cost Time: 7.4
+Cost Speed: 116.39067461695495
+Cost Acceleration: 654.2228729508223
+Cost Jerk: 254.7484431385184
+Cost Lane Center Offset: 0.25199622368224517
+len(traj.t): 74
+Total Cost: 50.51427011420815
+Processing BEL_Brussels-49_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 1565.5645619242202
+Cost Time: 10.0
+Cost Speed: 231.3621287517666
+Cost Acceleration: 1104.378066968242
+Cost Jerk: 960.9024616239191
+Cost Lane Center Offset: 0.9872577932321774
+len(traj.t): 100
+Total Cost: 48.6319447706138
+Processing GRC_NeaSmyrni-126_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 56, standing at the end False
+Cost Distance To Obstacles: 1069.8129672089399
+Cost Time: 5.6000000000000005
+Cost Speed: 415.3245029249862
+Cost Acceleration: 209.72853020264728
+Cost Jerk: 934.5984731560569
+Cost Lane Center Offset: 0.21266739507408955
+len(traj.t): 56
+Total Cost: 52.55852037299472
+Processing ESP_Barcelona-26_31_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 81, standing at the end False
+Cost Distance To Obstacles: 2808.0913740864917
+Cost Time: 8.1
+Cost Speed: 416.05043717177216
+Cost Acceleration: 2745.577416146217
+Cost Jerk: 663.507846025052
+Cost Lane Center Offset: 0.38729506513809825
+len(traj.t): 81
+Total Cost: 89.99647368511938
+Processing DEU_Lengede-55_1_T-6.xml...
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 392.95139600608604
+Cost Time: 1.5
+Cost Speed: 139.42274710342312
+Cost Acceleration: 12.699940123813304
+Cost Jerk: 111.93097373380144
+Cost Lane Center Offset: 0.008678994560858657
+len(traj.t): 15
+Total Cost: 45.300915730778996
+Processing DEU_Heilbronn-247_1_T-18.xml...
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 7573.799139216511
+Cost Time: 15.0
+Cost Speed: 77.89012799615003
+Cost Acceleration: 1155.1189417305072
+Cost Jerk: 1166.0269399975089
+Cost Lane Center Offset: 10.159835868399373
+len(traj.t): 150
+Total Cost: 81.55329989872718
+Processing DEU_Heilbronn-63_1_T-10.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 438.53107546912986
+Cost Time: 1.7000000000000002
+Cost Speed: 108.70483069477092
+Cost Acceleration: 3.800147140732096
+Cost Jerk: 90.37570042369791
+Cost Lane Center Offset: 4.464981815008052
+len(traj.t): 17
+Total Cost: 39.692749149608176
+Processing ESP_Bilbao-19_25_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 52, standing at the end False
+Cost Distance To Obstacles: 2539.603641435145
+Cost Time: 5.2
+Cost Speed: 490.5988261443342
+Cost Acceleration: 236.62543494166877
+Cost Jerk: 719.4226618764611
+Cost Lane Center Offset: 3.9350609304717232
+len(traj.t): 52
+Total Cost: 81.93433894861693
+Processing DEU_Schwetzingen-96_1_T-8.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 401.85741653665985
+Cost Time: 3.6
+Cost Speed: 36.686925656262254
+Cost Acceleration: 165.95409886306084
+Cost Jerk: 562.7786700657921
+Cost Lane Center Offset: 3.3973318504489534
+len(traj.t): 36
+Total Cost: 36.118734527006225
+Processing DEU_Nuremberg-13_11_T-1.xml...
+Planning failed at time step 6
+Standstill cycles 0 of 7, standing at the end False
+Cost Distance To Obstacles: 85.8313964003459
+Cost Time: 0.7000000000000001
+Cost Speed: 16.01030331498452
+Cost Acceleration: 13.929872881895092
+Cost Jerk: 104.24204058989737
+Cost Lane Center Offset: 0.142519172015587
+len(traj.t): 7
+Total Cost: 32.150876051305495
+Processing USA_Phoenix-56_6_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 77, standing at the end False
+Cost Distance To Obstacles: 3061.5515448052897
+Cost Time: 7.7
+Cost Speed: 253.33392820391583
+Cost Acceleration: 1463.012842823201
+Cost Jerk: 2284.0558291608554
+Cost Lane Center Offset: 1.3607952633356901
+len(traj.t): 77
+Total Cost: 99.4313628604753
+Processing POL_Krakow-57_1_T-13.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [2033] cannot #be reached from the start lanelet with ID [6726]
+The goal lanelet with ID [2032] cannot #be reached from the start lanelet with ID [6727]
+The goal lanelet with ID [2033] cannot #be reached from the start lanelet with ID [6727]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [2033] cannot #be reached from the start lanelet with ID [6726]
+The goal lanelet with ID [2032] cannot #be reached from the start lanelet with ID [6727]
+The goal lanelet with ID [2033] cannot #be reached from the start lanelet with ID [6727]
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 7.735438588463701
+Cost Time: 0.1
+Cost Speed: 1.1664274090000002
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.008652070332911443
+len(traj.t): 1
+Total Cost: 9.010518067796612
+No ego vehicle trajectory found
+    POL_Krakow-57_1_T-13.xml not feasible!
+Processing DEU_Nuremberg-15_10_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 92, standing at the end False
+Cost Distance To Obstacles: 2766.62321019099
+Cost Time: 9.200000000000001
+Cost Speed: 107.76557393069757
+Cost Acceleration: 231.12352601946532
+Cost Jerk: 992.0757229922308
+Cost Lane Center Offset: 24.657790512151465
+len(traj.t): 92
+Total Cost: 54.00701982223408
+Processing DEU_Heilbronn-230_1_T-20.xml...
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 115.32628439197113
+Cost Time: 15.0
+Cost Speed: 17.635122205422217
+Cost Acceleration: 68.75981990816692
+Cost Jerk: 444.23343724706046
+Cost Lane Center Offset: 5.394783231477973
+len(traj.t): 150
+Total Cost: 19.342329646560657
+Processing ZAM_Tjunction-1_373_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 104, standing at the end False
+Cost Distance To Obstacles: 2894.0323069239507
+Cost Time: 10.4
+Cost Speed: 276.1561626336532
+Cost Acceleration: 659.4715886387617
+Cost Jerk: 256.53385290567326
+Cost Lane Center Offset: 1.4469161639307488
+len(traj.t): 104
+Total Cost: 49.70423872371125
+Processing CHN_Beijing-4_42_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 123, standing at the end False
+Cost Distance To Obstacles: 2126.9462204499623
+Cost Time: 12.3
+Cost Speed: 47.261621098111185
+Cost Acceleration: 459.2735161307043
+Cost Jerk: 309.0690079520653
+Cost Lane Center Offset: 5.4795994229466345
+len(traj.t): 123
+Total Cost: 36.26772329312024
+Processing DEU_Arnstadt-23_1_T-1.xml...
+Planning failed at time step 28
+Standstill cycles 0 of 29, standing at the end False
+Cost Distance To Obstacles: 659.998563980557
+Cost Time: 2.9000000000000004
+Cost Speed: 221.8896610576894
+Cost Acceleration: 140.4605643612871
+Cost Jerk: 349.31581722637867
+Cost Lane Center Offset: 3.763657869894086
+len(traj.t): 29
+Total Cost: 50.328560844682976
+Processing DEU_Leipzig-47_14_T-1.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 16.506353147524873
+Cost Time: 0.2
+Cost Speed: 0.8267701190600288
+Cost Acceleration: 0.09727574495459387
+Cost Jerk: 9.196735751294522
+Cost Lane Center Offset: 0.00026364972375900485
+len(traj.t): 2
+Total Cost: 13.513699206278888
+Processing DEU_Hanover-26_23_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 111, standing at the end False
+Cost Distance To Obstacles: 2661.2777178671117
+Cost Time: 11.100000000000001
+Cost Speed: 9.905297651940815
+Cost Acceleration: 119.5067328496943
+Cost Jerk: 226.3327002906674
+Cost Lane Center Offset: 2.963913770268421
+len(traj.t): 111
+Total Cost: 38.30708434621336
+Processing ESP_Barcelona-20_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 77, standing at the end False
+Cost Distance To Obstacles: 2177.231238322548
+Cost Time: 7.7
+Cost Speed: 12.601855206845674
+Cost Acceleration: 110.44748860278332
+Cost Jerk: 70.07691718513028
+Cost Lane Center Offset: 0.3068289457953213
+len(traj.t): 77
+Total Cost: 38.48784841900133
+Processing GRC_NeaSmyrni-54_1_T-3.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 49.67035260433762
+Cost Time: 0.1
+Cost Speed: 18.487025089
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.015200492006223795
+len(traj.t): 1
+Total Cost: 68.27257818534385
+No ego vehicle trajectory found
+    GRC_NeaSmyrni-54_1_T-3.xml not feasible!
+Processing USA_Phoenix-15_36_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 52, standing at the end False
+Cost Distance To Obstacles: 2253.589084835032
+Cost Time: 5.2
+Cost Speed: 46.81594462421806
+Cost Acceleration: 254.13755985805798
+Cost Jerk: 79.03063218916486
+Cost Lane Center Offset: 0.18330878654116453
+len(traj.t): 52
+Total Cost: 55.849164044096426
+Processing DEU_Heilbronn-82_1_T-19.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 15.41324449195926
+Cost Time: 0.1
+Cost Speed: 1.3365604810000007
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0246756252242843
+len(traj.t): 1
+Total Cost: 16.874480598183546
+No ego vehicle trajectory found
+    DEU_Heilbronn-82_1_T-19.xml not feasible!
+Processing ZAM_Tjunction-1_59_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 116, standing at the end False
+Cost Distance To Obstacles: 2644.574031396675
+Cost Time: 11.600000000000001
+Cost Speed: 262.60421064825664
+Cost Acceleration: 536.0321912669909
+Cost Jerk: 202.8597155716236
+Cost Lane Center Offset: 3.5479251544579977
+len(traj.t): 116
+Total Cost: 43.062224776189694
+Processing DEU_Herzogenaurach-185_1_T-1.xml...
+Planning failed at time step 38
+Standstill cycles 0 of 39, standing at the end False
+Cost Distance To Obstacles: 921.4022205811141
+Cost Time: 3.9000000000000004
+Cost Speed: 53.17601060441523
+Cost Acceleration: 2953.416861250701
+Cost Jerk: 954.0005880626443
+Cost Lane Center Offset: 0.7529093340653024
+len(traj.t): 39
+Total Cost: 129.0986817905882
+Processing DEU_Memmingen-77_1_T-9.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 451.1509807063443
+Cost Time: 3.6
+Cost Speed: 107.69696501268336
+Cost Acceleration: 338.91266180007966
+Cost Jerk: 490.3721994750265
+Cost Lane Center Offset: 0.05781735594844502
+len(traj.t): 36
+Total Cost: 42.16085067639117
+Processing AUT_Haag-23_1_T-16.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Planning failed at time step 51
+Standstill cycles 0 of 52, standing at the end False
+Cost Distance To Obstacles: 677.45225350805
+Cost Time: 5.2
+Cost Speed: 164.4163606952776
+Cost Acceleration: 1385.2748938367056
+Cost Jerk: 1464.2137573386462
+Cost Lane Center Offset: 0.0844462691883433
+len(traj.t): 52
+Total Cost: 76.18926368553592
+Processing DEU_Kiel-50_15_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 2748.006944412714
+Cost Time: 15.0
+Cost Speed: 141.40522787593994
+Cost Acceleration: 583.1300226742652
+Cost Jerk: 2687.487609738273
+Cost Lane Center Offset: 1.7767274402870057
+len(traj.t): 150
+Total Cost: 56.078710214276526
+Processing DEU_Heilbronn-254_1_T-2.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 2.274826523482262
+Cost Time: 0.1
+Cost Speed: 0.02067520900000007
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.012157623223450407
+len(traj.t): 1
+Total Cost: 2.4076593557057127
+No ego vehicle trajectory found
+    DEU_Heilbronn-254_1_T-2.xml not feasible!
+Processing DEU_Memmingen-48_1_T-6.xml...
+Planning failed at time step 8
+Standstill cycles 0 of 9, standing at the end False
+Cost Distance To Obstacles: 142.16651570889974
+Cost Time: 0.9
+Cost Speed: 19.064926177266575
+Cost Acceleration: 182.91526220618886
+Cost Jerk: 743.8111198228053
+Cost Lane Center Offset: 0.33257180631092964
+len(traj.t): 9
+Total Cost: 121.82115508016349
+Processing POL_Poznan-99_1_T-26.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 440.158944081618
+Cost Time: 1.7000000000000002
+Cost Speed: 11.066586766933074
+Cost Acceleration: 1232.4398566432858
+Cost Jerk: 1162.1497128755996
+Cost Lane Center Offset: 0.6575786178180477
+len(traj.t): 17
+Total Cost: 169.1395693520738
+Processing POL_Srodmiescie-1_1_T-5.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 67.79712020857659
+Cost Time: 0.1
+Cost Speed: 0.9716935840000004
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.019839333468561905
+len(traj.t): 1
+Total Cost: 68.88865312604514
+No ego vehicle trajectory found
+    POL_Srodmiescie-1_1_T-5.xml not feasible!
+Processing ESP_Barcelona-16_14_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 836.0116791335329
+Cost Time: 1.7000000000000002
+Cost Speed: 7.889865976958177
+Cost Acceleration: 459.79027453838575
+Cost Jerk: 437.1741821443405
+Cost Lane Center Offset: 0.00039796903447019967
+len(traj.t): 17
+Total Cost: 104.10390586836776
+Processing BRA_BeloHorizonte-33_1_T-10.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+The goal lanelet with ID [3899] cannot #be reached from the start lanelet with ID [984]
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+The goal lanelet with ID [3899] cannot #be reached from the start lanelet with ID [984]
+The goal lanelet with ID [2463] cannot #be reached from the start lanelet with ID [106]
+The goal lanelet with ID [2239] cannot #be reached from the start lanelet with ID [106]
+The goal lanelet with ID [2463] cannot #be reached from the start lanelet with ID [106]
+The goal lanelet with ID [2239] cannot #be reached from the start lanelet with ID [106]
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 480.21368864290804
+Cost Time: 1.7000000000000002
+Cost Speed: 63.99168196115368
+Cost Acceleration: 93.27010496503507
+Cost Jerk: 165.86808547100344
+Cost Lane Center Offset: 0.015596197151761979
+len(traj.t): 17
+Total Cost: 48.956421013956
+Processing GRC_ArchaioLimani-16_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 79, standing at the end False
+Cost Distance To Obstacles: 4203.948501974305
+Cost Time: 7.9
+Cost Speed: 566.4018713343565
+Cost Acceleration: 2085.9356863710696
+Cost Jerk: 1654.4419440358288
+Cost Lane Center Offset: 2.8757691591215244
+len(traj.t): 79
+Total Cost: 115.6671363655023
+Processing POL_Srodmiescie-94_1_T-37.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 14.755990798516846
+Cost Time: 0.1
+Cost Speed: 1.6428430240000005
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.09639030726297841
+len(traj.t): 1
+Total Cost: 16.595224129779826
+No ego vehicle trajectory found
+    POL_Srodmiescie-94_1_T-37.xml not feasible!
+Processing BEL_Brussels-78_3_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 92, standing at the end False
+Cost Distance To Obstacles: 1717.62225044138
+Cost Time: 9.200000000000001
+Cost Speed: 282.9953859161523
+Cost Acceleration: 1844.8978322290084
+Cost Jerk: 606.4012974055032
+Cost Lane Center Offset: 2.7096700298330827
+len(traj.t): 92
+Total Cost: 57.61985256545519
+Processing POL_Krakow-25_1_T-4.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 7.206814678923022
+Cost Time: 0.2
+Cost Speed: 0.0011965603253274813
+Cost Acceleration: 0.02981118960093995
+Cost Jerk: 2.8100456480116143
+Cost Lane Center Offset: 0.23778178039035539
+len(traj.t): 2
+Total Cost: 5.34282492862563
+Processing POL_Srodmiescie-16_1_T-4.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+The goal lanelet with ID [1150] cannot #be reached from the start lanelet with ID [77]
+The goal lanelet with ID [1311] cannot #be reached from the start lanelet with ID [77]
+The goal lanelet with ID [1150] cannot #be reached from the start lanelet with ID [77]
+The goal lanelet with ID [1311] cannot #be reached from the start lanelet with ID [77]
+The goal lanelet with ID [915] cannot #be reached from the start lanelet with ID [49]
+The goal lanelet with ID [914] cannot #be reached from the start lanelet with ID [49]
+The goal lanelet with ID [915] cannot #be reached from the start lanelet with ID [49]
+The goal lanelet with ID [914] cannot #be reached from the start lanelet with ID [49]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9805]
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9805]
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9806]
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9806]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9805]
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9805]
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9806]
+The goal lanelet with ID [1659] cannot #be reached from the start lanelet with ID [9806]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [573] cannot #be reached from the start lanelet with ID [1470]
+The goal lanelet with ID [573] cannot #be reached from the start lanelet with ID [1470]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [573] cannot #be reached from the start lanelet with ID [1470]
+The goal lanelet with ID [573] cannot #be reached from the start lanelet with ID [1470]
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 35.98981974323737
+Cost Time: 0.1
+Cost Speed: 0.403367056
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 2.762450358783352e-06
+len(traj.t): 1
+Total Cost: 36.49318956168773
+No ego vehicle trajectory found
+    POL_Srodmiescie-16_1_T-4.xml not feasible!
+Processing DEU_Kleinmachnow-52_1_T-5.xml...
+Standstill cycles 0 of 100, standing at the end False
+Cost Distance To Obstacles: 880.742645955396
+Cost Time: 10.0
+Cost Speed: 207.7918100541614
+Cost Acceleration: 1316.987669361974
+Cost Jerk: 1033.3681999115024
+Cost Lane Center Offset: 0.9115357635424792
+len(traj.t): 100
+Total Cost: 44.39801861046576
+Processing USA_Austin-57_27_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 41.77448022792678
+Cost Time: 0.1
+Cost Speed: 0.5391219609999998
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 1.7083463486399314e-05
+len(traj.t): 1
+Total Cost: 42.413619272390264
+No ego vehicle trajectory found
+    USA_Austin-57_27_T-1.xml not feasible!
+Processing DEU_Leipzig-15_16_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 124, standing at the end False
+Cost Distance To Obstacles: 3636.187990800172
+Cost Time: 12.4
+Cost Speed: 454.1014661424475
+Cost Acceleration: 2986.668512505736
+Cost Jerk: 884.641796650521
+Cost Lane Center Offset: 6.564732494105097
+len(traj.t): 124
+Total Cost: 76.65939111768533
+Processing DEU_Arnstadt-62_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 97, standing at the end False
+Cost Distance To Obstacles: 1686.0444934545012
+Cost Time: 9.700000000000001
+Cost Speed: 319.3773455669996
+Cost Acceleration: 1815.7150434708017
+Cost Jerk: 2967.0192045285116
+Cost Lane Center Offset: 1.436235097195109
+len(traj.t): 97
+Total Cost: 79.69579713523721
+Processing DEU_Damme-37_1_T-1.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 541.5041801242082
+Cost Time: 3.6
+Cost Speed: 79.05687984041278
+Cost Acceleration: 330.06852847122013
+Cost Jerk: 301.460878402866
+Cost Lane Center Offset: 0.3679013235615775
+len(traj.t): 36
+Total Cost: 38.39051022672969
+Processing DEU_Herzogenaurach-153_1_T-8.xml...
+Planning failed at time step 68
+Standstill cycles 0 of 69, standing at the end False
+Cost Distance To Obstacles: 1242.7011909500743
+Cost Time: 6.9
+Cost Speed: 111.71128335604111
+Cost Acceleration: 2101.9016720278487
+Cost Jerk: 2772.0320316263287
+Cost Lane Center Offset: 0.8160591930100345
+len(traj.t): 69
+Total Cost: 97.17771358193194
+Processing ESP_Barcelona-72_13_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 82, standing at the end False
+Cost Distance To Obstacles: 2948.178337088173
+Cost Time: 8.200000000000001
+Cost Speed: 453.11993240005586
+Cost Acceleration: 2988.8760597891146
+Cost Jerk: 717.453205903975
+Cost Lane Center Offset: 1.0925996167326255
+len(traj.t): 82
+Total Cost: 94.89170896095185
+Processing DEU_Aschaffenburg-10_33_T-1.xml...
+Planning failed at time step 47
+Standstill cycles 0 of 48, standing at the end False
+Cost Distance To Obstacles: 1688.6256765053347
+Cost Time: 4.800000000000001
+Cost Speed: 244.9358554410387
+Cost Acceleration: 1153.9720398506888
+Cost Jerk: 1706.8332949281466
+Cost Lane Center Offset: 0.9393696203776642
+len(traj.t): 48
+Total Cost: 104.70221325719972
+Processing DEU_Leipzig-63_25_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 56, standing at the end False
+Cost Distance To Obstacles: 3551.0774058844127
+Cost Time: 5.6000000000000005
+Cost Speed: 256.35320407351077
+Cost Acceleration: 1126.7965558374874
+Cost Jerk: 1883.145860264581
+Cost Lane Center Offset: 1.947913649861924
+len(traj.t): 56
+Total Cost: 127.37358820910453
+Processing ESP_Barcelona-35_16_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 987.2498486258884
+Cost Time: 1.7000000000000002
+Cost Speed: 12.75261127787661
+Cost Acceleration: 159.53770297097765
+Cost Jerk: 217.37227632680623
+Cost Lane Center Offset: 0.16720552845565606
+len(traj.t): 17
+Total Cost: 82.70468498411793
+Processing ESP_Vigo-5_1_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 25.7014946926937
+Cost Time: 0.1
+Cost Speed: 2.9604481000000007
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.03613873147348233
+len(traj.t): 1
+Total Cost: 28.798081524167184
+No ego vehicle trajectory found
+    ESP_Vigo-5_1_T-1.xml not feasible!
+Processing DEU_Lohmar-61_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 86, standing at the end False
+Cost Distance To Obstacles: 2003.1551950288745
+Cost Time: 8.6
+Cost Speed: 32.33565125281948
+Cost Acceleration: 698.1134157239871
+Cost Jerk: 1009.3797284033728
+Cost Lane Center Offset: 2.073905604067933
+len(traj.t): 86
+Total Cost: 52.147184837361884
+Processing USA_NewYork-54_8_T-1.xml...
+Planning failed at time step 38
+Standstill cycles 0 of 39, standing at the end False
+Cost Distance To Obstacles: 805.7135205975602
+Cost Time: 3.9000000000000004
+Cost Speed: 279.8576677956536
+Cost Acceleration: 412.1504929970704
+Cost Jerk: 445.86670722875664
+Cost Lane Center Offset: 0.02185130146220881
+len(traj.t): 39
+Total Cost: 53.736159997961614
+Processing CHN_Qingdao-21_2_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 76, standing at the end False
+Cost Distance To Obstacles: 1703.9039034833045
+Cost Time: 7.6000000000000005
+Cost Speed: 26.202832032252616
+Cost Acceleration: 100.64377553264724
+Cost Jerk: 72.57796460703906
+Cost Lane Center Offset: 0.4245008451773461
+len(traj.t): 76
+Total Cost: 32.64938126974238
+Processing DEU_Schwetzingen-59_1_T-2.xml...
+Planning failed at time step 35
+Standstill cycles 0 of 36, standing at the end False
+Cost Distance To Obstacles: 1651.9070114344584
+Cost Time: 3.6
+Cost Speed: 457.7528269182626
+Cost Acceleration: 721.7839908218356
+Cost Jerk: 469.6112768247524
+Cost Lane Center Offset: 0.10065165069540237
+len(traj.t): 36
+Total Cost: 95.29877104583343
+Processing ESP_Bilbao-37_4_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 94, standing at the end False
+Cost Distance To Obstacles: 2841.683541209651
+Cost Time: 9.4
+Cost Speed: 440.6360882807337
+Cost Acceleration: 2235.7555547150173
+Cost Jerk: 2431.2162276867193
+Cost Lane Center Offset: 1.5214226443246102
+len(traj.t): 94
+Total Cost: 93.98311526102603
+Processing DEU_Heilbronn-106_1_T-3.xml...
+Planning failed at time step 28
+Standstill cycles 0 of 29, standing at the end False
+Cost Distance To Obstacles: 488.9182634490263
+Cost Time: 2.9000000000000004
+Cost Speed: 95.66284804135068
+Cost Acceleration: 1834.5687131792529
+Cost Jerk: 1108.7178040362212
+Cost Lane Center Offset: 1.2185134262278474
+len(traj.t): 29
+Total Cost: 124.59262559076136
+Processing AUT_Haag-54_1_T-5.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: AUT
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 14
+Standstill cycles 0 of 15, standing at the end False
+Cost Distance To Obstacles: 40.276882512751335
+Cost Time: 1.5
+Cost Speed: 10.724994480813283
+Cost Acceleration: 217.61598972734572
+Cost Jerk: 343.557035761129
+Cost Lane Center Offset: 0.002667573215955176
+len(traj.t): 15
+Total Cost: 42.31183800368368
+Processing USA_Tyler-51_1_T-1.xml...
+Planning failed at time step 25
+Standstill cycles 0 of 26, standing at the end False
+Cost Distance To Obstacles: 85.75383729285318
+Cost Time: 2.6
+Cost Speed: 141.91077447849642
+Cost Acceleration: 1934.5566198145245
+Cost Jerk: 1403.3231956329116
+Cost Lane Center Offset: 0.0009387025893737607
+len(traj.t): 26
+Total Cost: 139.7363602277452
+Processing ESP_Bilbao-30_27_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 40.60775780072276
+Cost Time: 0.1
+Cost Speed: 5.090394409
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.4235310995009046
+len(traj.t): 1
+Total Cost: 46.221683309223664
+No ego vehicle trajectory found
+    ESP_Bilbao-30_27_T-1.xml not feasible!
+Processing DEU_Salzwedel-27_1_T-2.xml...
+Goal Reached
+Standstill cycles 0 of 62, standing at the end False
+Cost Distance To Obstacles: 1221.1385010403728
+Cost Time: 6.2
+Cost Speed: 249.5136849790647
+Cost Acceleration: 663.121833504759
+Cost Jerk: 853.0700524341406
+Cost Lane Center Offset: 0.3591989701283286
+len(traj.t): 62
+Total Cost: 54.380697918201065
+Processing BRA_VilaVelha-55_1_T-5.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [1513] cannot #be reached from the start lanelet with ID [2726]
+The goal lanelet with ID [1513] cannot #be reached from the start lanelet with ID [2726]
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: BRA
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [1513] cannot #be reached from the start lanelet with ID [2726]
+The goal lanelet with ID [1513] cannot #be reached from the start lanelet with ID [2726]
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 7821.712239295924
+Cost Time: 15.0
+Cost Speed: 17.971753840596076
+Cost Acceleration: 88.89770488220323
+Cost Jerk: 547.1408006545416
+Cost Lane Center Offset: 8.26904574505812
+len(traj.t): 150
+Total Cost: 71.55994362945549
+Processing POL_Krakow-128_1_T-4.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Lanelets_of_goal_position not given
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 721, in planning
+    raise RuntimeError
+RuntimeError
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 47.57887569379938
+Cost Time: 0.2
+Cost Speed: 2.0538551141890733
+Cost Acceleration: 0.3316627290432438
+Cost Jerk: 31.35288239696604
+Cost Lane Center Offset: 0.015077551593748184
+len(traj.t): 2
+Total Cost: 40.86617674279575
+Processing DEU_Heilbronn-209_1_T-1.xml...
+Planning failed at time step 16
+Standstill cycles 0 of 17, standing at the end False
+Cost Distance To Obstacles: 93.04414180338718
+Cost Time: 1.7000000000000002
+Cost Speed: 82.33988370911423
+Cost Acceleration: 111.84719154871819
+Cost Jerk: 142.65329836991486
+Cost Lane Center Offset: 0.653968278791181
+len(traj.t): 17
+Total Cost: 27.02579315940739
+Processing DEU_Kiel-2_58_T-1.xml...
+Planning failed at time step 0
+Standstill cycles 0 of 1, standing at the end False
+Cost Distance To Obstacles: 55.47202686402415
+Cost Time: 0.1
+Cost Speed: 0.006625476000000026
+Cost Acceleration: 0.0
+Cost Jerk: 0.0
+Cost Lane Center Offset: 0.0031475098906338706
+len(traj.t): 1
+Total Cost: 55.58179984991479
+No ego vehicle trajectory found
+    DEU_Kiel-2_58_T-1.xml not feasible!
+Processing POL_Srodmiescie-149_1_T-13.xml...
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+[WARNING] Unknown country: Default traffic sign IDs are used. Specified country: POL
+Lanelets_of_goal_position not given
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [400]
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [400]
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [455]
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [455]
+Multiple start lanelet IDs: some may fail to reach goal lanelet
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [400]
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [400]
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [455]
+The goal lanelet with ID [147] cannot #be reached from the start lanelet with ID [455]
+The goal lanelet with ID [50215] cannot #be reached from the start lanelet with ID [50195]
+The goal lanelet with ID [50213] cannot #be reached from the start lanelet with ID [50195]
+The goal lanelet with ID [50207] cannot #be reached from the start lanelet with ID [50195]
+The goal lanelet with ID [50215] cannot #be reached from the start lanelet with ID [50195]
+The goal lanelet with ID [50213] cannot #be reached from the start lanelet with ID [50195]
+The goal lanelet with ID [50207] cannot #be reached from the start lanelet with ID [50195]
+Goal Reached
+Standstill cycles 0 of 85, standing at the end False
+Cost Distance To Obstacles: 2313.712310226552
+Cost Time: 8.5
+Cost Speed: 190.580016244358
+Cost Acceleration: 734.327882420906
+Cost Jerk: 808.288670218503
+Cost Lane Center Offset: 1.2138549384623338
+len(traj.t): 85
+Total Cost: 56.12497334175036
+Processing CHN_Tianjin-18_1_T-1.xml...
+Goal Reached
+Standstill cycles 0 of 150, standing at the end False
+Cost Distance To Obstacles: 1369.2518618387085
+Cost Time: 15.0
+Cost Speed: 469.7648023314124
+Cost Acceleration: 1720.0280425286974
+Cost Jerk: 1346.9726627387245
+Cost Lane Center Offset: 2.9294470282844443
+len(traj.t): 150
+Total Cost: 47.72631210977218
+Processing ZAM_Tjunction-1_293_T-1.xml...
+Planning failed at time step 1
+Standstill cycles 0 of 2, standing at the end False
+Cost Distance To Obstacles: 89.2330382885545
+Cost Time: 0.2
+Cost Speed: 22.27938763365025
+Cost Acceleration: 0.2818566253349877
+Cost Jerk: 27.030771579842913
+Cost Lane Center Offset: 0.029137802880929847
+len(traj.t): 2
+Total Cost: 69.62709596513179
+Processing DEU_Hanover-38_24_T-1.xml...
+Planning failed at time step 22
+Standstill cycles 0 of 23, standing at the end False
+Cost Distance To Obstacles: 1551.9226195135188
+Cost Time: 2.3000000000000003
+Cost Speed: 192.40308359832036
+Cost Acceleration: 8.873016462224632
+Cost Jerk: 49.54189388044261
+Cost Lane Center Offset: 0.03019972325287477
+len(traj.t): 23
+Total Cost: 80.68133970338083

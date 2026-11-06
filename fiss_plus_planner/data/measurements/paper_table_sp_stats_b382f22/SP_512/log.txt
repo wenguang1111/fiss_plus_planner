@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/scripts/demo_cr.py", line 9, in <module>
+    from fiss_plus_planner.planners.benchmark.planning import planning  # noqa: E402
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/benchmark/planning.py", line 39, in <module>
+    from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
+  File "/home/xu/workspace/fiss_plus_planner/fiss_plus_planner/planners/sparse_planner.py", line 21, in <module>
+    from CVAE_efficient_sampling.CVAE import CVAE_Efficient
+  File "/home/xu/workspace/fiss_plus_planner/CVAE_efficient_sampling/CVAE.py", line 5, in <module>
+    from .imgs_cond_dataset import CVAEDataset
+  File "/home/xu/workspace/fiss_plus_planner/CVAE_efficient_sampling/imgs_cond_dataset.py", line 11, in <module>
+    from normalizer import Normalizer
+ModuleNotFoundError: No module named 'normalizer'

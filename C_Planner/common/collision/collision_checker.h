@@ -22,6 +22,20 @@ bool polygon_collision(const std::vector<Eigen::Vector2d>& poly1,
 std::vector<Eigen::Vector2d> compute_vehicle_polygon(double x, double y, double yaw,
                                                      double vehicle_length, double vehicle_width);
 
+// First trajectory step that collides with an obstacle (traj.x.size() if none)
+int first_collision_step(
+    const FrenetTrajectory& traj,
+    const double* obstacles_array,
+    const int* num_vertices_array,
+    int num_time_steps,
+    int num_obstacles,
+    int max_vertices,
+    double vehicle_length,
+    double vehicle_width,
+    int time_step_now = 0,
+    int check_resolution = 1
+);
+
 // Main single-threaded collision checker
 // Returns vector of trajectories that have no collisions
 std::vector<FrenetTrajectory> check_collision(

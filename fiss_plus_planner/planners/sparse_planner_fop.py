@@ -19,6 +19,7 @@ from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
 from CVAE_efficient_sampling.CVAE import CVAE_Efficient
+from fiss_plus_planner.planners.sparse_planning.cvae_paper import CVAE_EfficientPaper
 class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5, scenario_dir: str = "", scenario_file: str = ""):
         super().__init__(num_width, num_speed, num_t)
@@ -26,6 +27,8 @@ class SparsePlannerFOPSettings(FrenetOptimalPlannerSettings):
         self.scenario_dir = scenario_dir
         self.scenario_file = scenario_file
         self.num_samples: int =64
+        self.fallback = True  # False: a cycle without a feasible CVAE sample fails (no FOP fallback)
+        self.cvae_version = "paper"  # "paper": statistics and Resize of the paper's measurements; "submodule": CVAE.py
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         current_dir = Path(__file__).parent.parent.parent
         self.cvae_model_path = current_dir / Path("CVAE_efficient_sampling/weights/attn_cvae_zoom_out_zdim_64_sigmoid_1.0_stall_end.pth")
@@ -44,10 +47,15 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         )
 
         self.image_history: List[Tuple[int, Image.Image]] = []
-        self.cvae_efficient_model = CVAE_Efficient(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
+        self.cvae_efficient_model = self.load_sampler_model()
         self.all_trajs = []
         self.time_image_generation = 0.0
         self.num_FOP_intervention = 0
+
+    def load_sampler_model(self):
+        """The learned sampler of the parameters (overridden by GaussianPlanner_CPP)."""
+        cvae_cls = {"paper": CVAE_EfficientPaper, "submodule": CVAE_Efficient}[self.settings.cvae_version]
+        return cvae_cls(device=self.settings.device, model_path=str(self.settings.cvae_model_path))
 
     def record_generated_sampling_parameters(self, samples: List[List[float]], time_step_now: int):
         """Record generated sampling parameters to a file."""
@@ -59,20 +67,18 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
                 t, d, s_d = sample
                 f.write(f"{time_step_now}, {d}, {s_d}, {t}\n")
     
-    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
-        """Plan using CVAE sampled trajectories."""
-        # reset stats
-        self.stats = Stats()
-        self.num_FOP_intervention = 0  # 1 if this cycle falls back to FOP (was never reset before 2026-11-02)
-        self.settings.highest_speed = max_target_speed
+    def condition_images(self, time_step_now: int, current_state: InitialState) -> List[Image.Image]:
+        """BEV images of the last 3 cycles (the CVAE condition); sets time_image_generation (input, not planning time)."""
         images_last_3_frame: List[Image.Image] = []
-
         time_start = time.time()
         img = self.scenario_drawer.create_scenario_img_at_time_step(
             time_step_now,
             current_state
         )
-        self.image_history.append((time_step_now, img))
+        if self.image_history and self.image_history[-1][0] == time_step_now:
+            self.image_history[-1] = (time_step_now, img)  # same cycle planned again (clearance fallback)
+        else:
+            self.image_history.append((time_step_now, img))
 
         # #Useful for debugging, make sure if you want to delete it
         # output_dir = Path("output/generated_images") / Path(self.settings.scenario_file)
@@ -99,6 +105,15 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
             ]
 
         self.time_image_generation = time.time() - time_start
+        return images_last_3_frame
+
+    def plan(self, frenet_state: FrenetState, max_target_speed: float, obstacles: list, time_step_now: int = 0, current_state: InitialState = None) -> FrenetTrajectory:
+        """Plan using CVAE sampled trajectories."""
+        # reset stats
+        self.stats = Stats()
+        self.num_FOP_intervention = 0  # 1 if this cycle falls back to FOP (was never reset before 2026-11-02)
+        self.settings.highest_speed = max_target_speed
+        images_last_3_frame = self.condition_images(time_step_now, current_state)
         # Output is t, d, s_d -> reorder to  d, s_d, t.
         # time_start = time.time()
         cvae_samples = self.cvae_efficient_model.generate_samples(images_last_3_frame, self.settings.num_samples)
@@ -117,6 +132,8 @@ class SparsePlannerFOP(FrenetOptimalPlanner):
         fplist = self.check_collision_multithread(fplist, time_step_now)
 
         if(len(fplist) == 0):
+            if not self.settings.fallback:
+                return None
             self.num_FOP_intervention  = 1
             return super().plan(
                 frenet_state,

@@ -26,7 +26,8 @@ void def_iterative_planner(py::class_<Planner, Frenet_Planner>& cls, const char*
             py::arg("num_time_steps"), py::arg("num_obstacles"), py::arg("max_vertices"))
         .def("plan", &Planner::plan,
              py::arg("frenet_state"), py::arg("max_target_speed"),
-             py::arg("time_step_now") = 0, py::arg("num_threads") = 1);
+             py::arg("time_step_now") = 0, py::arg("num_threads") = 1)
+        .def("set_external_normals", &Planner::set_external_normals, py::arg("normals"));
 }
 
 PYBIND11_MODULE(frenet_planner_cpp, m) {
@@ -48,7 +49,8 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
         .def_readwrite("max_t", &SettingParameters::max_t)
         .def_readwrite("num_t", &SettingParameters::num_t)
         .def_readwrite("check_obstacle", &SettingParameters::check_obstacle)
-        .def_readwrite("check_boundary", &SettingParameters::check_boundary);
+        .def_readwrite("check_boundary", &SettingParameters::check_boundary)
+        .def_readwrite("planning_obstacle_cost", &SettingParameters::planning_obstacle_cost);
 
     // Bind VehicleParams struct
     py::class_<VehicleParams>(m, "VehicleParams")
@@ -192,6 +194,26 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("max_target_speed"),
              py::arg("time_step_now") = 0,
              py::arg("num_threads") = 1)
+        .def("best_traj_generation_array",
+             [](Frenet_Planner& self,
+                const FrenetState& frenet_state,
+                py::array_t<double, py::array::c_style | py::array::forcecast> samples,
+                double max_target_speed,
+                int time_step_now,
+                int num_threads) {
+                // samples: (N, 3) array of (d, s_d, t), without building a Python list of tuples
+                auto s = samples.unchecked<2>();
+                if (s.shape(1) != 3) throw std::invalid_argument("samples must have shape (N, 3)");
+                std::vector<std::tuple<double, double, double>> vec;
+                vec.reserve(s.shape(0));
+                for (py::ssize_t i = 0; i < s.shape(0); ++i) vec.emplace_back(s(i, 0), s(i, 1), s(i, 2));
+                return self.best_traj_generation(frenet_state, vec, max_target_speed, time_step_now, num_threads);
+             },
+             py::arg("frenet_state"),
+             py::arg("samples"),
+             py::arg("max_target_speed"),
+             py::arg("time_step_now") = 0,
+             py::arg("num_threads") = 1)
         .def("get_samples", &Frenet_Planner::get_samples)
      //    .def("calc_frenet_paths",
      //         [](Frenet_Planner& self, const FrenetState& frenet_state) {
@@ -211,6 +233,12 @@ PYBIND11_MODULE(frenet_planner_cpp, m) {
              py::arg("time_step_now") = 0)
         .def("getAllSuccessfulTrajectories", &Frenet_Planner::getAllSuccessfulTrajectories)
         .def("get_stats", &Frenet_Planner::get_stats)
+        .def("get_last_evals", [](const Frenet_Planner& self) {
+            // (feasible, violation, cost) per sample of the last best_traj_generation
+            py::list out;
+            for (const SampleEval& e : self.last_evals) out.append(py::make_tuple(e.feasible, e.violation, e.cost));
+            return out;
+        })
         .def_readwrite("settings", &Frenet_Planner::settings)
         .def_readwrite("vehicle_params", &Frenet_Planner::vehicle_params)
         .def_readwrite("best_traj", &Frenet_Planner::best_traj);

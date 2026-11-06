@@ -1,0 +1,92 @@
+2026-11-02 10:08:31
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../CVAE_efficient_sampling
+ M cfgs/demo_config.yaml
+ M planners/benchmark/planning.py
+ M planners/frenet_optimal_planner.py
+ M planners/iterative_sampling_planner.py
+ M planners/sparse_planner_fop.py
+ M scripts/demo_cr.py
+ M scripts/paper_table.py
+ M scripts/run_paper_table.sh
+THREADS=config CLEARANCE=1
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      50%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          10          96           1          18         112
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-02 10:16:00
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../CVAE_efficient_sampling
+ M cfgs/demo_config.yaml
+ M planners/benchmark/planning.py
+ M planners/frenet_optimal_planner.py
+ M planners/iterative_sampling_planner.py
+ M planners/sparse_planner_fop.py
+ M scripts/demo_cr.py
+ M scripts/paper_table.py
+ M scripts/run_paper_table.sh
+THREADS=8 CLEARANCE=1 PARALLEL=1 PLANNERS=FOP
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      43%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          10          96           1          18         112
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-02 10:16:42
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../CVAE_efficient_sampling
+ M cfgs/demo_config.yaml
+ M planners/benchmark/planning.py
+ M planners/frenet_optimal_planner.py
+ M planners/iterative_sampling_planner.py
+ M planners/sparse_planner_fop.py
+ M scripts/demo_cr.py
+ M scripts/paper_table.py
+ M scripts/run_paper_table.sh
+THREADS=8 CLEARANCE=1 PARALLEL=1 PLANNERS=CEM
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      49%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          11          95           1          18         111
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-02 10:17:16
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../CVAE_efficient_sampling
+ M cfgs/demo_config.yaml
+ M planners/benchmark/planning.py
+ M planners/frenet_optimal_planner.py
+ M planners/iterative_sampling_planner.py
+ M planners/sparse_planner_fop.py
+ M scripts/demo_cr.py
+ M scripts/paper_table.py
+ M scripts/run_paper_table.sh
+THREADS=8 CLEARANCE=1 PARALLEL=1 PLANNERS=MPPI
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      77%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          12          93           1          18         109
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0

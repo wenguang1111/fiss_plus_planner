@@ -28,8 +28,8 @@ public:
 protected:
     const IterativeSamplingSettings& iteration_settings() const override { return cem_settings; }
     void update_proposal(GaussianProposal& proposal,
-                         const std::vector<Unit3>& feasible,
-                         const std::vector<double>& costs) const override;
+                         const std::vector<Unit3>& units,
+                         const std::vector<SampleEval>& evals) const override;
 };
 
 #endif // CEM_PLANNER_H

@@ -1,0 +1,34 @@
+2026-11-02 14:02:32
+dsc-cuda-01
+a585cacd8022f5a0fcf9ff1bd877663f3e33c465
+ M ../C_Planner/CEM_Planner.cpp
+ M ../C_Planner/CEM_Planner.h
+ M ../C_Planner/Fiss_Plus_Planner.cpp
+ M ../C_Planner/Frenet_Planner.cpp
+ M ../C_Planner/Frenet_Planner.h
+ M ../C_Planner/Iterative_Sampling_Planner.cpp
+ M ../C_Planner/Iterative_Sampling_Planner.h
+ M ../C_Planner/MPPI_Planner.cpp
+ M ../C_Planner/MPPI_Planner.h
+ M ../C_Planner/common/collision/collision_checker.cpp
+ M ../C_Planner/common/collision/collision_checker.h
+ M ../C_Planner/common/cost/cost_function.cpp
+ M ../C_Planner/common/cost/cost_function.h
+ M ../C_Planner/common/geometry/cubic_spline.cpp
+ M ../C_Planner/fiss_plus_pybind11_bindings.cpp
+ M ../C_Planner/pybind11_bindings.cpp
+ M cfgs/demo_config.yaml
+ M planners/FOP_cpp_wrapper.py
+ M planners/benchmark/planning.py
+ M planners/fiss_plus_cpp_wrapper.py
+THREADS=1 CLEARANCE=0 PARALLEL=0 PLANNERS=FOP FISS+ CEM MPPI affinity  2
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      45%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122          11          85           1          27         111
+NVIDIA GeForce RTX 5070 Ti, 615.71.10
+torch 2.8.0+cu128 cuda True numba 0.64.0

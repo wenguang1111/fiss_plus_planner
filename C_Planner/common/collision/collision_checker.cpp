@@ -130,6 +130,61 @@ std::vector<Eigen::Vector2d> compute_vehicle_polygon(double x, double y, double 
     return polygon;
 }
 
+int first_collision_step(
+    const FrenetTrajectory& traj,
+    const double* obstacles_array,
+    const int* num_vertices_array,
+    int num_time_steps,
+    int num_obstacles,
+    int max_vertices,
+    double vehicle_length,
+    double vehicle_width,
+    int time_step_now,
+    int check_resolution
+) {
+    int traj_len = traj.x.size();
+    int max_steps = std::min(traj_len, num_time_steps - time_step_now);
+
+    for (int step_idx = 0; step_idx < max_steps; step_idx += check_resolution) {
+        // Compute ego vehicle polygon at this step
+        auto ego_poly = compute_vehicle_polygon(
+            traj.x[step_idx],
+            traj.y[step_idx],
+            traj.yaw[step_idx],
+            vehicle_length,
+            vehicle_width
+        );
+
+        int time_step = time_step_now + step_idx;
+
+        // Check against all obstacles at this time step
+        for (int obs_idx = 0; obs_idx < num_obstacles; obs_idx++) {
+            // Get vertex count for this obstacle at this time step
+            int vertex_count = num_vertices_array[time_step * num_obstacles + obs_idx];
+
+            if (vertex_count <= 0) {
+                continue;
+            }
+
+            // Extract obstacle polygon from flat array
+            std::vector<Eigen::Vector2d> obs_poly;
+            for (int v = 0; v < vertex_count; v++) {
+                int array_idx = (time_step * num_obstacles + obs_idx) * max_vertices * 2 + v * 2;
+                obs_poly.push_back({
+                    obstacles_array[array_idx],
+                    obstacles_array[array_idx + 1]
+                });
+            }
+
+            // Check collision between ego and obstacle
+            if (polygon_collision(ego_poly, obs_poly)) {
+                return step_idx;
+            }
+        }
+    }
+    return traj_len;
+}
+
 std::vector<FrenetTrajectory> check_collision(
     const std::vector<FrenetTrajectory>& trajs,
     const double* obstacles_array,
@@ -143,59 +198,17 @@ std::vector<FrenetTrajectory> check_collision(
     int check_resolution
 ) {
     std::vector<FrenetTrajectory> passed_trajs;
-    
-    // Check each trajectory for collisions
+
     for (const auto& traj : trajs) {
-        bool has_collision = false;
-        
-        // Check trajectory points
-        int traj_len = traj.x.size();
-        int max_steps = std::min(traj_len, num_time_steps - time_step_now);
-        
-        for (int step_idx = 0; step_idx < max_steps && !has_collision; step_idx += check_resolution) {
-            // Compute ego vehicle polygon at this step
-            auto ego_poly = compute_vehicle_polygon(
-                traj.x[step_idx], 
-                traj.y[step_idx],
-                traj.yaw[step_idx],
-                vehicle_length, 
-                vehicle_width
-            );
-            
-            int time_step = time_step_now + step_idx;
-            
-            // Check against all obstacles at this time step
-            for (int obs_idx = 0; obs_idx < num_obstacles && !has_collision; obs_idx++) {
-                // Get vertex count for this obstacle at this time step
-                int vertex_count = num_vertices_array[time_step * num_obstacles + obs_idx];
-                
-                if (vertex_count <= 0) {
-                    continue;
-                }
-                
-                // Extract obstacle polygon from flat array
-                std::vector<Eigen::Vector2d> obs_poly;
-                for (int v = 0; v < vertex_count; v++) {
-                    int array_idx = (time_step * num_obstacles + obs_idx) * max_vertices * 2 + v * 2;
-                    obs_poly.push_back({
-                        obstacles_array[array_idx],
-                        obstacles_array[array_idx + 1]
-                    });
-                }
-                
-                // Check collision between ego and obstacle
-                if (polygon_collision(ego_poly, obs_poly)) {
-                    has_collision = true;
-                }
-            }
-        }
-        
+        int first = first_collision_step(traj, obstacles_array, num_vertices_array, num_time_steps, num_obstacles,
+                                         max_vertices, vehicle_length, vehicle_width, time_step_now,
+                                         check_resolution);
         // Add trajectory to result if no collision
-        if (!has_collision) {
+        if (first >= static_cast<int>(traj.x.size())) {
             passed_trajs.push_back(traj);
             passed_trajs.back().collision_passed = true;
         }
     }
-    
+
     return passed_trajs;
 }

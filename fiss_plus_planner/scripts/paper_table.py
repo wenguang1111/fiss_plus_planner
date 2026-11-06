@@ -10,6 +10,7 @@ Per planner and N:
     N_fail   share of the input scenarios without success (a scenario that fails in its first cycle has no row),
              split into fail_plan (no feasible trajectory: step_number_for_break > 0, or no row) and fail_stop
              (develop ends a run as unsuccessful when the speed drops below 0.01 m/s)
+    clear_fb share of the cycles re-planned without the safe following distance (runs with SAFETY.check_clearance)
     p_B      SP only: mean share of the cycles in which SP falls back to FOP ('Percent_FOP_Intervence')
 --paper DIR adds the paper's own FOP / FISS+ / SP CSVs as rows with source 'paper' (not used for J_common).
 Writes table_long.csv and table_paper_layout.csv (metric x method rows, N columns) into --dir.
@@ -65,7 +66,9 @@ def main():
                  J_all=d.final_trajector_cost.mean(), J_common=d.reindex(common).final_trajector_cost.mean(),
                  t_ms=1e3 * d["average runtime_plan [s]"].mean(), t_warm=1e3 * d["runtime history [s]"].map(warm).mean(),
                  trajs_per_cycle=d.num_trajs_generated.mean(),
-                 p_B=d.Percent_FOP_Intervence.mean() if p == "SP" else float("nan"))
+                 p_B=d.Percent_FOP_Intervence.mean() if p == "SP" else float("nan"),
+                 clear_fb=(100 * d.num_clearance_fallbacks / d.steps).mean() if "num_clearance_fallbacks" in d
+                 else float("nan"))
             for (p, n, src), d in runs.items()]
     table = pd.DataFrame(rows).sort_values(["source", "planner", "N"])
     table.to_csv(os.path.join(args.dir, "table_long.csv"), index=False)
@@ -73,7 +76,7 @@ def main():
     order = [p for p in ["FOP", "FISS+", "CEM", "MPPI", "SP"] if p in set(table.planner)]
     now = table[table.source == "now"]
     layout = pd.concat({metric: now.pivot(index="planner", columns="N", values=metric).reindex(order).dropna(how="all")
-                        for metric in ["J_common", "J_all", "t_ms", "t_warm", "p_B", "N_fail", "success", "fail_plan", "fail_stop",
+                        for metric in ["J_common", "J_all", "t_ms", "t_warm", "p_B", "clear_fb", "N_fail", "success", "fail_plan", "fail_stop",
                                        "trajs_per_cycle"]})
     layout.to_csv(os.path.join(args.dir, "table_paper_layout.csv"))
 

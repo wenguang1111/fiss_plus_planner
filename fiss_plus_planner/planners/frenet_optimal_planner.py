@@ -14,6 +14,8 @@ from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, Frene
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.common.utils import prepare_trajectory_array, check_trajectories_collision
 from fiss_plus_planner.planners.common.utils import check_trajectories_collision_parallel_static
+from fiss_plus_planner.planners.common.scenario.obstacle_frenet import (obstacle_frenet_bounds, clearance_baseline,
+                                                                          clearance_first_violation)
 from typing import Tuple
 
 
@@ -32,6 +34,7 @@ class Stats(object):
         self.time_step_have_to_break = 0 # for the code to break early when no feasible traj found in planning.py
         self.success = False
         self.num_FOP_intervention = 0 # only for sparse_planner_fop
+        self.num_clearance_fallbacks = 0 # cycles re-planned without the safe following distance
         
     def __add__(self, other):
         self.num_iter += other.num_iter
@@ -39,6 +42,7 @@ class Stats(object):
         self.num_trajs_validated += other.num_trajs_validated
         self.num_collison_checks += other.num_collison_checks
         self.num_FOP_intervention += other.num_FOP_intervention
+        self.num_clearance_fallbacks += getattr(other, "num_clearance_fallbacks", 0)  # the C++ wrapper Stats has none
         return self
     
     def average(self, value: int):
@@ -71,6 +75,16 @@ class FrenetOptimalPlannerSettings(object):
         self.check_obstacle = True          # True if check collison with obstacles
         self.check_boundary = True          # True if check collison with road boundaries
 
+        # Safe following distance (SAFETY config), as the C++ planners of the Experiment branch: from
+        # clearance_grace_time on, gap >= clearance_min_gap + clearance_time_gap * v to obstacles ahead in the path
+        self.check_clearance = False
+        self.clearance_time_gap = 2.0       # [s]
+        self.clearance_min_gap = 3.0        # [m] ego front to obstacle rear
+        self.clearance_lateral_margin = 0.2 # [m] added on each ego side for the in-path test
+        self.clearance_grace_time = 1.0     # [s] start of the horizon without the requirement
+        self.clearance_recovery_time = 3.0  # [s] a gap below the target is restored within this time
+        self.clearance_fallback = True      # plan without it if no candidate keeps the gap (planning.py)
+
 class FrenetOptimalPlanner(object):
     def __init__(self, planner_settings: FrenetOptimalPlannerSettings, ego_vehicle: Vehicle, 
                  obstacles_array: np.ndarray = None, obstacles_num_vertices: np.ndarray = None):
@@ -88,6 +102,12 @@ class FrenetOptimalPlanner(object):
         
         # Statistics
         self.stats = Stats()
+
+        # Safe following distance: obstacle extents in the Frenet frame (per reference line) and the baseline gap
+        # of the current cycle; clearance_suspended is set by planning.py for the re-plan without it
+        self.clearance_suspended = False
+        self._clearance_bounds = None
+        self._clearance_baseline = None
 
     def get_samples(self):
         """ Get sampling parameters d, s_d, t """
@@ -247,10 +267,53 @@ class FrenetOptimalPlanner(object):
             passed.append(i)
         return [trajs[i] for i in passed]
 
+    def clearance_active(self) -> bool:
+        return (self.settings.check_clearance and not self.clearance_suspended and self.cubic_spline is not None
+                and self.obstacles_array is not None and self.obstacles_array.size > 0)
+
+    def clearance_first_steps(self, trajs: list, time_step_now: int) -> np.ndarray:
+        """First step of each trajectory closer than the safe following distance (its length if none). All
+        candidates of a cycle start at the ego state, which defines the baseline gap."""
+        lengths = np.array([len(fp.s) for fp in trajs], dtype=np.int64)
+        if len(trajs) == 0 or not self.clearance_active():
+            return lengths
+        st = self.settings
+        if self._clearance_bounds is None or self._clearance_bounds[0] is not self.cubic_spline:
+            self._clearance_bounds = (self.cubic_spline, obstacle_frenet_bounds(
+                self.cubic_spline, self.obstacles_array, self.obstacles_num_vertices))
+        bounds = self._clearance_bounds[1]
+        half_width = 0.5 * self.vehicle.w + st.clearance_lateral_margin
+        half_length = 0.5 * self.vehicle.l
+        start = (time_step_now, trajs[0].s[0], trajs[0].d[0], trajs[0].s_d[0])
+        if self._clearance_baseline is None or self._clearance_baseline[0] != start:
+            horizon = int(np.ceil(st.max_t / st.tick_t))
+            self._clearance_baseline = (start, clearance_baseline(bounds, *start[1:], time_step_now, horizon,
+                                                                  st.tick_t, half_width, half_length))
+        k0, gap = self._clearance_baseline[1]
+        max_len = int(lengths.max())
+        s, d, s_d = (np.zeros((len(trajs), max_len)) for _ in range(3))
+        for i, fp in enumerate(trajs):
+            s[i, :lengths[i]], d[i, :lengths[i]], s_d[i, :lengths[i]] = fp.s, fp.d, fp.s_d
+        first_step = int(np.ceil(st.clearance_grace_time / st.tick_t - 1e-9))
+        return clearance_first_violation(s, d, s_d, lengths, bounds, k0, gap, time_step_now, first_step, half_width,
+                                         half_length, st.clearance_min_gap, st.clearance_time_gap, st.tick_t,
+                                         st.clearance_recovery_time)
+
+    def check_clearance(self, trajs: list, time_step_now: int = 0) -> list:
+        """Trajectories that keep the safe following distance (all if the check is off)."""
+        if not self.clearance_active():
+            return trajs
+        first = self.clearance_first_steps(trajs, time_step_now)
+        return [fp for fp, k in zip(trajs, first) if k >= len(fp.s)]
+
     def check_collision_multithread(self, trajs: list, time_step_now: int = 0) -> list:
         if len(trajs) == 0 or self.obstacles_array is None or self.obstacles_num_vertices is None:
             return trajs
-        
+        # safe following distance first (cheap interval test before the polygon check, as in C++)
+        trajs = self.check_clearance(trajs, time_step_now)
+        if len(trajs) == 0:
+            return trajs
+
         # Prepare trajectory data
         trajectories, traj_lengths = prepare_trajectory_array(trajs, return_lengths=True)
         

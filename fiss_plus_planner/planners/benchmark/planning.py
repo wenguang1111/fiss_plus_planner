@@ -1,4 +1,5 @@
 import os
+import sys
 import signal
 import time
 import csv
@@ -36,8 +37,11 @@ from fiss_plus_planner.planners.fiss_planner import FissPlanner, FissPlannerSett
 from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPlusPlannerSettings
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
+# CVAE_efficient_sampling at the commit of the paper's model (3f50130) imports its normalizer as a top-level module
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'CVAE_efficient_sampling'))
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
+from fiss_plus_planner.planners.gaussian_planner_cpp import GaussianPlannerSettings_CPP, GaussianPlanner_CPP
 from fiss_plus_planner.planners.FOP_cpp_wrapper import FOP_CPP_Wrapper
 from fiss_plus_planner.planners.CEM_cpp_wrapper import CEM_CPP_Wrapper
 from fiss_plus_planner.planners.cem_planner import CEMPlanner, CEMPlannerSettings
@@ -162,9 +166,10 @@ def prepare_obstacles_polygons_time_series(
 
 def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProblem, vehicle_params: DictConfig, method: str, num_samples: tuple, 
                             input_dir: str, file: str, output_dir: str, number_threads: int, runtime_measurement: bool, collect_data_for_ml: bool,
-                            sampler_cfg: dict = None) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
+                            sampler_cfg: dict = None, safety_cfg: dict = None) -> Tuple[bool, Trajectory, float, list, Stats, list, list]:
     """sampler_cfg: settings of the iterative sampling planners, {'CEM': {...}, 'MPPI': {...}} (config sections),
-    and 'SP_NUM_SAMPLES' (CVAE samples of Sparse_FOP)."""
+    and 'SP_NUM_SAMPLES' / 'SP_CVAE' / 'SP_FALLBACK' / 'SP_CVAE_BACKEND' (CVAE samples, CVAE version and FOP fallback of Sparse_FOP / Sparse_CPP, CVAE inference of Sparse_CPP). safety_cfg: safe following distance of the Python planners
+    (SAFETY config, FrenetOptimalPlannerSettings.check_clearance ...)."""
     sampler_cfg = sampler_cfg or {}
     # Plan a global route
     global_planner = GlobalPlanner()
@@ -306,6 +311,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = SparsePlannerFOPSettings(num_width, num_speed, num_t, input_dir, file)
         if sampler_cfg.get('SP_NUM_SAMPLES'):
             planner_settings.num_samples = int(sampler_cfg['SP_NUM_SAMPLES'])  # CVAE samples; FOP fallback = N_W x N_S x N_T
+        if sampler_cfg.get('SP_CVAE'):
+            planner_settings.cvae_version = sampler_cfg['SP_CVAE']
+        if sampler_cfg.get('SP_FALLBACK') is not None:
+            planner_settings.fallback = bool(sampler_cfg['SP_FALLBACK'])
         planner = SparsePlannerFOP(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
     elif method == 'FOP_CPP':
@@ -331,14 +340,46 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = FissPlusPlannerSettings(num_width, num_speed, num_t)
         planner = FissPlusCppWrapper(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads, runtime_measurement)
         use_cpp_planner = True
-    elif method == 'Sparse_CPP':
-        # Use C++ Sparse Planner with pybind11
-        planner_settings = SparsePlannerSettings_CPP(num_width, num_speed, num_t, input_dir, file)
-        planner = SparsePlanner_CPP(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+    elif method in ('Sparse_CPP', 'Gaussian_CPP'):
+        # Use C++ Sparse Planner with pybind11; Gaussian_CPP: the same with the conditional Gaussian / mixture instead
+        # of the CVAE (SP_GAUSSIAN_WEIGHTS = checkpoint of scripts/train_sp_sampler.py)
+        if method == 'Gaussian_CPP':
+            planner_settings = GaussianPlannerSettings_CPP(num_width, num_speed, num_t, input_dir, file)
+            if sampler_cfg.get('SP_GAUSSIAN_WEIGHTS'):
+                planner_settings.gaussian_weights = sampler_cfg['SP_GAUSSIAN_WEIGHTS']
+        else:
+            planner_settings = SparsePlannerSettings_CPP(num_width, num_speed, num_t, input_dir, file)
+        if sampler_cfg.get('SP_NUM_SAMPLES'):
+            planner_settings.num_samples = int(sampler_cfg['SP_NUM_SAMPLES'])
+        if sampler_cfg.get('SP_CVAE'):
+            planner_settings.cvae_version = sampler_cfg['SP_CVAE']
+        if sampler_cfg.get('SP_FALLBACK') is not None:
+            planner_settings.fallback = bool(sampler_cfg['SP_FALLBACK'])
+        if sampler_cfg.get('SP_CVAE_BACKEND'):
+            planner_settings.cvae_backend = sampler_cfg['SP_CVAE_BACKEND']
+        if sampler_cfg.get('SP_SAMPLER'):
+            planner_settings.sampler = sampler_cfg['SP_SAMPLER']
+        if sampler_cfg.get('SP_SHADOW_SAMPLERS'):
+            planner_settings.shadow_samplers = list(sampler_cfg['SP_SHADOW_SAMPLERS'])
+            os.makedirs(output_dir, exist_ok=True)
+            planner_settings.shadow_log = os.path.join(output_dir, 'shadow_eval.csv')
+        planner_cls = GaussianPlanner_CPP if method == 'Gaussian_CPP' else SparsePlanner_CPP
+        planner = planner_cls(planner_settings, vehicle, obstacles_array, obstacles_num_vertices, number_threads,
+                              runtime_measurement)
         use_cpp_planner = True
     else:
         print("ERROR: Planning method entered is not recognized!")
         raise ValueError
+
+    # Safe following distance (SAFETY config), shared by the Python planners through check_collision_multithread
+    for name, value in (safety_cfg or {}).items():
+        if not hasattr(planner.settings, name):
+            raise KeyError(f"unknown SAFETY setting: {name}")
+        setattr(planner.settings, name, value)
+    if use_cpp_planner and getattr(planner.settings, 'check_clearance', False):
+        raise NotImplementedError("the C++ planners of develop have no safe following distance: SAFETY.check_clearance False")
+    clearance_fallback = (not use_cpp_planner and planner.settings.check_clearance
+                          and planner.settings.clearance_fallback)
 
     csp_ego, ref_ego_lane_pts = planner.generate_frenet_frame(ego_lane_pts)
 
@@ -366,7 +407,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     goal_reached = False
     next_state = initial_state
     best_trajs_all_time_steps = []
-    
+    stop_on_standstill = sampler_cfg.get('STOP_ON_STANDSTILL', True) is not False
+    standing = False
+    standstill_cycles = 0
+
     for i in range(final_time_step):
         num_cycles += 1
         
@@ -384,6 +428,17 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
 
         start_time = time.time()
         best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
+        if best_traj_ego is None and clearance_fallback and planner.clearance_active():
+            # no candidate keeps the safe following distance: plan the cycle again without it (counted, timed)
+            first_stats = planner.stats
+            first_image_time = getattr(planner, 'time_image_generation', 0.0)
+            planner.clearance_suspended = True
+            best_traj_ego = planner.plan(current_frenet_state, max_speed, obstacles_all, i, next_state)
+            planner.clearance_suspended = False
+            planner.stats += first_stats
+            planner.stats.num_clearance_fallbacks += 1
+            if hasattr(planner, 'time_image_generation'):
+                planner.time_image_generation += first_image_time
         end_time = time.time()
 
         best_trajs_all_time_steps.append(best_traj_ego)
@@ -393,7 +448,7 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.time_step_have_to_break = i
             break
         processing_time = (end_time - start_time)
-        if method == 'Sparse_FOP' or method == 'Sparse' or method == 'Sparse_CPP':
+        if method in ('Sparse_FOP', 'Sparse', 'Sparse_CPP', 'Gaussian_CPP'):
             # the BEV image is an input of the sparse planners, not planning time (also in runtime_history since 2026-11-02)
             processing_time -= planner.time_image_generation
             stats.num_FOP_intervention += planner.num_FOP_intervention
@@ -450,10 +505,18 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                 break
         
         #break when the speed is close to zero, this is a simple model with out standstill feature.
+        # STOP_ON_STANDSTILL False: keep simulating at standstill (no standstill model: heading by finite differences)
         if abs(next_state.velocity) < 0.01:
-            goal_reached = True
-            stats.success = False
-            break
+            if stop_on_standstill:
+                goal_reached = True
+                stats.success = False
+                break
+            if not standing:
+                print(f"Standstill at time step {i}")
+            standing = True
+            standstill_cycles += 1
+        else:
+            standing = False
 
         if show_animation:  # pragma: no cover
             plt.cla()
@@ -483,6 +546,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.success = True
             goal_reached = True
             
+    if not stop_on_standstill:
+        print(f"Standstill cycles {standstill_cycles} of {num_cycles}, standing at the end {standing}")
     # construct the final frenet trajectory and calculate the final cost
     final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list, global_state_list)
     final_trajectory.cost_final = planner.cost_function.final_trajectory_cost(
@@ -644,7 +709,12 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
                 scenario, planning_problem, vehicle_params, method, num_samples, input_dir, file, output_dir, 
                 number_threads, runtime_measurement, collect_data_for_ml,
                 sampler_cfg={'CEM': cfg.get('CEM'), 'MPPI': cfg.get('MPPI'),
-                             'SP_NUM_SAMPLES': cfg.get('SP_NUM_SAMPLES')})
+                             'SP_NUM_SAMPLES': cfg.get('SP_NUM_SAMPLES'), 'SP_CVAE': cfg.get('SP_CVAE'),
+                             'SP_CVAE_BACKEND': cfg.get('SP_CVAE_BACKEND'),
+                             'SP_FALLBACK': cfg.get('SP_FALLBACK'), 'SP_GAUSSIAN_WEIGHTS': cfg.get('SP_GAUSSIAN_WEIGHTS'),
+                             'SP_SAMPLER': cfg.get('SP_SAMPLER'), 'SP_SHADOW_SAMPLERS': cfg.get('SP_SHADOW_SAMPLERS'),
+                             'STOP_ON_STANDSTILL': cfg.get('STOP_ON_STANDSTILL', True)},
+                safety_cfg=cfg.get('SAFETY'))
 
         if ego_vehicle_trajectory is None:
             print("No ego vehicle trajectory found")
@@ -663,6 +733,8 @@ def planning(cfg: dict, output_dir: str, input_dir: str, file: str) -> Stats:
         # record_sampling_parameters_to_csv(fplist)
 
     except RuntimeError:
+        import traceback
+        traceback.print_exc()  # also torch / CUDA errors are RuntimeErrors: keep their reason in the log
         print("   ", f"{file} not feasible!")
         return
 
