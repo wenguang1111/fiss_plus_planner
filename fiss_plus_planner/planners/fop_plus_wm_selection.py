@@ -39,6 +39,11 @@ class FopPlusWMSelectionSettings(FrenetOptimalPlannerSettings):
         self.world_model_rollout = 5
         self.world_model_action_horizon = 5
         self.world_model_batch_size = 16
+        # "tensorrt": fp16 TensorRT engine (built once, cached next to the weights; needs CUDA).
+        # "torch": the PyTorch model, under fp16 autocast when world_model_fp16 is set.
+        self.world_model_backend = "tensorrt"
+        # Torch backend only: fp16 autocast on CUDA (about 2x faster); predictions are cast back to fp32.
+        self.world_model_fp16 = True
         self.world_model_risk_step_weights = (0.2, 0.2, 0.2, 0.2, 0.2)
         self.world_model_starting_point = 8
         self.world_model_front = 20
@@ -68,6 +73,9 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
         # the longer candidate sequence to supply its full sequence of planned actions.
         self.settings.min_t = 1.0
         self.settings.max_t = 1.0
+        # With min_t == max_t every time sample is identical, so extra samples only
+        # duplicate candidates and multiply the world-model rollouts for no change in selection.
+        self.settings.num_t = 1
         self.settings.tick_t = 0.1
         risk_weights = torch.as_tensor(
             self.settings.world_model_risk_step_weights,
@@ -111,6 +119,7 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
             str(self.settings.world_model_weights_path), map_location=self.settings.device
         ))
         self.world_model.eval()
+        self._trt_world_model = self._create_trt_world_model() if self._uses_tensorrt() else None
 
         reward_module = _load_module_from_path(
             "fiss_plus_planner._fop_plus_world_model_reward",
@@ -287,7 +296,37 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
         ), dim=1)
         local_actions = local_positions - previous_positions
         return local_actions if batched else local_actions.squeeze(0)
-    
+
+    def _uses_tensorrt(self) -> bool:
+        backend = self.settings.world_model_backend
+        if backend not in ("tensorrt", "torch"):
+            raise ValueError(f"Unknown world_model_backend '{backend}'")
+        if backend == "tensorrt" and self.settings.device.type != "cuda":
+            print("Warning: TensorRT needs CUDA; FOP+_WM falls back to the PyTorch world model")
+            return False
+        return backend == "tensorrt"
+
+    def _create_trt_world_model(self):
+        # Imported here so the torch backend works without TensorRT installed.
+        from fiss_plus_planner.planners.world_model_trt import TensorRTWorldModel
+
+        return TensorRTWorldModel(
+            self.world_model,
+            self.settings.world_model_weights_path,
+            state_shape=(self.settings.world_model_history, self.settings.img_size, self.settings.img_size),
+            action_shape=(self.settings.world_model_action_horizon, 2),
+            max_batch_size=self.settings.world_model_batch_size,
+            device=self.settings.device,
+        )
+
+    def _predict_next_state(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        """One world-model step on the configured backend; output always fp32."""
+        if self._trt_world_model is not None:
+            return self._trt_world_model(state, action)
+        use_fp16 = self.settings.world_model_fp16 and self.settings.device.type == "cuda"
+        with torch.autocast("cuda", dtype=torch.float16, enabled=use_fp16):
+            prediction, _ = self.world_model(state, action)
+        return prediction.float()
 
     def _score_candidates(self, candidates: List[FrenetTrajectory], images: List[Image.Image],
                           ego_pos: np.ndarray, ego_yaw: float
@@ -312,7 +351,7 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
                     action = self.correct_reference_frame(
                         batch_actions, step, action_horizon
                     )
-                    prediction, _ = self.world_model(state, action)
+                    prediction = self._predict_next_state(state, action)
                     collision_risk = torch.stack([
                         self.collision_risk(prediction[i:i + 1])
                         for i in range(batch_size)
@@ -370,7 +409,7 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
                 action = self.correct_reference_frame(
                     actions, step, self.settings.world_model_action_horizon
                 )
-                prediction, _ = self.world_model(state, action)
+                prediction = self._predict_next_state(state, action)
                 predictions.append(prediction[0, 0].detach().cpu().numpy())
                 state = torch.cat((state[:, 1:], prediction), dim=1)
 

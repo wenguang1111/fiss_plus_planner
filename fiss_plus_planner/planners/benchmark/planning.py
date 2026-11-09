@@ -52,8 +52,6 @@ from fiss_plus_planner.planners.sparse_planner_optimized import SparsePlannerOpt
 from fiss_plus_planner.planners.sparse_planner_fop import SparsePlannerFOPSettings, SparsePlannerFOP
 from fiss_plus_planner.planners.sparse_planner_CVAE import SparsePlannerCVAESettings, SparsePlannerCVAE
 from fiss_plus_planner.planners.sparse_planner_CVAE_rl import SparsePlannerWorldModelSettings, SparsePlannerWorldModel
-from fiss_plus_planner.planners.sparse_planner_CVAE_rl_offline import SparsePlannerRLoffline, SparsePlannerRLofflineSettings
-from fiss_plus_planner.planners.sparse_planner_CVAE_wm_selection import SparsePlannerWMSelection, SparsePlannerWMSelectionSettings
 from fiss_plus_planner.planners.sparse_planner_CVAE_rnd_selection import SparsePlannerCVAERandomSelection, SparsePlannerCVAERandomSettings
 
 
@@ -317,10 +315,14 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             planner = SparsePlannerWorldModel(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
             use_cpp_planner = False
     elif method == 'Sparse_RLoffline':
+            # Imported lazily: sparse_planner_CVAE_rl_offline.py is not in the repo yet.
+            from fiss_plus_planner.planners.sparse_planner_CVAE_rl_offline import SparsePlannerRLoffline, SparsePlannerRLofflineSettings
             planner_settings = SparsePlannerRLofflineSettings(num_width, num_speed, num_t, input_dir, file)
             planner = SparsePlannerRLoffline(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
             use_cpp_planner = False
     elif method == 'Sparse_WM_selection':
+            # Imported lazily: sparse_planner_CVAE_wm_selection.py is not in the repo yet.
+            from fiss_plus_planner.planners.sparse_planner_CVAE_wm_selection import SparsePlannerWMSelection, SparsePlannerWMSelectionSettings
             planner_settings = SparsePlannerWMSelectionSettings(num_width, num_speed, num_t, input_dir, file)
             planner = SparsePlannerWMSelection(planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
             use_cpp_planner = False
