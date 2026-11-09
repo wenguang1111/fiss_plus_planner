@@ -5,6 +5,7 @@ import yaml
 import csv
 
 from fiss_plus_planner.planners.benchmark.planning import planning
+from demo_cr import MEASUREMENT_CSV_HEADER, append_measurement_to_csv
 
 if __name__ == '__main__':
     repo_dir = os.getcwd()
@@ -31,15 +32,18 @@ if __name__ == '__main__':
         if os.path.exists(csv_path):
             with open(csv_path, 'r', newline='', encoding='utf-8') as csv_file:
                 reader = csv.DictReader(csv_file)
+                expected_fields = next(csv.reader([MEASUREMENT_CSV_HEADER]))
+                if reader.fieldnames is not None and reader.fieldnames != expected_fields:
+                    raise ValueError(
+                        f'{csv_path} has a different header than the current measurement format; '
+                        'move it away or delete it before resuming.'
+                    )
                 if reader.fieldnames is not None:
                     for row in reader:
                         existing_scenarios.add(row['scenario'])
         else:
             with open(csv_path, 'w', newline='', encoding='utf-8') as csv_file:
-                csv_file.write(
-                    'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                    'num_collision_checks,average_cost,max_cost, step_number_for_break, success, reached_final_time\n'
-                )
+                csv_file.write(MEASUREMENT_CSV_HEADER)
     
     if cfg['FILES']:
         # Only run the specified scenario files under the input directory
@@ -51,14 +55,7 @@ if __name__ == '__main__':
             measurement = planning(cfg, output_dir, input_dir, file)
             
             if save_measurments and measurement is not None:
-                with open(csv_path, 'a', newline='', encoding='utf-8') as csv_file:
-                    max_cost = max(measurement.best_traj_costs) if measurement.best_traj_costs else 0.0
-                    runtime_history_str = json.dumps(measurement.runtime_history)
-                    csv_file.write(
-                        f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
-                        f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-                        f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success},{measurement.reached_final_time}\n'
-                    )
+                append_measurement_to_csv(csv_path, file, measurement)
     else:
         for i, file in enumerate(os.listdir(input_dir)):
             if save_measurments and file in existing_scenarios:
@@ -68,11 +65,4 @@ if __name__ == '__main__':
             measurement = planning(cfg, output_dir, input_dir, file)
             
             if save_measurments and measurement is not None:
-                with open(csv_path, 'a', newline='', encoding='utf-8') as csv_file:
-                    max_cost = max(measurement.best_traj_costs) if measurement.best_traj_costs else 0.0
-                    runtime_history_str = json.dumps(measurement.runtime_history)
-                    csv_file.write(
-                        f'{file},{measurement.step_number},{measurement.average_runtime},"{runtime_history_str}",'
-                        f'{measurement.num_trajs_generated},{measurement.num_trajs_validated},'
-                        f'{measurement.num_collison_checks},{measurement.average_cost},{max_cost}, {measurement.time_step_have_to_break},{measurement.success},{measurement.reached_final_time}\n'
-                    )
+                append_measurement_to_csv(csv_path, file, measurement)

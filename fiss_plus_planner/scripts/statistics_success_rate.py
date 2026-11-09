@@ -12,9 +12,9 @@ MEASUREMENTS_DIR = (
 
 
 DEFAULT_CSVS = {
-    "FISS+": MEASUREMENTS_DIR / "measurement_FISS+.csv",
-    "FOP+": MEASUREMENTS_DIR / "measurement_FOP+.csv",
-    "FOP+ random": MEASUREMENTS_DIR / "measurement_FOP+_random.csv",
+    # "FISS+": MEASUREMENTS_DIR / "measurement_FISS+.csv",
+    # "FOP+": MEASUREMENTS_DIR / "measurement_FOP+.csv",
+    # "FOP+ random": MEASUREMENTS_DIR / "measurement_FOP+_random.csv",
     "FOP+ WM": MEASUREMENTS_DIR / "measurement_FOP+_WM.csv",
     # "Sparse CVAE": MEASUREMENTS_DIR / "measurement_Sparse_CVAE.csv",
     # "Sparse RLoffline": MEASUREMENTS_DIR / "measurement_Sparse_RLoffline.csv",
@@ -147,6 +147,13 @@ def calculate_statistics(csv_path: Path):
 
             if not row.get("scenario"):
                 continue
+
+            if None in row.values():
+                raise ValueError(
+                    f"Row for {row['scenario']} (line {reader.line_num}) has fewer "
+                    f"columns than the header; the CSV mixes measurement formats: "
+                    f"{csv_path}"
+                )
 
             total += 1
             if runtime_column:
@@ -459,29 +466,29 @@ def main() -> None:
         )
     )
 
-    parser.add_argument(
-            "--fiss",
-            type=Path,
-            default=DEFAULT_CSVS["FISS+"],
-            help=(
-                "FISS+ measurement CSV "
-                f"(default: {DEFAULT_CSVS['FISS+' ]})"
-            ),
-    )
+    # parser.add_argument(
+    #         "--fiss",
+    #         type=Path,
+    #         default=DEFAULT_CSVS["FISS+"],
+    #         help=(
+    #             "FISS+ measurement CSV "
+    #             f"(default: {DEFAULT_CSVS['FISS+' ]})"
+    #         ),
+    # )
 
-    parser.add_argument(
-        "--fopplus",
-        type=Path,
-        default=DEFAULT_CSVS["FOP+"],
-        help=f"FOP+ measurement CSV (default: {DEFAULT_CSVS['FOP+']})",
-    )
+    # parser.add_argument(
+    #     "--fopplus",
+    #     type=Path,
+    #     default=DEFAULT_CSVS["FOP+"],
+    #     help=f"FOP+ measurement CSV (default: {DEFAULT_CSVS['FOP+']})",
+    # )
 
-    parser.add_argument(
-        "--fopplus-random",
-        type=Path,
-        default=DEFAULT_CSVS["FOP+ random"],
-        help=f"FOP+ random-selection measurement CSV (default: {DEFAULT_CSVS['FOP+ random']})",
-    )
+    # parser.add_argument(
+    #     "--fopplus-random",
+    #     type=Path,
+    #     default=DEFAULT_CSVS["FOP+ random"],
+    #     help=f"FOP+ random-selection measurement CSV (default: {DEFAULT_CSVS['FOP+ random']})",
+    # )
 
     parser.add_argument(
         "--fopplus-wm",
@@ -543,9 +550,9 @@ def main() -> None:
     args = parser.parse_args()
 
     csv_files = {
-        "FISS+": args.fiss,
-        "FOP+": args.fopplus,
-        "FOP+ random": args.fopplus_random,
+        # "FISS+": args.fiss,
+        # "FOP+": args.fopplus,
+        # "FOP+ random": args.fopplus_random,
         "FOP+ WM": args.fopplus_wm,
         # "Sparse CVAE": args.cvae,
         # "Sparse RLoffline": args.rloffline,

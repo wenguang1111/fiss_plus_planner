@@ -41,9 +41,9 @@ class FopPlusWMSelectionSettings(FrenetOptimalPlannerSettings):
         self.world_model_batch_size = 16
         # "tensorrt": fp16 TensorRT engine (built once, cached next to the weights; needs CUDA).
         # "torch": the PyTorch model, under fp16 autocast when world_model_fp16 is set.
-        self.world_model_backend = "tensorrt"
+        self.world_model_backend = "torch"
         # Torch backend only: fp16 autocast on CUDA (about 2x faster); predictions are cast back to fp32.
-        self.world_model_fp16 = True
+        self.world_model_fp16 = False
         self.world_model_risk_step_weights = (0.2, 0.2, 0.2, 0.2, 0.2)
         self.world_model_starting_point = 8
         self.world_model_front = 20

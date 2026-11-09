@@ -18,6 +18,15 @@ def readExsistedScenarios(existing_entries):
     return existing_scenarios
 
 
+MEASUREMENT_CSV_HEADER = (
+    'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
+    'num_collision_checks,'
+    'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
+    'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
+    'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision,reached_final_time\n'
+)
+
+
 def append_measurement_to_csv(csv_path, file, measurement):
     if not hasattr(measurement, 'best_traj_costs'):
         return 
@@ -66,13 +75,7 @@ if __name__ == '__main__':
         os.makedirs(measurement_dir, exist_ok=True)
         csv_path = os.path.join(measurement_dir, 'measurement_' + name_planner + '.csv')
         with open(csv_path, 'w', newline='') as csv_file:
-            csv_file.write(
-                'scenario,steps,average runtime_plan [s],runtime history [s],num_trajs_generated,num_trajs_validated,'
-                'num_collision_checks,'
-                'average_cost,max_cost,final_trajector_cost, step_number_for_break, num_FOP_intervence_for_SP, Percent_FOP_Intervence, success,'
-                'rejected_dynamic_per_cycle,rejected_offroad_per_cycle,rejected_collision_per_cycle,'
-                'last_cycle_rejected_dynamic,last_cycle_rejected_offroad,last_cycle_rejected_collision,reached_final_time\n'
-            )
+            csv_file.write(MEASUREMENT_CSV_HEADER)
 
     if cfg['FILES']:
         # Only run the specified scenario files under the input directory
