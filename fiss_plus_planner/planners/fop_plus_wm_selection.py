@@ -11,12 +11,16 @@ from torchvision import transforms
 from commonroad.scenario.obstacle import Obstacle
 from commonroad.scenario.state import InitialState
 
+from fiss_plus_planner.planners.common import frenet_numba
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetState, FrenetTrajectory
 from fiss_plus_planner.planners.common.utils import transform_points_to_ego
 from fiss_plus_planner.planners.common.vehicle.vehicle import Vehicle
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planning.scenario_drawer import ScenarioDrawer
+
+
+WORLD_MODEL_DIR = Path(__file__).parent.parent.parent / "trajectory_planner_world_model"
 
 
 def _load_module_from_path(module_name: str, module_path: Path):
@@ -41,9 +45,9 @@ class FopPlusWMSelectionSettings(FrenetOptimalPlannerSettings):
         self.world_model_batch_size = 16
         # "tensorrt": fp16 TensorRT engine (built once, cached next to the weights; needs CUDA).
         # "torch": the PyTorch model, under fp16 autocast when world_model_fp16 is set.
-        self.world_model_backend = "torch"
+        self.world_model_backend = "tensorrt"
         # Torch backend only: fp16 autocast on CUDA (about 2x faster); predictions are cast back to fp32.
-        self.world_model_fp16 = False
+        self.world_model_fp16 = True
         self.world_model_risk_step_weights = (0.2, 0.2, 0.2, 0.2, 0.2)
         self.world_model_starting_point = 8
         self.world_model_front = 20
@@ -57,10 +61,7 @@ class FopPlusWMSelectionSettings(FrenetOptimalPlannerSettings):
         self.reference_path_length = 10
         self.img_size = 256
 
-        project_root = Path(__file__).parent.parent.parent
-        self.world_model_weights_path = (
-            project_root / "trajectory_planner_world_model" / "World_Model" / "best_world_model.pt"
-        )
+        self.world_model_weights_path = WORLD_MODEL_DIR / "World_Model" / "best_world_model.pt"
 
 
 class FopPlusWMSelectionPlanner(FopPlusPlanner):
@@ -99,11 +100,42 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
             obstacles_num_vertices=self.obstacles_num_vertices,
         )
 
-        project_root = Path(__file__).parent.parent.parent
-        world_model_dir = project_root / "trajectory_planner_world_model"
+        self._init_bev_predictor()
+
+        reward_module = _load_module_from_path(
+            "fiss_plus_planner._fop_plus_world_model_reward",
+            WORLD_MODEL_DIR / "world_model_evaluation" / "reward_function.py",
+        )
+        self.collision_risk = reward_module.CollisionRisk(
+            starting_point_x=self.settings.world_model_starting_point,
+            front=self.settings.world_model_front,
+            width=self.settings.world_model_width,
+        )
+
+        self.lateral_deviation_per_sample = reward_module.lateral_deviation_per_sample
+        self.progress_loss_per_sample = reward_module.progress_loss_per_sample
+
+        if str(WORLD_MODEL_DIR) not in sys.path:
+            sys.path.append(str(WORLD_MODEL_DIR))
+        self.inference_module = _load_module_from_path(
+            "fiss_plus_planner._fop_plus_cvae_inference",
+            WORLD_MODEL_DIR / "inference.py",
+        )
+        self.image_history: List[Tuple[int, Image.Image]] = []
+        self.ref_lane_pts_global: np.ndarray | None = None
+        self._failure_rollout_actions: torch.Tensor | None = None
+        self._failure_rollout_images: List[Image.Image] = []
+        self._last_candidate_collision_risks: List[float] = []
+        self._last_candidate_lateral_costs: List[float] = []
+        self._last_candidate_progress_costs: List[float] = []
+        self._last_candidate_total_costs: List[float] = []
+        self._last_scoring_time_step: int | None = None
+
+    def _init_bev_predictor(self) -> None:
+        """Load the world model that predicts each candidate's future BEV frames."""
         world_model_module = _load_module_from_path(
             "fiss_plus_planner._fop_plus_world_model",
-            world_model_dir / "models" / "world_model.py",
+            WORLD_MODEL_DIR / "models" / "world_model.py",
         )
         self.world_model = world_model_module.WorldModel(
             num_attention_blocks=1,
@@ -121,39 +153,22 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
         self.world_model.eval()
         self._trt_world_model = self._create_trt_world_model() if self._uses_tensorrt() else None
 
-        reward_module = _load_module_from_path(
-            "fiss_plus_planner._fop_plus_world_model_reward",
-            world_model_dir / "world_model_evaluation" / "reward_function.py",
-        )
-        self.collision_risk = reward_module.CollisionRisk(
-            starting_point_x=self.settings.world_model_starting_point,
-            front=self.settings.world_model_front,
-            width=self.settings.world_model_width,
-        )
-
-        self.lateral_deviation_per_sample = reward_module.lateral_deviation_per_sample
-        self.progress_loss_per_sample = reward_module.progress_loss_per_sample
-
-        if str(world_model_dir) not in sys.path:
-            sys.path.append(str(world_model_dir))
-        self.inference_module = _load_module_from_path(
-            "fiss_plus_planner._fop_plus_cvae_inference",
-            world_model_dir / "inference.py",
-        )
-        self.image_history: List[Tuple[int, Image.Image]] = []
-        self.ref_lane_pts_global: np.ndarray | None = None
-        self._failure_rollout_actions: torch.Tensor | None = None
-        self._failure_rollout_images: List[Image.Image] = []
-        self._last_candidate_collision_risks: List[float] = []
-        self._last_candidate_lateral_costs: List[float] = []
-        self._last_candidate_progress_costs: List[float] = []
-        self._last_candidate_total_costs: List[float] = []
-        self._last_scoring_time_step: int | None = None
-
     def generate_frenet_frame(self, centerline_pts: np.ndarray):
         cubic_spline, ref_lane_pts = super().generate_frenet_frame(centerline_pts)
         self.ref_lane_pts_global = ref_lane_pts
         return cubic_spline, ref_lane_pts
+
+    # Numba versions of the two FOP sampling steps; bit-identical to the Python ones they replace
+    # (~10 ms -> ~0.8 ms and ~3 ms -> ~0.9 ms for 100 candidates).
+    def calc_frenet_paths(self, frenet_state: FrenetState, samples=None) -> list:
+        return frenet_numba.calc_frenet_paths(
+            self, frenet_state, self.get_samples() if samples is None else samples
+        )
+
+    def calc_global_paths(self, fplist: list) -> list:
+        return frenet_numba.calc_global_paths(
+            self, fplist, frenet_numba.spline_coefficients(self.cubic_spline)
+        )
 
     def _update_image_history(self, time_step_now: int, current_state: InitialState) -> List[Image.Image]:
         image = self.scenario_drawer.create_scenario_img_at_time_step(
@@ -168,9 +183,15 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
         return [self.image_history[-1][1]] * self.settings.world_model_history
 
     def _candidate_actions(self, candidates: List[FrenetTrajectory], ego_pos: np.ndarray,
-                           ego_yaw: float) -> torch.Tensor:
-        """Convert each global trajectory to the ego-frame action deltas expected by the model."""
-        required_steps = self.settings.world_model_action_horizon + self.settings.world_model_rollout - 1
+                           ego_yaw: float, num_steps: int | None = None) -> torch.Tensor:
+        """Convert each global trajectory to the ego-frame action deltas expected by the model.
+
+        Each candidate yields ``num_steps`` deltas (default: what the world-model rollout consumes),
+        truncated or padded by repeating its last delta.
+        """
+        required_steps = num_steps or (
+            self.settings.world_model_action_horizon + self.settings.world_model_rollout - 1
+        )
         action_batches = []
 
         for candidate in candidates:
@@ -329,8 +350,9 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
         return prediction.float()
 
     def _score_candidates(self, candidates: List[FrenetTrajectory], images: List[Image.Image],
-                          ego_pos: np.ndarray, ego_yaw: float
+                          ego_pos: np.ndarray, ego_yaw: float, time_step_now: int
                           ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Return each candidate's weighted rollout collision risk and its ego-frame action deltas."""
         actions = self._candidate_actions(candidates, ego_pos, ego_yaw)
         image_tensor = torch.cat(
             [transforms.ToTensor()(image) for image in images], dim=0
@@ -415,18 +437,22 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
 
         if len(predictions) != self.settings.world_model_rollout:
             return False
+        return self._save_bev_rollout_plot(predictions, output_path, "World-model")
 
+    @staticmethod
+    def _save_bev_rollout_plot(frames: List[np.ndarray], output_path: str | Path, source: str) -> bool:
+        """Plot predicted BEV frames (values in [0, 1]) side by side, labelled with their source."""
         import matplotlib.pyplot as plt
 
         figure, axes = plt.subplots(
-            1, len(predictions), figsize=(4 * len(predictions), 4), squeeze=False
+            1, len(frames), figsize=(4 * len(frames), 4), squeeze=False
         )
-        for step, (axis, predicted_bev) in enumerate(zip(axes[0], predictions), start=1):
+        for step, (axis, predicted_bev) in enumerate(zip(axes[0], frames), start=1):
             axis.imshow(predicted_bev, cmap="gray", vmin=0.0, vmax=1.0)
-            axis.set_title(f"World-model prediction {step}/{self.settings.world_model_rollout}")
+            axis.set_title(f"{source} prediction {step}/{len(frames)}")
             axis.axis("off")
 
-        figure.suptitle("World-model rollout before episode failure")
+        figure.suptitle(f"{source} rollout before episode failure")
         figure.tight_layout()
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -488,7 +514,7 @@ class FopPlusWMSelectionPlanner(FopPlusPlanner):
         ego_pos = np.asarray(initial_state.position, dtype=float)
         ego_yaw = float(initial_state.orientation)
         collision_risk_scores, candidate_actions = self._score_candidates(
-            candidates, images, ego_pos, ego_yaw
+            candidates, images, ego_pos, ego_yaw, time_step_now
         )
         self._last_candidate_collision_risks = collision_risk_scores.detach().cpu().tolist()
         self._last_scoring_time_step = time_step_now

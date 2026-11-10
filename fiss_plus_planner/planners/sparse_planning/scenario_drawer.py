@@ -103,11 +103,7 @@ class ScenarioDrawer:
 
         images = [] if self.GENERATE_GIF else None
         for time_step, ego_state in enumerate(ego_state_list):
-            img = self._render_frame(
-                ego_state=ego_state,
-                time_step=time_step,
-                # highest_speed=highest_speed,
-            )
+            img = self._render_frame(ego_state, *self._scenario_obstacles_at(time_step))
             img.save(output_dir / f"{time_step}.{image_format}")
             if images is not None:
                 images.append(img)
@@ -129,12 +125,21 @@ class ScenarioDrawer:
         ego_state: State,
     ) -> Image.Image:
 
-        img = self._render_frame(
-                ego_state=ego_state,
-                time_step=time_step,
-                # highest_speed=highest_speed,
-        )
-        return img
+        return self._render_frame(ego_state, *self._scenario_obstacles_at(time_step))
+
+    def create_scenario_img_with_obstacles(
+        self,
+        ego_state: State,
+        obstacle_polygons: np.ndarray,
+        obstacle_num_vertices: np.ndarray,
+    ) -> Image.Image:
+        """Render the BEV at ``ego_state`` with caller-supplied obstacles, e.g. predicted ones.
+
+        ``obstacle_polygons`` has shape (num_obstacles, max_vertices, 2) in global coordinates and
+        ``obstacle_num_vertices`` gives each obstacle's vertex count, as in one time step of
+        ``obstacles_array`` / ``obstacles_num_vertices``.
+        """
+        return self._render_frame(ego_state, obstacle_polygons, obstacle_num_vertices)
 
     def generate_image_at_time_step(
         self,
@@ -142,11 +147,7 @@ class ScenarioDrawer:
         ego_state: State,
         highest_speed: Optional[float] = None,
     ) -> Tensor:
-        img = self._render_frame(
-            ego_state=ego_state,
-            time_step=time_step,
-            # highest_speed=highest_speed,
-        )
+        img = self._render_frame(ego_state, *self._scenario_obstacles_at(time_step))
         return self._transform(img).unsqueeze(0)
 
     def _compute_ref_ego_lane_pts(self) -> Optional[np.ndarray]:
@@ -171,33 +172,48 @@ class ScenarioDrawer:
         ref_rk = [spline.calc_curvature(i_s) for i_s in s]
         return np.column_stack((ref_xy, ref_yaw, ref_rk))
 
+    def _scenario_obstacles_at(self, time_step: int):
+        return self.obstacles_array[time_step], self.obstacles_num_vertices[time_step]
+
+    def _create_figure(self):
+        view_size = self.VIEW_SIZE_DEFAULT
+        self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=64, facecolor="black")
+        self._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        self._canvas = FigureCanvas(self._fig)
+        self._ax.set_facecolor("black")
+        self._ax.set_aspect("equal", adjustable="box")
+        self._ax.axis("off")
+        self._ax.set_xlim(-view_size / 2.0, view_size / 2.0)
+        self._ax.set_ylim(-view_size / 2.0, view_size / 2.0)
+
+    # Geometry farther than this from the ego cannot reach the square view: half its diagonal plus a
+    # margin far larger than the outline stroke (~0.3 m at this scale).
+    CULL_RADIUS = VIEW_SIZE_DEFAULT / 2.0 * np.sqrt(2.0) + 2.0
+
     def _render_frame(
         self,
         ego_state: State,
-        time_step: int,
-        # highest_speed: Optional[float],
+        obstacle_polygons: np.ndarray,
+        obstacle_num_vertices: np.ndarray,
     ) -> Image.Image:
-        view_size = self.VIEW_SIZE_DEFAULT
         if self._fig is None:
-            self._fig, self._ax = plt.subplots(figsize=(4, 4), dpi=64, facecolor="black")
-            self._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-            self._canvas = FigureCanvas(self._fig)
+            self._create_figure()
+            # Patches are created once and then only moved (set_xy) or hidden between frames;
+            # creating and removing matplotlib artists every frame dominated the render time.
+            self._lanelet_patches, self._obstacle_patches, self._ego_patch = [], [], None
+            self._lanelet_geometry = self._prepare_lanelet_geometry()
         ax = self._ax
-        ax.clear()
-        ax.set_facecolor("black")
-        ax.set_aspect("equal", adjustable="box")
-        ax.axis("off")
+        # The ego is re-added last every frame so that it is still drawn after all obstacles.
+        if self._ego_patch is not None:
+            self._ego_patch.remove()
 
-        ego_x, ego_y = ego_state.position
+        ego_xy = np.array(ego_state.position, dtype=float)
         yaw = 0.0 if ego_state.orientation is None else float(ego_state.orientation)
-        transform = self._build_ego_transform(np.array([ego_x, ego_y]), yaw)
+        transform = self._build_ego_transform(np.array([ego_xy[0], ego_xy[1]]), yaw)
 
-        ax.set_xlim(-view_size / 2.0, view_size / 2.0)
-        ax.set_ylim(-view_size / 2.0, view_size / 2.0)
-
-        self._draw_lanelet_boundaries(ax, transform)
-        self._draw_obstacles(ax, time_step, transform)
-        self._draw_ego(ax)
+        self._draw_lanelet_boundaries(ax, transform, ego_xy)
+        self._draw_obstacles(ax, obstacle_polygons, obstacle_num_vertices, transform, ego_xy)
+        self._ego_patch = self._draw_ego(ax)
         # self._draw_speed_arrow(ax, ego_state, highest_speed)
 
         self._canvas.draw()
@@ -205,46 +221,68 @@ class ScenarioDrawer:
         buf = np.frombuffer(self._canvas.tostring_rgb(), dtype=np.uint8).reshape(height, width, 3)
         return Image.fromarray(buf)
 
-    def _draw_lanelet_boundaries(self, ax, transform: np.ndarray):
+    def _prepare_lanelet_geometry(self) -> list:
+        """(left, right, (xmin, xmax, ymin, ymax)) in world coordinates for every drawable lanelet."""
         lanelet_network = getattr(self.scenario, "lanelet_network", None)
         if lanelet_network is None:
-            return
+            return []
+        geometry = []
         for lanelet in lanelet_network.lanelets:
-            left = self._apply_transform(np.asarray(lanelet.left_vertices, dtype=float), transform)
-            right = self._apply_transform(np.asarray(lanelet.right_vertices, dtype=float), transform)
+            left = np.asarray(lanelet.left_vertices, dtype=float)
+            right = np.asarray(lanelet.right_vertices, dtype=float)
             if left.shape[0] < 2 or right.shape[0] < 2:
                 continue
-            lane_area = np.vstack([left, right[::-1]])
-            patch = Polygon(
-                lane_area,
-                closed=True,
-                facecolor=self.COLOR_GRAY,
-                edgecolor=self.COLOR_GRAY,
-                linewidth=self.LINE_WIDTH,
-                zorder=5,
-            )
-            ax.add_patch(patch)
+            both = np.vstack([left, right])
+            bounds = (both[:, 0].min(), both[:, 0].max(), both[:, 1].min(), both[:, 1].max())
+            geometry.append((left, right, bounds))
+        return geometry
 
-    def _draw_obstacles(self, ax, time_step: int, transform: np.ndarray):
-        num_vertices_row = self.obstacles_num_vertices[time_step]
-        for obs_idx, num_vertices in enumerate(num_vertices_row):
+    def _near_ego(self, bounds, ego_xy: np.ndarray) -> bool:
+        """Whether a box (xmin, xmax, ymin, ymax) comes within CULL_RADIUS of the ego."""
+        xmin, xmax, ymin, ymax = bounds
+        dx = max(xmin - ego_xy[0], 0.0, ego_xy[0] - xmax)
+        dy = max(ymin - ego_xy[1], 0.0, ego_xy[1] - ymax)
+        return dx * dx + dy * dy <= self.CULL_RADIUS * self.CULL_RADIUS
+
+    def _update_patches(self, ax, patches: list, polygons: list, color: str, zorder: int):
+        """Show ``polygons`` (ego-frame vertex arrays) on the pooled ``patches``, in order; hide the rest."""
+        for i, coords in enumerate(polygons):
+            if i == len(patches):
+                patch = Polygon(coords, closed=True, facecolor=color, edgecolor=color,
+                                linewidth=self.LINE_WIDTH, zorder=zorder)
+                # Not ax.add_patch: its data-limit update is useless with fixed view limits.
+                ax.add_artist(patch)
+                patches.append(patch)
+            else:
+                patches[i].set_xy(coords)
+                patches[i].set_visible(True)
+        for patch in patches[len(polygons):]:
+            patch.set_visible(False)
+
+    def _draw_lanelet_boundaries(self, ax, transform: np.ndarray, ego_xy: np.ndarray):
+        polygons = []
+        for left, right, bounds in self._lanelet_geometry:
+            if not self._near_ego(bounds, ego_xy):
+                continue
+            left_local = self._apply_transform(left, transform)
+            right_local = self._apply_transform(right, transform)
+            polygons.append(np.vstack([left_local, right_local[::-1]]))
+        self._update_patches(ax, self._lanelet_patches, polygons, self.COLOR_GRAY, zorder=5)
+
+    def _draw_obstacles(self, ax, obstacle_polygons: np.ndarray, obstacle_num_vertices: np.ndarray,
+                        transform: np.ndarray, ego_xy: np.ndarray):
+        polygons = []
+        for polygon, num_vertices in zip(obstacle_polygons, obstacle_num_vertices):
             if num_vertices < 3:
                 continue
-            coords = self._apply_transform(
-                self.obstacles_array[time_step, obs_idx, :num_vertices, :],
-                transform,
-            )
-            patch = Polygon(
-                coords,
-                closed=True,
-                facecolor=self.COLOR_WHITE,
-                edgecolor=self.COLOR_WHITE,
-                linewidth=self.LINE_WIDTH,
-                zorder=30,
-            )
-            ax.add_patch(patch)
+            vertices = polygon[:num_vertices, :]
+            bounds = (vertices[:, 0].min(), vertices[:, 0].max(), vertices[:, 1].min(), vertices[:, 1].max())
+            if not self._near_ego(bounds, ego_xy):
+                continue
+            polygons.append(self._apply_transform(vertices, transform))
+        self._update_patches(ax, self._obstacle_patches, polygons, self.COLOR_WHITE, zorder=30)
 
-    def _draw_ego(self, ax):
+    def _draw_ego(self, ax) -> Polygon:
         ego_x, ego_y = 0.0, 0.0
         yaw = 0.0
         half_l = self.vehicle_length / 2.0
@@ -267,7 +305,8 @@ class ScenarioDrawer:
             linewidth=self.LINE_WIDTH,
             zorder=30,
         )
-        ax.add_patch(patch)
+        ax.add_artist(patch)
+        return patch
 
     def _draw_speed_arrow(self, ax, ego_state: State, highest_speed: Optional[float]):
         if highest_speed is None or highest_speed <= 0:
