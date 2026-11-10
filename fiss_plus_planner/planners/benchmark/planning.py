@@ -36,6 +36,8 @@ from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPl
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.fop_plus_random_planner import FopPlusRandomPlanner
 from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner, FopPlusWMSelectionSettings
+from fiss_plus_planner.planners.fop_plus_cv_selection import FopPlusCVSelectionPlanner
+from fiss_plus_planner.planners.fop_plus_cv_geo_selection import FopPlusCVGeoSelectionPlanner, FopPlusCVGeoSelectionSettings
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
 from fiss_plus_planner.planners.sparse_planner_cpp import SparsePlannerSettings_CPP, SparsePlanner_CPP
@@ -284,6 +286,22 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner_settings = FopPlusWMSelectionSettings(
             num_width, num_speed, num_t, input_dir, file)
         planner = FopPlusWMSelectionPlanner(
+            planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method == 'FOP+_CV':
+        # Same settings as FOP+_WM; only the future-BEV predictor differs.
+        planner_settings = FopPlusWMSelectionSettings(
+            num_width, num_speed, num_t, input_dir, file)
+        planner = FopPlusCVSelectionPlanner(
+            planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
+        use_cpp_planner = False
+    elif method in ('FOP+_CV_Geo', 'FOP+_CV_Geo_1s'):
+        # Classical baseline: constant-velocity prediction with geometric collision checking, no BEV.
+        # FOP+_CV_Geo checks the world model's 0.5 s rollout horizon, FOP+_CV_Geo_1s the whole candidate.
+        planner_settings = FopPlusCVGeoSelectionSettings(
+            num_width, num_speed, num_t, input_dir, file,
+            horizon_steps=10 if method == 'FOP+_CV_Geo_1s' else 5)
+        planner = FopPlusCVGeoSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
     elif method == 'FISS':
@@ -556,21 +574,25 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
             stats.success = False
             goal_reached = False
             
-    if method == 'FOP+_WM' and not stats.success:
+    failure_rollout_dirs = {'FOP+_WM': "world_model_failure_rollouts",
+                            'FOP+_CV': "constant_velocity_failure_rollouts",
+                            'FOP+_CV_Geo': "constant_velocity_geo_failure_rollouts",
+                            'FOP+_CV_Geo_1s': "constant_velocity_geo_1s_failure_rollouts"}
+    if method in failure_rollout_dirs and not stats.success:
         planner.print_failure_candidate_costs()
         failure_plot_path = (
-            os.path.join(output_dir, "world_model_failure_rollouts")
+            os.path.join(output_dir, failure_rollout_dirs[method])
             + os.sep
             + f"{os.path.splitext(os.path.basename(file))[0]}_rollout5.png"
         )
         try:
             saved = planner.save_failure_rollout_plot(failure_plot_path)
             if saved:
-                print(f"Saved five world-model rollout images: {failure_plot_path}")
+                print(f"Saved five {method} rollout images: {failure_plot_path}")
             else:
-                print("No selected world-model rollout is available to plot for this failure")
+                print(f"No selected {method} rollout is available to plot for this failure")
         except Exception as exc:
-            print(f"Warning: failed to save world-model failure rollout plot: {exc}")
+            print(f"Warning: failed to save {method} failure rollout plot: {exc}")
 
     # construct the final frenet trajectory and calculate the final cost
     final_trajectory = FrenetTrajectory.from_frenet_states_list(frenet_state_list, global_state_list)
