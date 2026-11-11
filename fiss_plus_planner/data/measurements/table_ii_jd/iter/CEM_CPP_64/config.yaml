@@ -1,0 +1,44 @@
+OUTPUT_DIR: data/measurements/table_ii_jd/iter/CEM_CPP_64/output/
+MEASUREMENTS_DIR: data/measurements/table_ii_jd/iter/CEM_CPP_64
+INPUT_DIR: data/demo/UsedForSelfEvaluation
+FILES: []
+PLANNER: CEM_CPP
+N_W_SAMPLE: 5
+N_S_SAMPLE: 5
+N_T_SAMPLE: 5
+SAVE_GIF: false
+SAVE_MEASUREMENTS: true
+Num_Threads_For_CollisionChecker: 1
+Runtime_Measurement: true
+Collect_Data_For_ML: false
+SHOW_SAMPLED_TRAJECTORIES: false
+PLANNING_OBSTACLE_COST: true
+SP_NUM_SAMPLES: 64
+SP_CVAE: paper
+SP_FALLBACK: true
+SP_CVAE_BACKEND: graph_fp16
+SP_GAUSSIAN_WEIGHTS: data/output/sp_sampler/runs/gaussian_s0/best.pt
+SAFETY:
+  check_clearance: false
+  clearance_time_gap: 2.0
+  clearance_min_gap: 3.0
+  clearance_lateral_margin: 0.2
+  clearance_grace_time: 1.0
+  clearance_recovery_time: 3.0
+  clearance_fallback: true
+CEM:
+  num_iterations: 8
+  elite_fraction: 0.1
+  smoothing: 0.7
+  init_std: 0.3
+  seed: 0
+  population: 8
+MPPI:
+  num_iterations: 8
+  temperature: 0.1
+  learning_rate: 0.7
+  init_std: 0.3
+  seed: 0
+SP_SAMPLER: cvae
+SP_SHADOW_SAMPLERS: []
+STOP_ON_STANDSTILL: true

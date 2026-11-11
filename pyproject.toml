@@ -37,6 +37,17 @@ tensorboard = "^2.20.0"
 tensorboardx = "^2.6.4"
 opencv-python = "4.6.0.66"
 
+# TensorRT backend of the Sparse Planner CVAE (SP_CVAE_BACKEND=trt_fp16, planners/sparse_planning/cvae_paper.py):
+# fp16 ONNX export + TensorRT engine. Version used for all trt_fp16 measurements (2026-11, RTX 5070 Ti, CUDA 12.8):
+# tensorrt-cu12 11.4.0.106, onnx 1.16.2, torch 2.8.0+cu128. Install with `poetry install --with trt`.
+# On Jetson (aarch64) TensorRT comes with JetPack (python3-libnvinfer) instead of this wheel.
+[tool.poetry.group.trt]
+optional = true
+
+[tool.poetry.group.trt.dependencies]
+tensorrt-cu12 = "11.4.0.106"
+onnx = "1.16.2"
+
 [tool.poetry.group.docs]
 optional = true
 

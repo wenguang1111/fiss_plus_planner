@@ -1,4 +1,4 @@
-# Experiments: Sparse Planner paper re-measurement and FOP-based learning (2026-11-01 .. 2026-11-06)
+# Experiments: Sparse Planner paper re-measurement and FOP-based learning (2026-11-01 .. 2026-11-11)
 
 This branch (`sp-paper-experiments`, from `develop` @ `a585cac`) records the code, the measured results and the notes of
 the experiments for the revised Sparse Planner paper (IROS'27 draft, "Sparse Planner: A Hybrid Planner for Efficient
@@ -39,7 +39,7 @@ Paths below are relative to `fiss_plus_planner/` (the scripts are run from there
 - *J_common*: J averaged over the scenarios all compared planners complete (per column).
 
 **Main run script:** `scripts/run_paper_table.sh` (header lists all env switches: `PLANNERS NS SP_NS CLEARANCE PARALLEL
-THREADS OUT CPUS SP_IMPL SP_CVAE_BACKEND SP_FALLBACK SP_SAMPLER SP_SHADOW ITER_SPLIT STOP_ON_STANDSTILL SP_GAUSSIAN_WEIGHTS`).
+THREADS OUT CPUS SP_IMPL SP_CVAE_BACKEND SP_FALLBACK SP_SAMPLER SP_SHADOW ITER_SPLIT STOP_ON_STANDSTILL JD SP_GAUSSIAN_WEIGHTS`).
 Runs are resumable (`.complete` marker per run folder; delete the folder to re-measure). Each result folder has
 `<planner>_<N>/{measurement_<planner>.csv, config.yaml, log.txt}` and `machine.txt` (CPU, GPU, commit).
 
@@ -61,7 +61,10 @@ Runs are resumable (`.complete` marker per run folder; delete the folder to re-m
 - Scripts: `run_paper_table.sh`, `paper_table.py`, `run_table_ii.sh`, `table_ii.py`, `plot_table_ii.py`,
   `compare_cvae_backend.py`, `sp_ablation.py`, `run_sp_ablation_fallback.sh`, `sp_ablation_fallback.py`,
   `build_sp_image_cache.py`, `train_sp_sampler.py`, `run_sp_sampler_training.sh`, `select_sp_checkpoint.py`,
-  `run_gaussian_test250.sh`, `summarize_test250_sp.py`.
+  `run_gaussian_test250.sh`, `summarize_test250_sp.py`, `run_jd_sweep.sh`, `run_jd_sp.sh`, `jd_summary.py`,
+  `run_test250_missing.sh`; `run_paper_table.sh` env `JD=1` (J_D in the planning cost, default off).
+- `pyproject.toml`: optional group `trt` with the TensorRT / ONNX versions of all `trt_fp16` measurements
+  (tensorrt-cu12 11.4.0.106, onnx 1.16.2, torch 2.8.0+cu128; `poetry.lock` not regenerated).
 - Paper drafts: `paper/evaluation.tex`, `paper/ablation_sampling.tex`, `paper/related_work.tex`,
   `paper/sparse_planner_zh.md` (Chinese full draft), `paper/images/fail_vs_runtime.pdf`.
 
@@ -86,6 +89,8 @@ Runs are resumable (`.complete` marker per run folder; delete the folder to re-m
 | E13 | Gaussian / MoG, 26 scenarios, no fallback | `selfeval_gauss/` | `run_gaussian_test250.sh INPUT=...` | yes |
 | E14 | Gaussian / MoG, Test 250, no fallback (clean) | `test250_gauss_nofb/` | `run_gaussian_test250.sh` (4 parallel) | no |
 | E15 | Gaussian / MoG TRT runtime, SP with fallback | `selfeval_gauss_trt/` | `BACKEND=trt_fp16 ...` | yes |
+| E16 | Table II with J_D in the planning cost | `table_ii_jd/` | `run_jd_sweep.sh`, `run_jd_sp.sh`, `jd_summary.py` | yes |
+| E17 | Test 250 FISS+ / MPPI N-sweep (+ FOP 125 recheck) | `test250_nostop/{grid,iter}`, `test250_recheck/` | `run_test250_missing.sh` | no (one core per process) |
 | - | superseded / invalid | `paper_table_sp_stats_b382f22/`, `paper_table_sp_expand/`, `test250_nostop/gauss/` | | |
 
 ---
@@ -245,6 +250,25 @@ Gaussian 0.77/0.75/0.85/1.58/2.62/4.71/8.97/17.71, MoG 0.70/0.65/0.78/1.52/2.55/
 Gaussian 16.6/10.9/9.1/7.8/7.6/7.2/5.0/7.7, MoG 14.1/6.8/6.0/3.4/2.0/1.2/0.7/1.4. Forward GPU ms N 1/64/1024: CVAE trt
 0.20/0.24/0.60, Gaussian 0.20/0.21/0.21, MoG 0.21/0.21/0.22.
 
+### E16 Table II with J_D in the planning cost (`table_ii_jd/`, 2026-11-11)
+
+Same settings as E7/E8 (26 scenarios, sequential, CPU 2, 1 thread, no clearance), but `JD=1`; SP / SP* trt_fp16. FISS+ C++
+plans with `cost_total` (no J_D) -> identical to J_D off; CEM / MPPI / SP* at N = 1 identical too (one sample).
+Failed of 26, N 1/8/16/64/128/256/512/1024: FOP -/7/4/3/2/5/7/8, FISS+ -/3/1/5/9/9/10/10, CEM 16/6/7/9/11/10/10/10,
+MPPI 16/6/9/11/11/11/11/11, SP* 8/5/5/5/6/6/6/7, SP 0 -> nearly the same as J_D off (rise with N stays).
+J on the scenarios all six complete (n 9/11/13x6): FOP -/60.61/45.25/40.90/41.22/40.37/41.10/40.57, CEM
+44.12/56.61/45.50/41.01/40.61/40.51/40.51/40.55, MPPI ~CEM, FISS+ 54.68/46.52/42.09..41.86, SP* = SP
+43.82/53.25/47.77/43.47/43.37/43.20/43.08/42.94: SP cheapest at N <= 8, ~5-7 % above FOP/CEM/MPPI at N >= 64 (off ~3-4 %).
+**User decision:** J_D stays off for the paper.
+
+### E17 Test 250 FISS+ / MPPI N-sweep (`test250_nostop/{grid,iter}`, 2026-11-11)
+
+Same settings as E10 (`STOP_ON_STANDSTILL=0`, one core per process, runtime invalid). FOP 125 rerun into `test250_recheck/`:
+250/250 identical to E10. Failed of 250 (CSV success False or no row), N 1..1024: FISS+ -/19/14/26/46/50/56/59, MPPI
+138/48/46/70/79/79/81/80 (N 1 and 8 = CEM: one iteration). J on the scenarios FOP, FISS+, CEM, MPPI, SP*, SP all complete
+(n 107/160/164/155/146/147/146/148): FISS+ lowest, CEM / MPPI +0.3-1 %, FOP +1-2 % (N=8 +17 %), SP = SP* +15-19 % vs FISS+
+at N >= 16. J over all rows (incl. failed scenarios up to the failure) SP ~73-76 vs baselines 66-68 = truncation bias.
+
 ### Superseded / invalid runs (kept for the record)
 
 - `paper_table_sp_stats_b382f22/`: SP with the submodule CVAE statistics (wrong statistics, p_B ~30 %).
@@ -264,6 +288,9 @@ Gaussian 16.6/10.9/9.1/7.8/7.6/7.2/5.0/7.7, MoG 14.1/6.8/6.0/3.4/2.0/1.2/0.7/1.4
   `paper/sparse_planner_zh.md`.
 
 ## 6. Open items
+
+- Runtime on Jetson Orin (planned): TensorRT there comes with JetPack; `CVAETRTSampler` uses `create_network(0)`
+  (TRT >= 10) and sets no FP16 builder flag (TRT 11 has none; on TRT 10 check the engine really runs in fp16).
 
 - Gaussian / MoG SP mode (with fallback) on Test 250 not run cleanly yet; E15 is single-seed.
 - Paper Sec. IV-A text (3500 scenarios / 2450 training) does not match the actual 622 training scenarios; case-study

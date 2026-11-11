@@ -15,6 +15,7 @@
 #     SP_SAMPLER=marginal SP_IMPL=Sparse_CPP ...   # Sparse_CPP with another sampler (cvae, marginal, uniform, mean)
 #     ITER_SPLIT=1 PLANNERS="CEM_CPP MPPI_CPP" NS="1 8 16 64" ...   # CEM / MPPI: N samples in total, clamp(N/8, 1, 8) iterations
 #     CPUS=2 THREADS=1 ...   # pin demo_cr.py to these CPUs (taskset); NO_TABLE=1: skip paper_table.py
+#     JD=1 ...   # J_D (obstacle distance cost) in the planning cost (default 0 = off, as the paper; FISS+ ignores it)
 #     STOP_ON_STANDSTILL=0 ...   # keep simulating at v < 0.01 instead of counting the standstill as failure
 #     SP_SHADOW="cvae marginal uniform mean grid" SP_IMPL=Sparse_CPP ...   # same-state evaluation, output/shadow_eval.csv
 #     SP_IMPL=Gaussian_CPP SP_GAUSSIAN_WEIGHTS=data/output/sp_sampler/runs/mog_s0/best.pt ...   # conditional Gaussian / mixture instead of the CVAE
@@ -54,7 +55,7 @@ if [ "$PARALLEL" != 1 ] && pgrep -f "python.*scripts/demo_cr.py" > /dev/null; th
 fi
 mkdir -p "$OUT"
 { date '+%F %T'; hostname; git rev-parse HEAD; git status --short --untracked-files=no | head -20
-  echo "THREADS=${THREADS:-config} CLEARANCE=$CLEARANCE PARALLEL=$PARALLEL PLANNERS=$PLANNERS SP_IMPL=$SP_IMPL SP_FALLBACK=$SP_FALLBACK SP_CVAE_BACKEND=$SP_CVAE_BACKEND SP_SAMPLER=$SP_SAMPLER SP_GAUSSIAN_WEIGHTS=$SP_GAUSSIAN_WEIGHTS SP_SHADOW=$SP_SHADOW ITER_SPLIT=$ITER_SPLIT CPUS=$CPUS affinity $(taskset -pc $$ | cut -d: -f2)"; lscpu | grep -E 'Model name|^CPU\(s\)|Thread|MHz'; free -g | head -2
+  echo "THREADS=${THREADS:-config} JD=${JD:-0} STOP_ON_STANDSTILL=${STOP_ON_STANDSTILL:-1} CLEARANCE=$CLEARANCE PARALLEL=$PARALLEL PLANNERS=$PLANNERS SP_IMPL=$SP_IMPL SP_FALLBACK=$SP_FALLBACK SP_CVAE_BACKEND=$SP_CVAE_BACKEND SP_SAMPLER=$SP_SAMPLER SP_GAUSSIAN_WEIGHTS=$SP_GAUSSIAN_WEIGHTS SP_SHADOW=$SP_SHADOW ITER_SPLIT=$ITER_SPLIT CPUS=$CPUS affinity $(taskset -pc $$ | cut -d: -f2)"; lscpu | grep -E 'Model name|^CPU\(s\)|Thread|MHz'; free -g | head -2
   nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2> /dev/null
   "$PY" -c 'import torch, numba; print("torch", torch.__version__, "cuda", torch.cuda.is_available(), "numba", numba.__version__)'
 } >> "$OUT/machine.txt" 2>&1
@@ -77,7 +78,7 @@ if threads:
 cfg.update(PLANNER=p, SP_NUM_SAMPLES=int(n), SP_FALLBACK=sp_fallback == "1", SP_CVAE_BACKEND=sp_backend, SP_SAMPLER=sp_sampler, SP_SHADOW_SAMPLERS=sp_shadow.split(), N_W_SAMPLE=int(nw), N_S_SAMPLE=int(ns), N_T_SAMPLE=int(nt), INPUT_DIR=inp, FILES=[],
            OUTPUT_DIR=out + "/output/", MEASUREMENTS_DIR=out, SAVE_GIF=False, SAVE_MEASUREMENTS=True,
            Runtime_Measurement=True,  # C++ wrappers: no conversion of all feasible trajectories to Python
-           PLANNING_OBSTACLE_COST=False, STOP_ON_STANDSTILL=os.environ.get("STOP_ON_STANDSTILL", "1") == "1")
+           PLANNING_OBSTACLE_COST=os.environ.get("JD", "0") == "1", STOP_ON_STANDSTILL=os.environ.get("STOP_ON_STANDSTILL", "1") == "1")
 if sp_gauss:
     cfg["SP_GAUSSIAN_WEIGHTS"] = sp_gauss
 if iter_split == "1" and p.startswith(("CEM", "MPPI")):

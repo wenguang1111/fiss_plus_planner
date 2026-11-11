@@ -270,3 +270,139 @@ torch 2.8.0+cu128 cuda True numba 0.64.0
 torch 2.8.0+cu128 cuda True numba 0.64.0
 torch 2.8.0+cu128 cuda True numba 0.64.0
 torch 2.8.0+cu128 cuda True numba 0.64.0
+2026-11-11 10:49:27
+dsc-cuda-01
+c109f2710577018c0a5470f02920f74950497e4f
+2026-11-11 10:49:27
+2026-11-11 10:49:27
+2026-11-11 10:49:27
+dsc-cuda-01
+dsc-cuda-01
+dsc-cuda-01
+c109f2710577018c0a5470f02920f74950497e4f
+c109f2710577018c0a5470f02920f74950497e4f
+2026-11-11 10:49:27
+c109f2710577018c0a5470f02920f74950497e4f
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+dsc-cuda-01
+2026-11-11 10:49:27
+dsc-cuda-01
+c109f2710577018c0a5470f02920f74950497e4f
+c109f2710577018c0a5470f02920f74950497e4f
+2026-11-11 10:49:27
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=11 affinity  0-23
+dsc-cuda-01
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+2026-11-11 10:49:27
+c109f2710577018c0a5470f02920f74950497e4f
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=10 affinity  0-23
+dsc-cuda-01
+c109f2710577018c0a5470f02920f74950497e4f
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=14 affinity  0-23
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=15 affinity  0-23
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=16 affinity  0-23
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=9 affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+ M data/measurements/test250_nostop/grid/machine.txt
+ M data/measurements/test250_nostop/iter/machine.txt
+ M scripts/run_paper_table.sh
+               total        used        free      shared  buff/cache   available
+Mem:             122           8          93           0          21         113
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=13 affinity  0-23
+THREADS=1 JD=0 STOP_ON_STANDSTILL=0 CLEARANCE=0 PARALLEL=1 PLANNERS=MPPI_CPP SP_IMPL=Sparse_FOP SP_FALLBACK=1 SP_CVAE_BACKEND=graph_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=1 CPUS=12 affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      98%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      97%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          92           0          21         113
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+NVIDIA GeForce RTX 5070 TiNVIDIA GeForce RTX 5070 Ti, 620.70.06, 620.70.06
+
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0
+torch 2.8.0+cu128 cuda True numba 0.64.0

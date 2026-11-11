@@ -1,0 +1,15 @@
+2026-11-11 10:12:02
+dsc-cuda-01
+c109f2710577018c0a5470f02920f74950497e4f
+ M scripts/run_paper_table.sh
+THREADS=1 JD=1 STOP_ON_STANDSTILL=1 CLEARANCE=0 PARALLEL=0 PLANNERS=SP SP_IMPL=Sparse_CPP SP_FALLBACK=0 SP_CVAE_BACKEND=trt_fp16 SP_SAMPLER=cvae SP_GAUSSIAN_WEIGHTS= SP_SHADOW= ITER_SPLIT=0 CPUS=2 affinity  0-23
+CPU(s):                                  24
+Model name:                              Intel(R) Core(TM) Ultra 9 285K
+Thread(s) per core:                      1
+CPU(s) scaling MHz:                      44%
+CPU max MHz:                             5700.0000
+CPU min MHz:                             800.0000
+               total        used        free      shared  buff/cache   available
+Mem:             122           9          93           0          21         113
+NVIDIA GeForce RTX 5070 Ti, 620.70.06
+torch 2.8.0+cu128 cuda True numba 0.64.0
