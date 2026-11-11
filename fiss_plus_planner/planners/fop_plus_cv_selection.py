@@ -9,14 +9,23 @@ from torchvision import transforms
 
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 from fiss_plus_planner.planners.common.utils import transform_points_from_ego
-from fiss_plus_planner.planners.constant_velocity_prediction import ConstantVelocityObstaclePredictor
-from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner
+from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner, FopPlusWMSelectionSettings
+from fiss_plus_planner.planners.obstacle_motion_prediction import ObstacleMotionPredictor
+
+
+class FopPlusCVSelectionSettings(FopPlusWMSelectionSettings):
+    def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5,
+                 scenario_dir: str = "", scenario_file: str = "", motion_model: str = "cv"):
+        super().__init__(num_width, num_speed, num_t, scenario_dir, scenario_file)
+        # Obstacle motion model of the prediction: "cv" constant velocity, "ca" constant acceleration.
+        self.obstacle_motion_model = motion_model
 
 
 class FopPlusCVSelectionPlanner(FopPlusWMSelectionPlanner):
-    """FOP+_WM with the world model replaced by constant-velocity obstacle prediction.
+    """FOP+_WM with the world model replaced by motion-model obstacle prediction.
 
-    Each cycle the surrounding obstacles are extrapolated once with lane-relative constant velocity.
+    Each cycle the surrounding obstacles are extrapolated once with the lane-relative motion model of
+    ``settings.obstacle_motion_model`` (constant velocity or constant acceleration).
     For every candidate, the future BEV frames are rendered by the same ``ScenarioDrawer`` that draws
     the observed BEV, centred on the candidate's own future ego poses. Candidates are then ranked with
     exactly the FOP+_WM settings and costs (risk ROI, step weights, lateral and progress terms).
@@ -24,11 +33,12 @@ class FopPlusCVSelectionPlanner(FopPlusWMSelectionPlanner):
 
     def _init_bev_predictor(self) -> None:
         scenario = self.scenario_drawer.scenario
-        self.obstacle_predictor = ConstantVelocityObstaclePredictor(
+        self.obstacle_predictor = ObstacleMotionPredictor(
             scenario.lanelet_network,
             scenario.obstacles,
             max_vertices=self.obstacles_array.shape[2],
             dt=scenario.dt,
+            motion_model=self.settings.obstacle_motion_model,
         )
         self._last_candidate_bevs: List[List[Image.Image]] = []
 
@@ -91,4 +101,4 @@ class FopPlusCVSelectionPlanner(FopPlusWMSelectionPlanner):
             return False
         selected_index = int(np.argmin(self._last_candidate_total_costs))
         frames = [np.asarray(bev, dtype=np.float32) / 255.0 for bev in self._last_candidate_bevs[selected_index]]
-        return self._save_bev_rollout_plot(frames, output_path, "CV")
+        return self._save_bev_rollout_plot(frames, output_path, self.settings.obstacle_motion_model.upper())

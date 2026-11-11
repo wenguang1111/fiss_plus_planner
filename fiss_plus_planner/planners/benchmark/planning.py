@@ -36,7 +36,7 @@ from fiss_plus_planner.planners.fiss_plus_planner import FissPlusPlanner, FissPl
 from fiss_plus_planner.planners.fop_plus_planner import FopPlusPlanner
 from fiss_plus_planner.planners.fop_plus_random_planner import FopPlusRandomPlanner
 from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner, FopPlusWMSelectionSettings
-from fiss_plus_planner.planners.fop_plus_cv_selection import FopPlusCVSelectionPlanner
+from fiss_plus_planner.planners.fop_plus_cv_selection import FopPlusCVSelectionPlanner, FopPlusCVSelectionSettings
 from fiss_plus_planner.planners.fop_plus_cv_geo_selection import FopPlusCVGeoSelectionPlanner, FopPlusCVGeoSelectionSettings
 from fiss_plus_planner.planners.frenet_optimal_planner import FrenetOptimalPlanner, FrenetOptimalPlannerSettings, Stats
 from fiss_plus_planner.planners.sparse_planner import SparsePlannerSettings, SparsePlanner
@@ -288,19 +288,23 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner = FopPlusWMSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
-    elif method == 'FOP+_CV':
-        # Same settings as FOP+_WM; only the future-BEV predictor differs.
-        planner_settings = FopPlusWMSelectionSettings(
-            num_width, num_speed, num_t, input_dir, file)
+    elif method in ('FOP+_CV', 'FOP+_CA'):
+        # Same settings as FOP+_WM; only the future-BEV predictor differs: obstacles extrapolated with
+        # constant velocity (CV) or constant acceleration (CA).
+        planner_settings = FopPlusCVSelectionSettings(
+            num_width, num_speed, num_t, input_dir, file,
+            motion_model='ca' if method == 'FOP+_CA' else 'cv')
         planner = FopPlusCVSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
-    elif method in ('FOP+_CV_Geo', 'FOP+_CV_Geo_1s'):
-        # Classical baseline: constant-velocity prediction with geometric collision checking, no BEV.
-        # FOP+_CV_Geo checks the world model's 0.5 s rollout horizon, FOP+_CV_Geo_1s the whole candidate.
+    elif method in ('FOP+_CV_Geo', 'FOP+_CV_Geo_1s', 'FOP+_CA_Geo', 'FOP+_CA_Geo_1s'):
+        # Classical baseline: constant-velocity (CV) or constant-acceleration (CA) prediction with
+        # geometric collision checking, no BEV. *_Geo checks the world model's 0.5 s rollout horizon,
+        # *_Geo_1s the whole candidate.
         planner_settings = FopPlusCVGeoSelectionSettings(
             num_width, num_speed, num_t, input_dir, file,
-            horizon_steps=10 if method == 'FOP+_CV_Geo_1s' else 5)
+            horizon_steps=10 if method.endswith('_1s') else 5,
+            motion_model='ca' if method.startswith('FOP+_CA') else 'cv')
         planner = FopPlusCVGeoSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
@@ -577,7 +581,10 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
     failure_rollout_dirs = {'FOP+_WM': "world_model_failure_rollouts",
                             'FOP+_CV': "constant_velocity_failure_rollouts",
                             'FOP+_CV_Geo': "constant_velocity_geo_failure_rollouts",
-                            'FOP+_CV_Geo_1s': "constant_velocity_geo_1s_failure_rollouts"}
+                            'FOP+_CV_Geo_1s': "constant_velocity_geo_1s_failure_rollouts",
+                            'FOP+_CA': "constant_acceleration_failure_rollouts",
+                            'FOP+_CA_Geo': "constant_acceleration_geo_failure_rollouts",
+                            'FOP+_CA_Geo_1s': "constant_acceleration_geo_1s_failure_rollouts"}
     if method in failure_rollout_dirs and not stats.success:
         planner.print_failure_candidate_costs()
         failure_plot_path = (

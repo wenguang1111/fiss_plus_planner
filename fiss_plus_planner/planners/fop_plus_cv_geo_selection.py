@@ -8,14 +8,14 @@ from PIL import Image
 
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 from fiss_plus_planner.planners.common.utils import compute_vehicle_polygon, polygon_collision
-from fiss_plus_planner.planners.fop_plus_cv_selection import FopPlusCVSelectionPlanner
-from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionSettings
+from fiss_plus_planner.planners.fop_plus_cv_selection import FopPlusCVSelectionPlanner, FopPlusCVSelectionSettings
 
 
-class FopPlusCVGeoSelectionSettings(FopPlusWMSelectionSettings):
+class FopPlusCVGeoSelectionSettings(FopPlusCVSelectionSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5,
-                 scenario_dir: str = "", scenario_file: str = "", horizon_steps: int = 5):
-        super().__init__(num_width, num_speed, num_t, scenario_dir, scenario_file)
+                 scenario_dir: str = "", scenario_file: str = "", horizon_steps: int = 5,
+                 motion_model: str = "cv"):
+        super().__init__(num_width, num_speed, num_t, scenario_dir, scenario_file, motion_model)
         # Collision-checked steps of 0.1 s: 5 matches the world-model rollout, 10 covers the whole
         # 1.0 s candidate. The lateral and progress costs keep the FOP+_WM action sequence either way.
         self.collision_horizon_steps = horizon_steps
@@ -28,8 +28,8 @@ class FopPlusCVGeoSelectionSettings(FopPlusWMSelectionSettings):
 
 
 class FopPlusCVGeoSelectionPlanner(FopPlusCVSelectionPlanner):
-    """Classical baseline for FOP+_WM: object-level constant-velocity prediction and geometric
-    collision checking, without any BEV.
+    """Classical baseline for FOP+_WM: object-level motion-model prediction (constant velocity or
+    constant acceleration) and geometric collision checking, without any BEV.
 
     Candidates, cost weights, lateral and progress costs, and the post-selection checks are those of
     FOP+_WM. Only the risk term differs: at step k of the collision horizon the ego footprint at
@@ -84,6 +84,7 @@ class FopPlusCVGeoSelectionPlanner(FopPlusCVSelectionPlanner):
         ego_poses, obstacle_polygons, obstacle_num_vertices = self._last_rollout
         candidate_poses = ego_poses[int(np.argmin(self._last_candidate_total_costs))]
         view_radius = self.scenario_drawer.VIEW_SIZE_DEFAULT / 4.0
+        model = self.settings.obstacle_motion_model.upper()
 
         figure, axes = plt.subplots(1, len(candidate_poses), figsize=(4 * len(candidate_poses), 4), squeeze=False)
         for step, (axis, pose) in enumerate(zip(axes[0], candidate_poses)):
@@ -95,9 +96,9 @@ class FopPlusCVGeoSelectionPlanner(FopPlusCVSelectionPlanner):
             axis.set_xlim(pose[0] - view_radius, pose[0] + view_radius)
             axis.set_ylim(pose[1] - view_radius, pose[1] + view_radius)
             axis.set_aspect("equal")
-            axis.set_title(f"CV-Geo prediction {step + 1}/{len(candidate_poses)}")
+            axis.set_title(f"{model}-Geo prediction {step + 1}/{len(candidate_poses)}")
 
-        figure.suptitle("CV-Geo rollout before episode failure (red: predicted collision)")
+        figure.suptitle(f"{model}-Geo rollout before episode failure (red: predicted collision)")
         figure.tight_layout()
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
