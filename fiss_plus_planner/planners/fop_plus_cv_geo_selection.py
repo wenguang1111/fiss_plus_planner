@@ -28,8 +28,8 @@ class FopPlusCVGeoSelectionSettings(FopPlusCVSelectionSettings):
 
 
 class FopPlusCVGeoSelectionPlanner(FopPlusCVSelectionPlanner):
-    """Classical baseline for FOP+_WM: object-level motion-model prediction (constant velocity or
-    constant acceleration) and geometric collision checking, without any BEV.
+    """Classical baseline for FOP+_WM: object-level prediction (constant velocity, constant acceleration or
+    IDM) and geometric collision checking, without any BEV.
 
     Candidates, cost weights, lateral and progress costs, and the post-selection checks are those of
     FOP+_WM. Only the risk term differs: at step k of the collision horizon the ego footprint at

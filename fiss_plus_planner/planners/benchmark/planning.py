@@ -297,14 +297,14 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
         planner = FopPlusCVSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
-    elif method in ('FOP+_CV_Geo', 'FOP+_CV_Geo_1s', 'FOP+_CA_Geo', 'FOP+_CA_Geo_1s'):
-        # Classical baseline: constant-velocity (CV) or constant-acceleration (CA) prediction with
+    elif method in ('FOP+_CV_Geo', 'FOP+_CV_Geo_1s', 'FOP+_CA_Geo', 'FOP+_CA_Geo_1s', 'FOP+_IDM_Geo_1s'):
+        # Classical baseline: constant-velocity (CV), constant-acceleration (CA) or IDM prediction with
         # geometric collision checking, no BEV. *_Geo checks the world model's 0.5 s rollout horizon,
         # *_Geo_1s the whole candidate.
         planner_settings = FopPlusCVGeoSelectionSettings(
             num_width, num_speed, num_t, input_dir, file,
             horizon_steps=10 if method.endswith('_1s') else 5,
-            motion_model='ca' if method.startswith('FOP+_CA') else 'cv')
+            motion_model=method.split('_')[1].lower())  # 'FOP+_IDM_Geo_1s' -> 'idm'
         planner = FopPlusCVGeoSelectionPlanner(
             planner_settings, vehicle, obstacles_array, obstacles_num_vertices)
         use_cpp_planner = False
@@ -584,7 +584,8 @@ def frenet_optimal_planning(scenario: Scenario, planning_problem: PlanningProble
                             'FOP+_CV_Geo_1s': "constant_velocity_geo_1s_failure_rollouts",
                             'FOP+_CA': "constant_acceleration_failure_rollouts",
                             'FOP+_CA_Geo': "constant_acceleration_geo_failure_rollouts",
-                            'FOP+_CA_Geo_1s': "constant_acceleration_geo_1s_failure_rollouts"}
+                            'FOP+_CA_Geo_1s': "constant_acceleration_geo_1s_failure_rollouts",
+                            'FOP+_IDM_Geo_1s': "idm_geo_1s_failure_rollouts"}
     if method in failure_rollout_dirs and not stats.success:
         planner.print_failure_candidate_costs()
         failure_plot_path = (

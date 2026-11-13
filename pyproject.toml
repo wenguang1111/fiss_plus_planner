@@ -24,6 +24,8 @@ commonroad-io = "=2024.1"
 commonroad-drivability-checker = "=2024.1"
 commonroad_vehicle_models = "=3.0.2"
 commonroad-reactive-planner = "=2024.1"
+# Needed by the commonroad-prediction submodule (crpred), whose IDM predictor is the FOP+_IDM_Geo_1s baseline.
+commonroad-clcs = "=2025.2.0"
 
 torch = "^2.8.0"
 torchvision = "^0.23.0"

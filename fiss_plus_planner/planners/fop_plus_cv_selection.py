@@ -10,6 +10,7 @@ from torchvision import transforms
 from fiss_plus_planner.planners.common.scenario.frenet import FrenetTrajectory
 from fiss_plus_planner.planners.common.utils import transform_points_from_ego
 from fiss_plus_planner.planners.fop_plus_wm_selection import FopPlusWMSelectionPlanner, FopPlusWMSelectionSettings
+from fiss_plus_planner.planners.idm_prediction import IDMObstaclePredictor
 from fiss_plus_planner.planners.obstacle_motion_prediction import ObstacleMotionPredictor
 
 
@@ -17,7 +18,7 @@ class FopPlusCVSelectionSettings(FopPlusWMSelectionSettings):
     def __init__(self, num_width: int = 5, num_speed: int = 5, num_t: int = 5,
                  scenario_dir: str = "", scenario_file: str = "", motion_model: str = "cv"):
         super().__init__(num_width, num_speed, num_t, scenario_dir, scenario_file)
-        # Obstacle motion model of the prediction: "cv" constant velocity, "ca" constant acceleration.
+        # Obstacle prediction: "cv" constant velocity, "ca" constant acceleration, "idm" crpred's IDM agents.
         self.obstacle_motion_model = motion_model
 
 
@@ -25,7 +26,7 @@ class FopPlusCVSelectionPlanner(FopPlusWMSelectionPlanner):
     """FOP+_WM with the world model replaced by motion-model obstacle prediction.
 
     Each cycle the surrounding obstacles are extrapolated once with the lane-relative motion model of
-    ``settings.obstacle_motion_model`` (constant velocity or constant acceleration).
+    ``settings.obstacle_motion_model`` (constant velocity, constant acceleration or IDM).
     For every candidate, the future BEV frames are rendered by the same ``ScenarioDrawer`` that draws
     the observed BEV, centred on the candidate's own future ego poses. Candidates are then ranked with
     exactly the FOP+_WM settings and costs (risk ROI, step weights, lateral and progress terms).
@@ -33,13 +34,11 @@ class FopPlusCVSelectionPlanner(FopPlusWMSelectionPlanner):
 
     def _init_bev_predictor(self) -> None:
         scenario = self.scenario_drawer.scenario
-        self.obstacle_predictor = ObstacleMotionPredictor(
-            scenario.lanelet_network,
-            scenario.obstacles,
-            max_vertices=self.obstacles_array.shape[2],
-            dt=scenario.dt,
-            motion_model=self.settings.obstacle_motion_model,
-        )
+        args = (scenario.lanelet_network, scenario.obstacles, self.obstacles_array.shape[2], scenario.dt)
+        if self.settings.obstacle_motion_model == "idm":
+            self.obstacle_predictor = IDMObstaclePredictor(*args)
+        else:
+            self.obstacle_predictor = ObstacleMotionPredictor(*args, self.settings.obstacle_motion_model)
         self._last_candidate_bevs: List[List[Image.Image]] = []
 
     def _score_candidates(self, candidates: List[FrenetTrajectory], images: List[Image.Image],

@@ -1,5 +1,5 @@
 """Lane-relative constant-velocity / constant-acceleration prediction of obstacle footprints."""
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 from commonroad.scenario.lanelet import Lanelet, LaneletNetwork
@@ -67,15 +67,25 @@ class ObstacleMotionPredictor:
         """
         polygons = np.zeros((num_steps, len(self.obstacles), self.max_vertices, 2))
         num_vertices = np.zeros((num_steps, len(self.obstacles)), dtype=np.int32)
-        for obs_idx, (obstacle, footprint) in enumerate(zip(self.obstacles, self._footprints)):
-            state = obstacle.state_at_time(time_step)
-            if state is None or footprint is None:
-                continue
-            for step, (x, y, yaw) in enumerate(self._predict_poses(obstacle, state, time_step, num_steps)):
+        for obs_idx, poses in self._predict_obstacle_poses(time_step, num_steps).items():
+            footprint = self._footprints[obs_idx]
+            for step, (x, y, yaw) in enumerate(poses):
                 c, s = np.cos(yaw), np.sin(yaw)
                 polygons[step, obs_idx, :len(footprint)] = footprint @ np.array([[c, s], [-s, c]]) + (x, y)
                 num_vertices[step, obs_idx] = len(footprint)
         return polygons, num_vertices
+
+    def _present_obstacles(self, time_step: int) -> Iterator[Tuple[int, Obstacle, State]]:
+        """(index, obstacle, state) of the obstacles that have a state and a footprint at ``time_step``."""
+        for obs_idx, (obstacle, footprint) in enumerate(zip(self.obstacles, self._footprints)):
+            state = obstacle.state_at_time(time_step)
+            if state is not None and footprint is not None:
+                yield obs_idx, obstacle, state
+
+    def _predict_obstacle_poses(self, time_step: int, num_steps: int) -> Dict[int, np.ndarray]:
+        """Predicted (x, y, yaw) rows of shape (num_steps, 3) by obstacle index, for the present obstacles."""
+        return {obs_idx: self._predict_poses(obstacle, state, time_step, num_steps)
+                for obs_idx, obstacle, state in self._present_obstacles(time_step)}
 
     def _footprint(self, obstacle: Obstacle) -> Optional[np.ndarray]:
         """Obstacle shape vertices in its own frame, truncated to ``max_vertices``."""
